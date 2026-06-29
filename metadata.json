@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Shift HR",
+  "description": "An elegant, intuitive HR time tracking and automated reporting app designed with offline syncing, simple spreadsheets, custom shifts, and administrative approvals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

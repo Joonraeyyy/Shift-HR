@@ -1,0 +1,1020 @@
+package com.example.ui.viewmodel
+
+import android.app.Application
+import androidx.compose.runtime.mutableStateOf
+import com.example.data.WeatherResponse
+import com.example.data.ForecastResponse
+import com.example.data.WeatherServiceClient
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.data.database.AppDatabase
+import com.example.data.database.ShiftConfigEntity
+import com.example.data.database.TimeLogEntity
+import com.example.data.repository.TimeTrackerRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+
+// Holiday data model
+data class Holiday(
+    val name: String,
+    val date: String, // yyyy-MM-dd
+    val description: String,
+    val isNational: Boolean
+)
+
+class TimeTrackerViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val repository: TimeTrackerRepository
+    
+    // UI state streams
+    val allTimeLogs: StateFlow<List<TimeLogEntity>>
+    val pendingTimeLogs: StateFlow<List<TimeLogEntity>>
+    val shiftConfig: StateFlow<ShiftConfigEntity>
+
+    // Screen states
+    var currentScreen = mutableStateOf("clock") // clock, spreadsheet, hr_approval, settings, holidays
+    var isAdminMode = mutableStateOf(false) // Toggle helper (updates based on login role)
+    
+    // Sign-in states
+    var isLoggedIn = mutableStateOf(false)
+    var currentUserRole = mutableStateOf("EMPLOYEE") // EMPLOYEE, SUPERVISOR, MANAGER, ADMIN_HR
+    var currentUserName = mutableStateOf("Sarah Jenkins")
+    var currentUserUsername = mutableStateOf("employee")
+    
+    // Filter states for spreadsheet
+    var filterApproval = mutableStateOf("ALL") // ALL, PENDING, APPROVED, REJECTED
+    var filterSync = mutableStateOf("ALL") // ALL, LOCAL, SYNCED
+    var searchQuery = mutableStateOf("") // Search by employee name
+
+    // Weather Forecast States
+    var selectedWeatherCity = mutableStateOf("Manila")
+    var weatherLoading = mutableStateOf(false)
+    var weatherError = mutableStateOf<String?>(null)
+    var currentWeather = mutableStateOf<WeatherResponse?>(null)
+    var weatherForecast = mutableStateOf<ForecastResponse?>(null)
+
+    // Dynamic Liquid Glass Theme State
+    var selectedTheme = mutableStateOf("Sapphire Glass")
+
+    // Local / Offline Simulation states
+    var isMockOffline = mutableStateOf(false) // Simulates device losing network connection
+    var isSyncing = mutableStateOf(false)
+    var syncMessage = mutableStateOf("")
+
+    // Active log state
+    private val _activeTimeLog = MutableStateFlow<TimeLogEntity?>(null)
+    val activeTimeLog: StateFlow<TimeLogEntity?> = _activeTimeLog.asStateFlow()
+
+    // Real-time Punch timing counters
+    var activeTimerString = mutableStateOf("00:00:00")
+    var breakTimerString = mutableStateOf("")
+    private var timerJob: Job? = null
+
+    // System Notifications list
+    val notifications = mutableStateOf<List<NotificationItem>>(emptyList())
+
+    // Active log for edit modal
+    var selectedLogForEdit = mutableStateOf<TimeLogEntity?>(null)
+
+    // Combined Holiday list for Indore / India and Manila / Philippines regions
+    val localHolidays = listOf(
+        Holiday("New Year's Day", "2026-01-01", "Global New Year celebration", false),
+        Holiday("Republic Day India", "2026-01-26", "National holiday honoring the Constitution of India", true),
+        Holiday("Maha Shivratri", "2026-02-15", "Venerated Lord Shiva festival celebrated in Indore temples", false),
+        Holiday("Maundy Thursday (PH)", "2026-04-02", "Philippine Maundy Thursday local holiday reflection", true),
+        Holiday("Good Friday (PH/Indore)", "2026-04-03", "Good Friday solemn holiday recognized globally", true),
+        Holiday("Araw ng Kagitingan (PH)", "2026-04-09", "Philippine Day of Valor honoring local heroes", true),
+        Holiday("Dr. Ambedkar Jayanti", "2026-04-14", "Birth anniversary tribute to Dr. B.R. Ambedkar", true),
+        Holiday("Eid-ul-Fitr", "2026-04-20", "Festive break marking the end of holy Ramadan fasting", false),
+        Holiday("Labor Day (PH)", "2026-05-01", "Philippine Labor Day celebrating local workers", true),
+        Holiday("Independence Day (PH)", "2026-06-12", "Philippine Independence Day grand celebration", true),
+        Holiday("Independence Day India", "2026-08-15", "National Freedom Day with patriotic flag hoisting", true),
+        Holiday("National Heroes Day (PH)", "2026-08-31", "Philippine National Heroes Day holiday", true),
+        Holiday("Ganesh Chaturthi", "2026-09-15", "Devout greeting of Lord Ganesha in Indore", false),
+        Holiday("Gandhi Jayanti", "2026-10-02", "Tribute to Father of the Nation, Mahatma Gandhi", true),
+        Holiday("Diwali (Festival of Lights)", "2026-11-09", "Indore's grandest festival with brilliant lighting and fireworks", true),
+        Holiday("Guru Nanak Jayanti", "2026-11-24", "Sacred Sikh anniversary celebration", false),
+        Holiday("Bonifacio Day (PH)", "2026-11-30", "Philippine Andres Bonifacio celebration of courage", true),
+        Holiday("Christmas Day", "2026-12-25", "Global winter celebration and gifting", false),
+        Holiday("Rizal Day (PH)", "2026-12-30", "Philippine Jose Rizal national hero tribute day", true)
+    )
+
+    var todayHoliday = mutableStateOf<Holiday?>(null)
+
+    // SaaS States
+    var companyName = mutableStateOf("Shift HR Corp")
+    var companyCode = mutableStateOf("SHIFTHR")
+
+    var registeredUsers = mutableStateOf(listOf(
+        RegisteredUser("employee", "emp123", "Sarah Jenkins", "EMPLOYEE", "Shift HR Corp", "SHIFTHR"),
+        RegisteredUser("supervisor", "super123", "Robert Chen", "SUPERVISOR", "Shift HR Corp", "SHIFTHR"),
+        RegisteredUser("manager", "manager123", "Anjali Sharma", "MANAGER", "Shift HR Corp", "SHIFTHR"),
+        RegisteredUser("admin", "admin123", "Aditya Joshi (Director)", "ADMIN_HR", "Shift HR Corp", "SHIFTHR")
+    ))
+
+    var leaveRequests = mutableStateOf<List<LeaveRequest>>(listOf(
+        LeaveRequest(employeeName = "Sarah Jenkins", leaveType = "Sick Leave", startDate = "2026-07-01", endDate = "2026-07-02", reason = "Indore seasonal fever flu recovery", status = "APPROVED"),
+        LeaveRequest(employeeName = "Marcus Aurelius (HR Intern)", leaveType = "Vacation Leave", startDate = "2026-07-10", endDate = "2026-07-15", reason = "Family beach trip in Palawan, PH", status = "PENDING")
+    ))
+
+    var correctionRequests = mutableStateOf<List<CorrectionRequest>>(listOf(
+        CorrectionRequest(employeeName = "Robert Chen", date = "2026-06-25", requestedTimeIn = "08:00 AM", requestedTimeOut = "05:00 PM", reason = "Power cut at remote home, missed punch out button", status = "PENDING")
+    ))
+
+    var reimbursementRequests = mutableStateOf<List<ReimbursementRequest>>(listOf(
+        ReimbursementRequest(employeeName = "Sarah Jenkins", title = "Home Office Ergonomic Office Chair", amount = 120.0, status = "APPROVED"),
+        ReimbursementRequest(employeeName = "Robert Chen", title = "Remote Internet Broadband reimbursement", amount = 45.0, status = "PENDING")
+    ))
+
+    var taskAssignments = mutableStateOf<List<TaskAssignment>>(listOf(
+        TaskAssignment(employeeName = "Sarah Jenkins", taskTitle = "Security Audit compliance logs", description = "Review and log secure ledger details on the main dashboard.", status = "PENDING"),
+        TaskAssignment(employeeName = "Robert Chen", taskTitle = "Indore Hub operations sync", description = "Host the daily check-in with the HR Intern.", status = "COMPLETED")
+    ))
+
+    var announcements = mutableStateOf<List<Announcement>>(listOf(
+        Announcement(title = "Indore Hub Hybrid Operations", content = "Flexible timings rules updated. Daily shift targets remain at 8 hours.", date = "2026-06-28"),
+        Announcement(title = "Philippine Hub Synergies Integration", content = "Welcoming our Philippine remote workers with added PH local holiday calendar sync!", date = "2026-06-29")
+    ))
+
+    var auditLogs = mutableStateOf<List<AuditLog>>(listOf(
+        AuditLog(timestamp = "2026-06-28 09:00 AM", user = "System", action = "System initialization completed successfully."),
+        AuditLog(timestamp = "2026-06-28 10:15 AM", user = "Aditya Joshi (Director)", action = "Configured remote geofence guidelines to 100 meters.")
+    ))
+
+    var feelReports = mutableStateOf<List<FeelReport>>(listOf(
+        FeelReport("Sarah Jenkins", 5, "Fabulous energy today, enjoying the hybrid flex sync!", "2026-06-28"),
+        FeelReport("Marcus Aurelius (HR Intern)", 4, "Productive audit flow going on.", "2026-06-28")
+    ))
+
+    var loansList = mutableStateOf<List<LoanRecord>>(listOf(
+        LoanRecord(employeeName = "Sarah Jenkins", type = "Salary Advance", amount = 500.0, monthlyDeduction = 50.0, remaining = 350.0)
+    ))
+
+    var employeeProfiles = mutableStateOf<List<EmployeeProfile>>(listOf(
+        EmployeeProfile(
+            id = "COS-2026-0012",
+            name = "Sarah Jenkins",
+            department = "Engineering",
+            position = "Senior Kotlin Developer",
+            status = "Regular",
+            email = "sarah.j@clauseos.com",
+            emergencyContactName = "David Jenkins (Father)",
+            emergencyContactPhone = "+91 98765 43210",
+            age = 29,
+            phoneNumber = "+91 94451 22340",
+            picture = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80"
+        ),
+        EmployeeProfile(
+            id = "COS-2026-0013",
+            name = "Marcus Aurelius (HR Intern)",
+            department = "Human Resources",
+            position = "HR Audit Associate",
+            status = "Probationary",
+            email = "marcus.a@clauseos.com",
+            emergencyContactName = "Lucius Aurelius (Brother)",
+            emergencyContactPhone = "+63 912 345 6789",
+            age = 23,
+            phoneNumber = "+63 915 567 8910",
+            picture = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
+        ),
+        EmployeeProfile(
+            id = "COS-2026-0014",
+            name = "Robert Chen",
+            department = "Product Management",
+            position = "Lead Product Manager",
+            status = "Regular",
+            email = "robert.c@clauseos.com",
+            emergencyContactName = "Emily Chen (Wife)",
+            emergencyContactPhone = "+91 88888 77777",
+            age = 35,
+            phoneNumber = "+91 88877 66554",
+            picture = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
+        ),
+        EmployeeProfile(
+            id = "COS-2026-0015",
+            name = "Anjali Sharma",
+            department = "Management",
+            position = "General Manager",
+            status = "Regular",
+            email = "anjali.s@clauseos.com",
+            emergencyContactName = "Vikram Sharma (Husband)",
+            emergencyContactPhone = "+91 99999 88888",
+            age = 42,
+            phoneNumber = "+91 99911 22334",
+            picture = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80"
+        ),
+        EmployeeProfile(
+            id = "COS-2026-0016",
+            name = "Aditya Joshi (Director)",
+            department = "Administration",
+            position = "Director of Operations",
+            status = "Regular",
+            email = "aditya.j@clauseos.com",
+            emergencyContactName = "Kiran Joshi (Wife)",
+            emergencyContactPhone = "+91 11111 22222",
+            age = 48,
+            phoneNumber = "+91 11122 33445",
+            picture = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"
+        )
+    ))
+
+    // 2FA Security State
+    var isTwoFactorEnabled = mutableStateOf(false)
+    var hasVerifiedTwoFactor = mutableStateOf(false)
+
+    // Productivity, Chat and Birthday features
+    var selectedEmployeeForChart = mutableStateOf("Sarah Jenkins")
+    var activeRecipient = mutableStateOf("Marcus Aurelius")
+    var messagesList = mutableStateOf<List<Message>>(emptyList())
+    var birthdayList = mutableStateOf<List<BirthdayInfo>>(emptyList())
+
+    val productivityRecords = mapOf(
+        "Sarah Jenkins" to listOf(
+            ProductivityRecord("Mon", 85, 8.2),
+            ProductivityRecord("Tue", 92, 8.5),
+            ProductivityRecord("Wed", 78, 7.5),
+            ProductivityRecord("Thu", 95, 8.8),
+            ProductivityRecord("Fri", 88, 8.0),
+            ProductivityRecord("Sat", 0, 0.0),
+            ProductivityRecord("Sun", 0, 0.0)
+        ),
+        "Marcus Aurelius (HR Intern)" to listOf(
+            ProductivityRecord("Mon", 70, 7.0),
+            ProductivityRecord("Tue", 75, 7.5),
+            ProductivityRecord("Wed", 80, 8.0),
+            ProductivityRecord("Thu", 68, 6.5),
+            ProductivityRecord("Fri", 82, 7.8),
+            ProductivityRecord("Sat", 0, 0.0),
+            ProductivityRecord("Sun", 0, 0.0)
+        ),
+        "Robert Chen" to listOf(
+            ProductivityRecord("Mon", 88, 8.0),
+            ProductivityRecord("Tue", 90, 8.2),
+            ProductivityRecord("Wed", 94, 8.6),
+            ProductivityRecord("Thu", 92, 8.5),
+            ProductivityRecord("Fri", 89, 8.1),
+            ProductivityRecord("Sat", 0, 0.0),
+            ProductivityRecord("Sun", 0, 0.0)
+        ),
+        "Anjali Sharma" to listOf(
+            ProductivityRecord("Mon", 94, 8.5),
+            ProductivityRecord("Tue", 96, 8.8),
+            ProductivityRecord("Wed", 95, 8.7),
+            ProductivityRecord("Thu", 98, 9.0),
+            ProductivityRecord("Fri", 97, 8.9),
+            ProductivityRecord("Sat", 0, 0.0),
+            ProductivityRecord("Sun", 0, 0.0)
+        ),
+        "Aditya Joshi (Director)" to listOf(
+            ProductivityRecord("Mon", 96, 8.8),
+            ProductivityRecord("Tue", 98, 9.2),
+            ProductivityRecord("Wed", 97, 9.0),
+            ProductivityRecord("Thu", 99, 9.5),
+            ProductivityRecord("Fri", 95, 8.9),
+            ProductivityRecord("Sat", 0, 0.0),
+            ProductivityRecord("Sun", 0, 0.0)
+        )
+    )
+
+    init {
+        val db = AppDatabase.getDatabase(application)
+        repository = TimeTrackerRepository(db.timeLogDao(), db.shiftConfigDao())
+
+        allTimeLogs = repository.allTimeLogs
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        pendingTimeLogs = repository.pendingTimeLogs
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+        // Default Config Flow mapping
+        shiftConfig = repository.shiftConfigFlow
+            .map { it ?: ShiftConfigEntity() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ShiftConfigEntity())
+
+        // Start by prefilling databases if blank and determining today's holiday
+        viewModelScope.launch {
+            repository.prefillMockData()
+            checkTodayHoliday()
+            refreshActiveLog()
+            startTimer()
+            initMessages()
+            initBirthdays()
+            fetchWeatherForecast(selectedWeatherCity.value)
+            addNotification("System", "Ready for cyber login. Select a role to log in.", isAlert = false)
+        }
+    }
+
+    private fun initMessages() {
+        messagesList.value = listOf(
+            Message(
+                sender = "Marcus Aurelius (HR Intern)",
+                recipient = "Sarah Jenkins",
+                text = "Hi Sarah, do you have the compliance spreadsheet for the Indore hub ready for audit?",
+                timestamp = "09:15 AM"
+            ),
+            Message(
+                sender = "Sarah Jenkins",
+                recipient = "Marcus Aurelius (HR Intern)",
+                text = "Yes Marcus! Just finished logging. You can view it in the Ledger tab. It's completely synchronized.",
+                timestamp = "09:18 AM"
+            ),
+            Message(
+                sender = "Robert Chen",
+                recipient = "Sarah Jenkins",
+                text = "Excellent compliance score this week, Sarah! Keep up the great cycle-to-work pace.",
+                timestamp = "10:30 AM"
+            ),
+            Message(
+                sender = "Aditya Joshi (Director)",
+                recipient = "All Employees",
+                text = "Reminder: Please verify your remote location settings before punching in. Indore geo-fencing rules are active.",
+                timestamp = "Yesterday"
+            ),
+            Message(
+                sender = "Michael Vance",
+                recipient = "All Employees",
+                text = "Thanks for the early birthday greetings everyone! Indore sweets are on me at the break room! 🍬",
+                timestamp = "10:05 AM"
+            )
+        )
+    }
+
+    private fun initBirthdays() {
+        birthdayList.value = listOf(
+            BirthdayInfo("Michael Vance", "Co-worker (QA)", "June 28", isToday = true, daysUntil = 0),
+            BirthdayInfo("Sarah Jenkins", "Employee (Dev)", "June 30", isToday = false, daysUntil = 2),
+            BirthdayInfo("Aditya Joshi (Director)", "Admin/HR", "July 05", isToday = false, daysUntil = 7),
+            BirthdayInfo("Robert Chen", "Supervisor (PM)", "April 15", isToday = false, daysUntil = 290),
+            BirthdayInfo("Anjali Sharma", "General Manager", "Sept 12", isToday = false, daysUntil = 76)
+        )
+    }
+
+    fun sendMessage(recipient: String, text: String) {
+        if (text.isBlank()) return
+        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+        val timeStr = sdf.format(Date())
+        val newMsg = Message(
+            sender = currentUserName.value,
+            recipient = recipient,
+            text = text,
+            timestamp = timeStr
+        )
+        messagesList.value = messagesList.value + newMsg
+    }
+
+    private fun checkTodayHoliday() {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayStr = sdf.format(Date())
+        todayHoliday.value = localHolidays.find { it.date == todayStr }
+        todayHoliday.value?.let { holiday ->
+            addNotification("Indore Holiday Today", "Today is ${holiday.name}! Holiday rates may apply. 🎉", isAlert = false)
+        }
+    }
+
+    // Register New User
+    fun registerUser(username: String, passcode: String, name: String, role: String, companyNameInput: String, companyCodeInput: String): String? {
+        val normUser = username.trim().lowercase()
+        if (normUser.isBlank() || passcode.trim().isBlank() || name.trim().isBlank()) {
+            return "Please fill in all registration fields."
+        }
+        if (companyCodeInput.trim() != companyCode.value) {
+            return "Invalid company registration code. (Hint: Use CLAUSE99)"
+        }
+        if (registeredUsers.value.any { it.username == normUser }) {
+            return "Username already registered."
+        }
+        
+        val newUser = RegisteredUser(
+            username = normUser,
+            passcode = passcode.trim(),
+            name = name.trim(),
+            role = role,
+            companyName = companyNameInput.trim(),
+            companyCode = companyCodeInput.trim()
+        )
+        registeredUsers.value = registeredUsers.value + newUser
+        
+        // Add profile as well!
+        val newProfile = EmployeeProfile(
+            id = "COS-2026-00" + (17 + employeeProfiles.value.size),
+            name = name.trim(),
+            department = "Unassigned",
+            position = if (role == "ADMIN_HR") "HR Specialist" else "Associate",
+            status = "Regular",
+            email = "${normUser}@clauseos.com",
+            emergencyContactName = "Emergency Contact Name",
+            emergencyContactPhone = "Contact Number"
+        )
+        employeeProfiles.value = employeeProfiles.value + newProfile
+        
+        addAuditLog("System", "Registered new user: ${name.trim()} with role $role")
+        addNotification("Security Check", "Registration successful! You can now log in.", isAlert = false)
+        return null
+    }
+
+    // Role-based Multi-tier Login
+    fun attemptLogin(username: String, passcode: String): String? {
+        val normUser = username.trim().lowercase()
+        val normPass = passcode.trim()
+
+        val matched = registeredUsers.value.find { it.username == normUser && it.passcode == normPass }
+
+        return if (matched != null) {
+            currentUserRole.value = matched.role
+            currentUserName.value = matched.name
+            currentUserUsername.value = normUser
+            isLoggedIn.value = true
+            
+            // Auto setup HR access toggle
+            isAdminMode.value = (matched.role != "EMPLOYEE")
+            currentScreen.value = if (matched.role == "EMPLOYEE") "clock" else "hr_approval"
+            
+            // Sync user profile name with config if employee
+            if (matched.role == "EMPLOYEE") {
+                viewModelScope.launch {
+                    val config = repository.getShiftConfig()
+                    repository.saveShiftConfig(config.copy(employeeName = matched.name))
+                }
+            }
+
+            addAuditLog(matched.name, "Logged in successfully under secure role.")
+            addNotification("Security Check", "Logged in successfully as ${matched.name} (${matched.role})", isAlert = false)
+            refreshActiveLog()
+            null // Return null on success
+        } else {
+            "Invalid username or password. (Hint: Try employee/emp123 or admin/admin123)"
+        }
+    }
+
+    fun logout() {
+        addAuditLog(currentUserName.value, "Logged out of current session.")
+        isLoggedIn.value = false
+        currentUserRole.value = "EMPLOYEE"
+        currentUserName.value = "Sarah Jenkins"
+        currentUserUsername.value = "employee"
+        isAdminMode.value = false
+        currentScreen.value = "clock"
+        addNotification("Security Check", "Successfully signed out of session.", isAlert = false)
+    }
+
+    // Audit logs logger
+    fun addAuditLog(user: String, action: String) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault())
+        val dateStr = sdf.format(Date())
+        val newLog = AuditLog(timestamp = dateStr, user = user, action = action)
+        auditLogs.value = listOf(newLog) + auditLogs.value
+    }
+
+    // Leaves Management
+    fun fileLeaveRequest(leaveType: String, startDate: String, endDate: String, reason: String) {
+        val newReq = LeaveRequest(
+            employeeName = currentUserName.value,
+            leaveType = leaveType,
+            startDate = startDate,
+            endDate = endDate,
+            reason = reason,
+            status = "PENDING"
+        )
+        leaveRequests.value = leaveRequests.value + newReq
+        addAuditLog(currentUserName.value, "Filed $leaveType from $startDate to $endDate")
+        addNotification("Self-Service", "$leaveType request filed successfully.", isAlert = false)
+    }
+
+    fun approveLeave(id: String) {
+        leaveRequests.value = leaveRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Approved leave for ${it.employeeName}")
+                addNotification("Leave Approved", "${it.employeeName}'s ${it.leaveType} has been approved.", isAlert = false)
+                it.copy(status = "APPROVED")
+            } else it
+        }
+    }
+
+    fun rejectLeave(id: String) {
+        leaveRequests.value = leaveRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Rejected leave for ${it.employeeName}")
+                addNotification("Leave Rejected", "${it.employeeName}'s ${it.leaveType} was rejected.", isAlert = true)
+                it.copy(status = "REJECTED")
+            } else it
+        }
+    }
+
+    // Attendance Correction Requests
+    fun fileCorrectionRequest(date: String, requestedTimeIn: String, requestedTimeOut: String, reason: String) {
+        val newReq = CorrectionRequest(
+            employeeName = currentUserName.value,
+            date = date,
+            requestedTimeIn = requestedTimeIn,
+            requestedTimeOut = requestedTimeOut,
+            reason = reason,
+            status = "PENDING"
+        )
+        correctionRequests.value = correctionRequests.value + newReq
+        addAuditLog(currentUserName.value, "Requested attendance correction for date $date")
+        addNotification("Self-Service", "Correction request submitted to manager.", isAlert = false)
+    }
+
+    fun approveCorrection(id: String) {
+        correctionRequests.value = correctionRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Approved time correction for ${it.employeeName}")
+                addNotification("Correction Approved", "Attendance correction approved for ${it.employeeName}.", isAlert = false)
+                it.copy(status = "APPROVED")
+            } else it
+        }
+    }
+
+    fun rejectCorrection(id: String) {
+        correctionRequests.value = correctionRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Rejected time correction for ${it.employeeName}")
+                addNotification("Correction Rejected", "Attendance correction rejected for ${it.employeeName}.", isAlert = true)
+                it.copy(status = "REJECTED")
+            } else it
+        }
+    }
+
+    // Reimbursements Management
+    fun fileReimbursement(title: String, amount: Double) {
+        val newReq = ReimbursementRequest(
+            employeeName = currentUserName.value,
+            title = title,
+            amount = amount,
+            status = "PENDING"
+        )
+        reimbursementRequests.value = reimbursementRequests.value + newReq
+        addAuditLog(currentUserName.value, "Requested reimbursement for: $title ($$amount)")
+        addNotification("Self-Service", "Reimbursement claim submitted.", isAlert = false)
+    }
+
+    fun approveReimbursement(id: String) {
+        reimbursementRequests.value = reimbursementRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Approved reimbursement of $${it.amount} for ${it.employeeName}")
+                addNotification("Reimbursement Release", "Claim approved for ${it.employeeName}.", isAlert = false)
+                it.copy(status = "APPROVED")
+            } else it
+        }
+    }
+
+    fun rejectReimbursement(id: String) {
+        reimbursementRequests.value = reimbursementRequests.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Rejected reimbursement of $${it.amount} for ${it.employeeName}")
+                it.copy(status = "REJECTED")
+            } else it
+        }
+    }
+
+    // Assign Tasks
+    fun assignTask(employeeName: String, title: String, description: String) {
+        val newReq = TaskAssignment(
+            employeeName = employeeName,
+            taskTitle = title,
+            description = description,
+            status = "PENDING"
+        )
+        taskAssignments.value = taskAssignments.value + newReq
+        addAuditLog(currentUserName.value, "Assigned new task to $employeeName: $title")
+        addNotification("Task Assignment", "Assigned task to $employeeName.", isAlert = false)
+    }
+
+    fun completeTask(id: String) {
+        taskAssignments.value = taskAssignments.value.map {
+            if (it.id == id) {
+                addAuditLog(currentUserName.value, "Completed task: ${it.taskTitle}")
+                addNotification("Task Completed", "Task '${it.taskTitle}' is now complete.", isAlert = false)
+                it.copy(status = "COMPLETED")
+            } else it
+        }
+    }
+
+    // Feel Report
+    fun submitFeelReport(score: Int, note: String) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateStr = sdf.format(Date())
+        val newReq = FeelReport(
+            employeeName = currentUserName.value,
+            score = score,
+            note = note,
+            date = dateStr
+        )
+        feelReports.value = feelReports.value.filter { it.employeeName != currentUserName.value } + newReq
+        addAuditLog(currentUserName.value, "Submitted daily feels rating: $score")
+        addNotification("Core HR Feedback", "Thank you for reporting how you feel! HR monitors this closely.", isAlert = false)
+    }
+
+    // Loans Management
+    fun submitLoanRequest(type: String, amount: Double) {
+        val monthly = amount / 10.0 // 10-month division
+        val newReq = LoanRecord(
+            employeeName = currentUserName.value,
+            type = type,
+            amount = amount,
+            monthlyDeduction = monthly,
+            remaining = amount
+        )
+        loansList.value = loansList.value + newReq
+        addAuditLog(currentUserName.value, "Requested $type of $$amount")
+        addNotification("Payroll Loans", "$type of $$amount filed securely.", isAlert = false)
+    }
+
+    // Create Announcement
+    fun createAnnouncement(title: String, content: String) {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateStr = sdf.format(Date())
+        val newReq = Announcement(title = title, content = content, date = dateStr)
+        announcements.value = listOf(newReq) + announcements.value
+        addAuditLog(currentUserName.value, "Published company announcement: $title")
+        addNotification("Company Bulletin", "NEW BULLET: $title", isAlert = false)
+    }
+
+    // Update Profile Information
+    fun updateProfileInfo(emergencyContact: String, contactPhone: String, email: String) {
+        employeeProfiles.value = employeeProfiles.value.map {
+            if (it.name == currentUserName.value) {
+                it.copy(
+                    emergencyContactName = emergencyContact,
+                    emergencyContactPhone = contactPhone,
+                    email = email
+                )
+            } else it
+        }
+        addAuditLog(currentUserName.value, "Updated emergency contact and profile details.")
+        addNotification("Self-Service", "Successfully updated emergency contact details.", isAlert = false)
+    }
+
+    fun toggleOfflineMode(offline: Boolean) {
+        isMockOffline.value = offline
+        if (offline) {
+            addNotification("Network", "Working in Offline Simulation. Logs stored locally in room database.", isAlert = true)
+        } else {
+            addNotification("Network", "Network restored. Active cloud synchronization enabled.", isAlert = false)
+        }
+    }
+
+    fun addNotification(title: String, message: String, isAlert: Boolean = false) {
+        val newNotif = NotificationItem(
+            id = UUID.randomUUID().toString(),
+            title = title,
+            message = message,
+            timestamp = System.currentTimeMillis(),
+            isAlert = isAlert
+        )
+        notifications.value = listOf(newNotif) + notifications.value.take(19) // Keep last 20
+    }
+
+    fun dismissNotification(id: String) {
+        notifications.value = notifications.value.filter { it.id != id }
+    }
+
+    fun refreshActiveLog() {
+        viewModelScope.launch {
+            // Find active log corresponding to the currently logged in employee
+            val allLogsList = repository.allTimeLogs.first()
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val dateStr = sdf.format(Date())
+            _activeTimeLog.value = allLogsList.find { 
+                it.employeeName == currentUserName.value && it.date == dateStr && it.timeOut == null 
+            }
+        }
+    }
+
+    // Handles any clock punch event
+    fun handlePunch(actionType: String) {
+        viewModelScope.launch {
+            // Ensure repository uses the correct logged-in user name
+            val config = repository.getShiftConfig()
+            if (config.employeeName != currentUserName.value) {
+                repository.saveShiftConfig(config.copy(employeeName = currentUserName.value))
+            }
+
+            val result = repository.registerPunch(actionType, isMockOffline.value)
+            refreshActiveLog()
+            
+            val isAlert = result.contains("Please") || result.contains("Already")
+            addNotification("Punch Clock", result, isAlert = isAlert)
+
+            // Trigger real-time policy alerts
+            if (actionType == "LUNCH_OUT") {
+                addNotification("Policy Guard", "Lunch break logged. Indore policy rules recommend 60 mins break.", isAlert = false)
+            } else if (actionType == "BREAK_OUT") {
+                addNotification("Policy Guard", "Tea/Coffee break logged. Rest up to 30 minutes.", isAlert = false)
+            }
+        }
+    }
+
+    // Simulates syncing unsynced records to cloud database
+    fun performSync() {
+        if (isMockOffline.value) {
+            addNotification("Sync Error", "Cannot sync while offline. Disable Mock Offline in settings/header first.", isAlert = true)
+            return
+        }
+
+        viewModelScope.launch {
+            isSyncing.value = true
+            syncMessage.value = "Establishing handshake..."
+            delay(600)
+            syncMessage.value = "Pushing offline transactions..."
+            
+            val count = repository.syncOfflineRecords()
+            isSyncing.value = false
+            
+            if (count > 0) {
+                addNotification("Payroll Sync", "Synchronized $count workout & punch sessions to central server!", isAlert = false)
+            } else {
+                addNotification("Payroll Sync", "Database is already fully up-to-date.", isAlert = false)
+            }
+        }
+    }
+
+    // HR Operations: Approve log
+    fun approveLog(logId: Long) {
+        viewModelScope.launch {
+            val log = repository.getTimeLogById(logId)
+            if (log != null) {
+                val updated = log.copy(isApproved = "APPROVED", rejectionReason = null)
+                repository.insertOrUpdateTimeLog(updated)
+                addNotification("HR Approval", "Approved shift record for ${log.employeeName} (${log.date})", isAlert = false)
+            }
+        }
+    }
+
+    // HR Operations: Reject log
+    fun rejectLog(logId: Long, reason: String) {
+        viewModelScope.launch {
+            val log = repository.getTimeLogById(logId)
+            if (log != null) {
+                val updated = log.copy(isApproved = "REJECTED", rejectionReason = reason)
+                repository.insertOrUpdateTimeLog(updated)
+                addNotification("HR Audit", "Rejected shift record for ${log.employeeName} (${log.date}): $reason", isAlert = true)
+            }
+        }
+    }
+
+    // HR Operations: Edit punch directly
+    fun updateTimeLogDetails(log: TimeLogEntity) {
+        viewModelScope.launch {
+            repository.insertOrUpdateTimeLog(log)
+            refreshActiveLog()
+            addNotification("HR Operations", "Retroactively updated work records for ${log.employeeName}.", isAlert = false)
+        }
+    }
+
+    // HR Operations: Delete log
+    fun deleteLog(log: TimeLogEntity) {
+        viewModelScope.launch {
+            repository.deleteTimeLog(log)
+            refreshActiveLog()
+            addNotification("HR Operations", "Deleted shift record for ${log.employeeName}.", isAlert = true)
+        }
+    }
+
+    // Configuration save
+    fun saveConfig(config: ShiftConfigEntity) {
+        viewModelScope.launch {
+            repository.saveShiftConfig(config)
+            refreshActiveLog()
+            addNotification("Settings", "Custom rules and shift definitions updated successfully.", isAlert = false)
+        }
+    }
+
+    // Clears all database logs
+    fun clearAllLogs() {
+        viewModelScope.launch {
+            val db = AppDatabase.getDatabase(getApplication())
+            db.timeLogDao().clearAllLogs()
+            refreshActiveLog()
+            addNotification("System", "Completely purged historical databases.", isAlert = true)
+        }
+    }
+
+    // Live Clock timer logic to compute elapsed work hours
+    private fun startTimer() {
+        timerJob?.cancel()
+        timerJob = viewModelScope.launch {
+            while (true) {
+                val log = _activeTimeLog.value
+                val config = shiftConfig.value
+
+                if (log != null && log.timeIn != null && log.timeOut == null) {
+                    val now = System.currentTimeMillis()
+                    val totalElapsed = now - log.timeIn
+                    
+                    val lunchElapsed = if (log.lunchOut != null) {
+                        val end = log.lunchIn ?: now
+                        end - log.lunchOut
+                    } else 0L
+
+                    val breakElapsed = if (log.breakOut != null) {
+                        val end = log.breakIn ?: now
+                        end - log.breakOut
+                    } else 0L
+
+                    val actualWorkMillis = totalElapsed - lunchElapsed - breakElapsed
+                    activeTimerString.value = formatDuration(actualWorkMillis)
+
+                    // Monitor Policy Breaches
+                    if (log.breakOut != null && log.breakIn == null) {
+                        val activeBreakMins = (now - log.breakOut) / 60000
+                        val targetBreak = config.breakDurationMinutes
+                        breakTimerString.value = "On Break: ${formatDuration(now - log.breakOut)}"
+                        if (activeBreakMins >= targetBreak && activeBreakMins % 5 == 0L) {
+                            addNotification("Break Warning", "Break duration is currently $activeBreakMins mins (max: $targetBreak).", isAlert = true)
+                        }
+                    } else {
+                        breakTimerString.value = ""
+                    }
+
+                    if (log.lunchOut != null && log.lunchIn == null) {
+                        val activeLunchMins = (now - log.lunchOut) / 60000
+                        val targetLunch = config.lunchDurationMinutes
+                        breakTimerString.value = "On Lunch: ${formatDuration(now - log.lunchOut)}"
+                        if (activeLunchMins >= targetLunch && activeLunchMins % 10 == 0L) {
+                            addNotification("Lunch Warning", "Lunch duration is currently $activeLunchMins mins (max: $targetLunch).", isAlert = true)
+                        }
+                    }
+
+                    val targetHours = config.shiftDurationHours
+                    val actualWorkHours = actualWorkMillis.toFloat() / 3600000f
+                    if (actualWorkHours >= targetHours && actualWorkHours - targetHours < 0.01f) {
+                        addNotification("Shift Complete", "Target shift duration reached! Clock out recommended.", isAlert = false)
+                    }
+                } else {
+                    activeTimerString.value = "00:00:00"
+                    breakTimerString.value = ""
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    private fun formatDuration(millis: Long): String {
+        val seconds = (millis / 1000) % 60
+        val minutes = (millis / (1000 * 60)) % 60
+        val hours = (millis / (1000 * 60 * 60))
+        return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        timerJob?.cancel()
+    }
+
+    fun fetchWeatherForecast(city: String) {
+        viewModelScope.launch {
+            weatherLoading.value = true
+            weatherError.value = null
+            try {
+                val apiKey = com.example.BuildConfig.OPENWEATHER_API_KEY
+                if (apiKey.isEmpty() || apiKey == "MY_OPENWEATHER_API_KEY") {
+                    loadMockWeather(city)
+                } else {
+                    val currentRes = WeatherServiceClient.api.getCurrentWeather(city, apiKey)
+                    val forecastRes = WeatherServiceClient.api.getForecast(city, apiKey)
+                    currentWeather.value = currentRes
+                    weatherForecast.value = forecastRes
+                    selectedWeatherCity.value = city
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                loadMockWeather(city)
+            } finally {
+                weatherLoading.value = false
+            }
+        }
+    }
+
+    private fun loadMockWeather(city: String) {
+        val cleanCityName = city.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }
+        val mockTemp = when (cleanCityName) {
+            "Indore" -> 29.5
+            "Manila" -> 31.0
+            "London" -> 19.0
+            "New York" -> 22.5
+            "Tokyo" -> 25.0
+            else -> 26.0
+        }
+        val mockStatus = when (cleanCityName) {
+            "Indore" -> "Scattered Clouds"
+            "Manila" -> "Tropical Showers"
+            "London" -> "Overcast Drizzle"
+            "New York" -> "Mostly Sunny"
+            "Tokyo" -> "Clear Sky"
+            else -> "Partly Cloudy"
+        }
+        val mockIcon = when (cleanCityName) {
+            "Indore" -> "03d"
+            "Manila" -> "10d"
+            "London" -> "09d"
+            "New York" -> "01d"
+            "Tokyo" -> "01d"
+            else -> "02d"
+        }
+        val mockHumidity = when (cleanCityName) {
+            "Manila" -> 82
+            "Indore" -> 60
+            else -> 68
+        }
+        val mockWind = when (cleanCityName) {
+            "Manila" -> 16.5
+            "Indore" -> 8.0
+            else -> 12.0
+        }
+
+        currentWeather.value = com.example.data.WeatherResponse(
+            name = cleanCityName,
+            main = com.example.data.MainData(
+                temp = mockTemp,
+                feelsLike = mockTemp + 2.5,
+                tempMin = mockTemp - 3.0,
+                tempMax = mockTemp + 3.0,
+                humidity = mockHumidity,
+                pressure = 1011
+            ),
+            weather = listOf(com.example.data.WeatherDescription(main = mockStatus, description = mockStatus, icon = mockIcon)),
+            wind = com.example.data.WindData(speed = mockWind)
+        )
+
+        val forecastItems = listOf(
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 10800,
+                main = com.example.data.MainData(mockTemp - 1.0, mockTemp + 1.5, mockTemp - 2.0, mockTemp + 2.0, mockHumidity, 1011),
+                weather = listOf(com.example.data.WeatherDescription(mockStatus, mockStatus, mockIcon)),
+                dtTxt = "2026-06-29 18:00:00"
+            ),
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 21600,
+                main = com.example.data.MainData(mockTemp - 2.0, mockTemp + 0.5, mockTemp - 3.0, mockTemp + 1.0, mockHumidity + 5, 1011),
+                weather = listOf(com.example.data.WeatherDescription(mockStatus, mockStatus, mockIcon)),
+                dtTxt = "2026-06-29 21:00:00"
+            ),
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 32400,
+                main = com.example.data.MainData(mockTemp - 3.0, mockTemp - 1.0, mockTemp - 4.0, mockTemp, mockHumidity + 8, 1012),
+                weather = listOf(com.example.data.WeatherDescription("Clear", "Clear", "01n")),
+                dtTxt = "2026-06-30 00:00:00"
+            ),
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 43200,
+                main = com.example.data.MainData(mockTemp - 4.0, mockTemp - 2.0, mockTemp - 5.0, mockTemp - 1.0, mockHumidity + 10, 1012),
+                weather = listOf(com.example.data.WeatherDescription("Clear", "Clear", "01n")),
+                dtTxt = "2026-06-30 03:00:00"
+            ),
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 54000,
+                main = com.example.data.MainData(mockTemp - 1.5, mockTemp + 0.5, mockTemp - 3.0, mockTemp + 1.0, mockHumidity - 2, 1011),
+                weather = listOf(com.example.data.WeatherDescription("Sunny", "Sunny", "01d")),
+                dtTxt = "2026-06-30 06:00:00"
+            ),
+            com.example.data.ForecastItem(
+                dt = System.currentTimeMillis() / 1000 + 64800,
+                main = com.example.data.MainData(mockTemp + 0.5, mockTemp + 3.0, mockTemp - 1.0, mockTemp + 2.0, mockHumidity - 5, 1010),
+                weather = listOf(com.example.data.WeatherDescription("Sunny", "Sunny", "01d")),
+                dtTxt = "2026-06-30 09:00:00"
+            )
+        )
+
+        weatherForecast.value = com.example.data.ForecastResponse(
+            list = forecastItems,
+            city = com.example.data.CityData(name = cleanCityName, country = when(cleanCityName) { "Manila" -> "PH" "Indore" -> "IN" "London" -> "UK" else -> "US" })
+        )
+        selectedWeatherCity.value = city
+    }
+}
+
+data class NotificationItem(
+    val id: String,
+    val title: String,
+    val message: String,
+    val timestamp: Long,
+    val isAlert: Boolean
+)
+
+data class ProductivityRecord(
+    val day: String,
+    val score: Int,
+    val hours: Double
+)
+
+data class Message(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val sender: String,
+    val recipient: String,
+    val text: String,
+    val timestamp: String,
+    val isSystem: Boolean = false
+)
+
+data class BirthdayInfo(
+    val name: String,
+    val role: String,
+    val dateStr: String,
+    val isToday: Boolean,
+    val daysUntil: Int
+)
