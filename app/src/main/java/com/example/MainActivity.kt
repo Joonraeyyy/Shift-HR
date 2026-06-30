@@ -543,6 +543,12 @@ fun TimeTrackerApp(
                     "saas_hub" -> {
                         SaaSHubScreen(viewModel = viewModel)
                     }
+                    "platform_guide" -> {
+                        Column {
+                            SaaSHeader(title = "Platform Guide & Architecture", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            PlatformGuideScreen(viewModel = viewModel)
+                        }
+                    }
                     "core_hr" -> {
                         Column {
                             SaaSHeader(title = "Core HR Dossier & Directory", onBack = { viewModel.currentScreen.value = "saas_hub" })
@@ -1749,6 +1755,42 @@ fun EmployeeClockScreen(
 
         // Large Glassmorphic Weather Forecast Card
         WeatherForecastCard(viewModel = viewModel)
+
+        // Quick platform guide helper banner
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+                .clickable { viewModel.currentScreen.value = "platform_guide" },
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "First time? Try the Interactive Platform Guide & Diagram 📚",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
 
         // Glassmorphic Chrono Shift Status Card
         Card(

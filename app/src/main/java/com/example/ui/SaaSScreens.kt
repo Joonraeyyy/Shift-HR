@@ -3252,6 +3252,63 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
             }
         }
 
+        // Interactive Beginner Guide Launcher Banner
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .clickable { viewModel.currentScreen.value = "platform_guide" }
+                .testTag("hub_guide_banner"),
+            colors = CardDefaults.cardColors(containerColor = NeonGreen.copy(alpha = 0.08f)),
+            border = BorderStroke(1.5.dp, NeonGreen)
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(50)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MenuBook,
+                        contentDescription = "Guide Logo",
+                        tint = NeonGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "NEW TO SHIFT HR? 📚",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonGreen,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Interactive Platform & Architecture Guide",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Take a quick animated walkthrough & try out live simulations of shift-clocks, NFC, AI, and check the official architecture diagram.",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.65f)
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowForwardIos,
+                    contentDescription = "Open Guide",
+                    tint = NeonGreen,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
         // TILE LAUNCHER GRID (SaaS Modules)
         Text(
             text = "Enterprise Suite Modules",
