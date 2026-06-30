@@ -407,7 +407,7 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
             // Leave Type Select
             Text("Select Leave Category:", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf("Sick Leave", "Vacation Leave").forEach { type ->
+                listOf("Sick Leave", "Vacation Leave", "Shift Change").forEach { type ->
                     val isSelected = leaveType == type
                     Box(
                         modifier = Modifier
@@ -485,7 +485,11 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
             ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = if (req.leaveType == "Sick Leave") Icons.Default.MedicalServices else Icons.Default.FlightTakeoff,
+                        imageVector = when (req.leaveType) {
+                            "Sick Leave" -> Icons.Default.MedicalServices
+                            "Vacation Leave" -> Icons.Default.FlightTakeoff
+                            else -> Icons.Default.Schedule
+                        },
                         contentDescription = null,
                         tint = NeonGreen,
                         modifier = Modifier.size(20.dp)
@@ -658,7 +662,7 @@ fun ReimbursementFilingView(viewModel: TimeTrackerViewModel, context: Context) {
             OutlinedTextField(
                 value = amount,
                 onValueChange = { amount = it },
-                label = { Text("Claim Amount ($)") },
+                label = { Text("Claim Amount (${viewModel.getCurrencySymbol()})") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
             )
@@ -702,7 +706,7 @@ fun ReimbursementFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(req.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Amount: $${req.amount}", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Amount: ${viewModel.getCurrencySymbol()}${String.format("%.2f", req.amount)}", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                     Box(
                         modifier = Modifier
@@ -2284,20 +2288,21 @@ fun SalaryCalculatorView(viewModel: TimeTrackerViewModel, context: Context) {
             Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
 
             PayrollDetailRow(label = "Total Approved Hours", value = String.format("%.2f hrs", totalHours))
-            PayrollDetailRow(label = "Basic Rate (per hr)", value = String.format("$%.2f", basicHourly))
-            PayrollDetailRow(label = "Basic Earned Salary", value = String.format("$%.2f", basicSalary))
-            PayrollDetailRow(label = "Overtime Pay (1.5x, ${String.format("%.1f", overtimeHours)}h)", value = String.format("$%.2f", overtimePay))
-            PayrollDetailRow(label = "Holiday Pay (2x, ${String.format("%.1f", holidayHours)}h)", value = String.format("$%.2f", holidayPay))
-            PayrollDetailRow(label = "Night Diff (1.1x, ${String.format("%.1f", nightDiffHours)}h)", value = String.format("$%.2f", nightDiffPay))
-            PayrollDetailRow(label = "Standard Allowance", value = String.format("$%.2f", allowances))
-            PayrollDetailRow(label = "Performance Bonuses", value = String.format("$%.2f", bonuses))
-            PayrollDetailRow(label = "Tax Deductions", value = String.format("-$%.2f", deductions))
-            PayrollDetailRow(label = "Active Loan Repayments", value = String.format("-$%.2f", loansRepayment))
+            val currSym = viewModel.getCurrencySymbol()
+            PayrollDetailRow(label = "Basic Rate (per hr)", value = String.format("${currSym}%.2f", basicHourly))
+            PayrollDetailRow(label = "Basic Earned Salary", value = String.format("${currSym}%.2f", basicSalary))
+            PayrollDetailRow(label = "Overtime Pay (1.5x, ${String.format("%.1f", overtimeHours)}h)", value = String.format("${currSym}%.2f", overtimePay))
+            PayrollDetailRow(label = "Holiday Pay (2x, ${String.format("%.1f", holidayHours)}h)", value = String.format("${currSym}%.2f", holidayPay))
+            PayrollDetailRow(label = "Night Diff (1.1x, ${String.format("%.1f", nightDiffHours)}h)", value = String.format("${currSym}%.2f", nightDiffPay))
+            PayrollDetailRow(label = "Standard Allowance", value = String.format("${currSym}%.2f", allowances))
+            PayrollDetailRow(label = "Performance Bonuses", value = String.format("${currSym}%.2f", bonuses))
+            PayrollDetailRow(label = "Tax Deductions", value = String.format("-${currSym}%.2f", deductions))
+            PayrollDetailRow(label = "Active Loan Repayments", value = String.format("-${currSym}%.2f", loansRepayment))
 
             Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Net Compute Salary", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(String.format("$%.2f", netSalary), color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                Text(String.format("${currSym}%.2f", netSalary), color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -2355,7 +2360,7 @@ fun PayslipsHistoryView(viewModel: TimeTrackerViewModel, context: Context) {
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(cycle, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Total Net Amount: $${String.format("%.2f", amount)}", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("Total Net Amount: ${viewModel.getCurrencySymbol()}${String.format("%.2f", amount)}", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
                 }
                 Button(
                     onClick = {
@@ -2554,12 +2559,42 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
     val corrections by viewModel.correctionRequests
     val claims by viewModel.reimbursementRequests
 
+    val userRole = viewModel.currentUserRole.value
+    val isAuthorized = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
+    val currencySymbol = viewModel.getCurrencySymbol()
+
+    // Role-based Status Banner
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        colors = CardDefaults.cardColors(containerColor = if (isAuthorized) NeonGreen.copy(alpha = 0.08f) else Color(0xFF3B1D22)),
+        border = BorderStroke(1.dp, if (isAuthorized) NeonGreen.copy(alpha = 0.3f) else Color(0xFFF43F5E).copy(alpha = 0.3f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isAuthorized) Icons.Default.VerifiedUser else Icons.Default.Lock,
+                contentDescription = null,
+                tint = if (isAuthorized) NeonGreen else Color(0xFFF43F5E),
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Text(
+                text = if (isAuthorized) "Authorized Approver: $userRole (${viewModel.currentUserName.value})" else "Unauthorized: Only Admin, HR, Supervisor, or Department Manager can approve requests.",
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+
     // 1. Leave approvals list
-    Text("Pending Leave Requests", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Text("Pending Leave & Shift Change Requests", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     Spacer(modifier = Modifier.height(6.dp))
     val pendingLeaves = leaves.filter { it.status == "PENDING" }
     if (pendingLeaves.isEmpty()) {
-        Text("No pending leave requests.", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No pending requests.", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
     } else {
         pendingLeaves.forEach { leave ->
             Card(
@@ -2574,7 +2609,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
-                            onClick = { viewModel.rejectLeave(leave.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.rejectLeave(leave.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2583,7 +2623,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { viewModel.approveLeave(leave.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.approveLeave(leave.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2617,7 +2662,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
-                            onClick = { viewModel.rejectCorrection(req.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.rejectCorrection(req.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2626,7 +2676,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { viewModel.approveCorrection(req.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.approveCorrection(req.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2641,7 +2696,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
 
     // 3. Reimbursement approvals list
     Spacer(modifier = Modifier.height(16.dp))
-    Text("Pending Reimbursements claims", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Text("Pending Reimbursements Claims", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     Spacer(modifier = Modifier.height(6.dp))
     val pendingClaims = claims.filter { it.status == "PENDING" }
     if (pendingClaims.isEmpty()) {
@@ -2656,13 +2711,18 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(claim.employeeName, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("$${claim.amount}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("${currencySymbol}${String.format("%.2f", claim.amount)}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     Text("Claim: ${claim.title}", color = Color.White, fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
-                            onClick = { viewModel.rejectReimbursement(claim.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.rejectReimbursement(claim.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
@@ -2671,7 +2731,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
-                            onClick = { viewModel.approveReimbursement(claim.id) },
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.approveReimbursement(claim.id) 
+                                }
+                            },
+                            enabled = isAuthorized,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
                             shape = RoundedCornerShape(6.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)

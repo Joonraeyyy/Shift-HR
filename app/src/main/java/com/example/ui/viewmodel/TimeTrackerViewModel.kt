@@ -130,6 +130,14 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     // System Notifications list
     val notifications = mutableStateOf<List<NotificationItem>>(emptyList())
 
+    // --- REGIONAL & SCHEDULE SETTINGS ---
+    var selectedCurrency = mutableStateOf("USD") // USD or PHP
+    var currentScheduleType = mutableStateOf("Weekly") // Weekly, 15 Days, Monthly
+
+    fun getCurrencySymbol(): String {
+        return if (selectedCurrency.value == "PHP") "₱" else "$"
+    }
+
     // Active log for edit modal
     var selectedLogForEdit = mutableStateOf<TimeLogEntity?>(null)
 
@@ -199,7 +207,8 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     var leaveRequests = mutableStateOf<List<LeaveRequest>>(listOf(
         LeaveRequest(employeeName = "Sarah Jenkins", leaveType = "Sick Leave", startDate = "2026-07-01", endDate = "2026-07-02", reason = "Indore seasonal fever flu recovery", status = "APPROVED"),
-        LeaveRequest(employeeName = "Marcus Aurelius (HR Intern)", leaveType = "Vacation Leave", startDate = "2026-07-10", endDate = "2026-07-15", reason = "Family beach trip in Palawan, PH", status = "PENDING")
+        LeaveRequest(employeeName = "Marcus Aurelius (HR Intern)", leaveType = "Vacation Leave", startDate = "2026-07-10", endDate = "2026-07-15", reason = "Family beach trip in Palawan, PH", status = "PENDING"),
+        LeaveRequest(employeeName = "Robert Chen", leaveType = "Shift Change", startDate = "2026-07-05", endDate = "2026-07-05", reason = "Requested Manila Dev Shift ➔ Night Ops", status = "PENDING")
     ))
 
     var correctionRequests = mutableStateOf<List<CorrectionRequest>>(listOf(

@@ -48,6 +48,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import kotlin.math.sin
+import kotlin.math.cos
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,6 +62,13 @@ import com.example.ui.viewmodel.*
 import com.example.ui.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import android.os.Build
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -207,7 +218,8 @@ fun TimeTrackerApp(
             onEdit = {
                 editLogState = it
                 viewDetailsLog = null
-            }
+            },
+            currencySymbol = viewModel.getCurrencySymbol()
         )
     }
 
@@ -1912,7 +1924,7 @@ fun EmployeeClockScreen(
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.08f)))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = "HOURLY PAY", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text(text = "$${shiftConfig.hourlyRate} / HR", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color(0xFF38BDF8))
+                        Text(text = "${viewModel.getCurrencySymbol()}${shiftConfig.hourlyRate} / HR", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color(0xFF38BDF8))
                     }
                 }
             }
@@ -2162,6 +2174,29 @@ fun EmployeeClockScreen(
     }
 }
 
+class PunchBubbleAnimationState(
+    val id: Long,
+    val startX: Float,
+    val startY: Float,
+    val targetX: Float,
+    val targetY: Float,
+    val maxRadius: Float,
+    val durationMillis: Int = 500,
+    val delayMillis: Int = 0
+) {
+    val progress = Animatable(0f)
+
+    suspend fun animate() {
+        if (delayMillis > 0) {
+            delay(delayMillis.toLong())
+        }
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing)
+        )
+    }
+}
+
 @Composable
 fun PunchButton(
     text: String,
@@ -2171,23 +2206,196 @@ fun PunchButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = bgColor,
-            contentColor = Color.White,
-            disabledContainerColor = Color.White.copy(alpha = 0.04f),
-            disabledContentColor = Color.White.copy(alpha = 0.2f)
-        ),
-        shape = RoundedCornerShape(16.dp),
-        modifier = modifier.height(54.dp),
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        border = if (enabled) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.06f))
+    val coroutineScope = rememberCoroutineScope()
+    val bubbles = remember { mutableStateListOf<PunchBubbleAnimationState>() }
+    var buttonWidth by remember { mutableStateOf(0f) }
+    var buttonHeight by remember { mutableStateOf(0f) }
+    val localDensity = androidx.compose.ui.platform.LocalDensity.current
+
+    // Coordinates padding for canvas overflow (so bubbles splash outside the button smoothly)
+    val padXPx = remember { with(localDensity) { 16.dp.toPx() } }
+    val padYPx = remember { with(localDensity) { 8.dp.toPx() } }
+
+    val cornerRadius = 16.dp
+
+    Box(
+        modifier = modifier
+            .height(54.dp)
+            .onSizeChanged { size ->
+                buttonWidth = size.width.toFloat()
+                buttonHeight = size.height.toFloat()
+            },
+        contentAlignment = Alignment.Center
     ) {
-        Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(text = text, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        if (!enabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .background(Color.White.copy(alpha = 0.04f))
+                    .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(cornerRadius)),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.2f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = text.uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.2f)
+                    )
+                }
+            }
+        } else {
+            // 1. Gooey layer (Blurred and Contrasted together on GPU RenderThread)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            try {
+                                val blurEffect = android.graphics.RenderEffect.createBlurEffect(
+                                    12f,
+                                    12f,
+                                    android.graphics.Shader.TileMode.CLAMP
+                                )
+                                val alphaMatrix = floatArrayOf(
+                                    1f, 0f, 0f, 0f, 0f,
+                                    0f, 1f, 0f, 0f, 0f,
+                                    0f, 0f, 1f, 0f, 0f,
+                                    0f, 0f, 0f, 25f, -300f
+                                )
+                                val colorFilterEffect = android.graphics.RenderEffect.createColorFilterEffect(
+                                    android.graphics.ColorMatrixColorFilter(alphaMatrix)
+                                )
+                                val chain = android.graphics.RenderEffect.createChainEffect(colorFilterEffect, blurEffect)
+                                renderEffect = chain.asComposeRenderEffect()
+                            } catch (e: Exception) {
+                                // Fallback
+                            }
+                        }
+                    }
+            ) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    if (buttonWidth > 0 && buttonHeight > 0) {
+                        // Draw button background body
+                        drawRoundRect(
+                            color = bgColor,
+                            topLeft = Offset(padXPx, padYPx),
+                            size = Size(buttonWidth - 2 * padXPx, buttonHeight - 2 * padYPx),
+                            cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx())
+                        )
+
+                        // Draw organic splash bubbles merging with the background
+                        bubbles.forEach { bubble ->
+                            val p = bubble.progress.value
+                            val currentX = bubble.startX + (bubble.targetX - bubble.startX) * p
+                            val currentY = bubble.startY + (bubble.targetY - bubble.startY) * p
+                            // Smooth sine wave scaling: 0 -> 1 -> 0
+                            val scale = sin(p * Math.PI).toFloat()
+                            val radius = bubble.maxRadius * scale
+
+                            if (radius > 0.1f) {
+                                drawCircle(
+                                    color = bgColor,
+                                    radius = radius,
+                                    center = Offset(currentX, currentY)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Crisp overlay text layer (unblurred for high contrast readability)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(cornerRadius))
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = { localOffset ->
+                                val canvasX = localOffset.x + padXPx
+                                val canvasY = localOffset.y + padYPx
+
+                                val tapTime = System.currentTimeMillis()
+                                val newBubbles = mutableListOf<PunchBubbleAnimationState>()
+
+                                // Add center major merge bubble
+                                newBubbles.add(
+                                    PunchBubbleAnimationState(
+                                        id = tapTime,
+                                        startX = canvasX,
+                                        startY = canvasY,
+                                        targetX = canvasX + (buttonWidth / 2f - canvasX) * 0.3f,
+                                        targetY = canvasY + (buttonHeight / 2f - canvasY) * 0.3f,
+                                        maxRadius = 24.dp.toPx(),
+                                        durationMillis = 500
+                                    )
+                                )
+
+                                // Add satellite splash droplets
+                                for (i in 0 until 2) {
+                                    val angle = (Math.random() * 2 * Math.PI).toFloat()
+                                    val distance = (25f + Math.random().toFloat() * 25f)
+                                    val satTargetX = canvasX + cos(angle) * distance
+                                    val satTargetY = canvasY + sin(angle) * distance
+
+                                    newBubbles.add(
+                                        PunchBubbleAnimationState(
+                                            id = tapTime + i + 1,
+                                            startX = canvasX,
+                                            startY = canvasY,
+                                            targetX = satTargetX,
+                                            targetY = satTargetY,
+                                            maxRadius = (6f + Math.random().toFloat() * 6f).dp.toPx(),
+                                            durationMillis = 400 + (Math.random() * 100).toInt(),
+                                            delayMillis = (Math.random() * 30).toInt()
+                                        )
+                                    )
+                                }
+
+                                bubbles.addAll(newBubbles)
+                                newBubbles.forEach { bubble ->
+                                    coroutineScope.launch {
+                                        bubble.animate()
+                                        bubbles.remove(bubble)
+                                    }
+                                }
+
+                                // Trigger actual action callback
+                                onClick()
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = text.uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = Color.White
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -2391,7 +2599,7 @@ fun SpreadsheetScreen(
             )
             DashboardMetricCard(
                 title = "EST PAYROLL",
-                value = "$${df.format(estimatedWages)}",
+                value = "${viewModel.getCurrencySymbol()}${df.format(estimatedWages)}",
                 icon = Icons.Default.Paid,
                 tint = Color(0xFF00E5FF)
             )
@@ -3821,7 +4029,7 @@ fun SettingsScreen(
                 OutlinedTextField(
                     value = payRate,
                     onValueChange = { payRate = it },
-                    label = { Text("Base Wage Hourly Pay Rate ($)") },
+                    label = { Text("Base Wage Hourly Pay Rate (${viewModel.getCurrencySymbol()})") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth().testTag("pay_rate_input"),
@@ -3831,6 +4039,138 @@ fun SettingsScreen(
                         unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
                     )
                 )
+            }
+        }
+
+        // DAILY SCHEDULE CONFIGURATION (Only Supervisor & Department Manager can adjust)
+        val isScheduleAuthorized = userRole == "SUPERVISOR" || userRole == "MANAGER"
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "DAILY SCHEDULE RECURRENCE",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                    color = Color(0xFFCCFF00),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Configure work schedule cycle limits (Weekly, 15 Days, or Monthly). Available to Supervisors and Department Managers only.",
+                    fontSize = 11.sp,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Weekly", "15 Days", "Monthly").forEach { option ->
+                        val isSelected = viewModel.currentScheduleType.value == option
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) Color(0xFFCCFF00).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f))
+                                .border(1.dp, if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    if (isScheduleAuthorized) {
+                                        viewModel.currentScheduleType.value = option
+                                        viewModel.addAuditLog(viewModel.currentUserName.value, "Adjusted daily schedule recurrence to $option")
+                                        viewModel.addNotification("Schedule Update", "Daily schedule cycle set to $option successfully.", isAlert = false)
+                                    } else {
+                                        viewModel.addNotification("Unauthorized", "Only Supervisor and Department Manager can adjust Daily Schedule.", isAlert = true)
+                                    }
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = option,
+                                color = if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                if (!isScheduleAuthorized) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "🔒 Locked: Log in as a Supervisor or Department Manager to edit.",
+                        color = Color(0xFFF43F5E),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "⚡ Authorized: You are adjusting the ${userRole.lowercase()} schedule.",
+                        color = Color(0xFF10B981),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // REGIONAL CURRENCY PREFERENCE (Add Philippines Peso not only Dollar)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "REGIONAL CURRENCY",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                    color = Color(0xFFCCFF00),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Toggle currency preferences between US Dollar ($) and Philippines Peso (₱) for payroll, wage calculations, and claims.",
+                    fontSize = 11.sp,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    listOf("USD" to "US Dollar ($)", "PHP" to "Philippines Peso (₱)").forEach { (code, label) ->
+                        val isSelected = viewModel.selectedCurrency.value == code
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) Color(0xFFCCFF00).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f))
+                                .border(1.dp, if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                .clickable {
+                                    viewModel.selectedCurrency.value = code
+                                    viewModel.addNotification("Currency Changed", "Currency display set to $code.", isAlert = false)
+                                }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.6f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -3893,15 +4233,21 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = Color(0xFFCCFF00), fontWeight = FontWeight.Bold)
+                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) Color.White else Color.White.copy(alpha = 0.5f))
+                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
                     }
-                    Text("Defines boundary around authorized coordinate hubs.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Text(if (isAuthorized) "Defines boundary around authorized coordinate hubs." else "Defines boundary around authorized coordinate hubs (Only Admin/HR can adjust).", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
                     Slider(
                         value = viewModel.geofenceRadius.value,
-                        onValueChange = { viewModel.geofenceRadius.value = it },
+                        onValueChange = { if (isAuthorized) viewModel.geofenceRadius.value = it },
                         valueRange = 50f..500f,
-                        colors = SliderDefaults.colors(thumbColor = Color(0xFFCCFF00), activeTrackColor = Color(0xFFCCFF00))
+                        enabled = isAuthorized,
+                        colors = SliderDefaults.colors(
+                            thumbColor = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.2f),
+                            activeTrackColor = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.2f),
+                            disabledThumbColor = Color.White.copy(alpha = 0.2f),
+                            disabledActiveTrackColor = Color.White.copy(alpha = 0.1f)
+                        )
                     )
                 }
 
@@ -3914,17 +4260,20 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) Color.White else Color.White.copy(alpha = 0.5f))
+                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (!isAuthorized) Color.White.copy(alpha = 0.5f) else if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
                     }
-                    Text("Drag outward to test Geofence Out-Of-Bounds error logic.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Text(if (isAuthorized) "Drag outward to test Geofence Out-Of-Bounds error logic." else "Drag outward to test Geofence Out-Of-Bounds error logic (Only Admin/HR can adjust).", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
                     Slider(
                         value = viewModel.simulatedDistance.value,
-                        onValueChange = { viewModel.simulatedDistance.value = it },
+                        onValueChange = { if (isAuthorized) viewModel.simulatedDistance.value = it },
                         valueRange = 0f..400f,
+                        enabled = isAuthorized,
                         colors = SliderDefaults.colors(
                             thumbColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
-                            activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981)
+                            activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                            disabledThumbColor = Color.White.copy(alpha = 0.2f),
+                            disabledActiveTrackColor = Color.White.copy(alpha = 0.1f)
                         )
                     )
                 }
@@ -4379,7 +4728,8 @@ fun MiniShiftLogo(modifier: Modifier = Modifier) {
 fun LogDetailDialog(
     log: TimeLogEntity,
     onDismiss: () -> Unit,
-    onEdit: (TimeLogEntity) -> Unit
+    onEdit: (TimeLogEntity) -> Unit,
+    currencySymbol: String = "$"
 ) {
     val df = DecimalFormat("#.##")
     val totalMillis = if (log.timeIn != null && log.timeOut != null) {
@@ -4452,7 +4802,7 @@ fun LogDetailDialog(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text("HOURLY PAY SCALE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text("$${log.hourlyRate}/HR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("${currencySymbol}${log.hourlyRate}/HR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Column {
                         Text("COMPUTED WORKING", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)

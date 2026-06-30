@@ -35,13 +35,22 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.viewmodel.TimeTrackerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.os.Build
+import android.graphics.ColorMatrixColorFilter
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.CornerRadius
+import kotlin.math.sin
+import kotlin.math.cos
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var activeGuideTab by remember { mutableStateOf("stepper") } // "stepper" or "diagram"
+    var activeGuideTab by remember { mutableStateOf("stepper") } // "stepper", "diagram" or "gooey"
 
     Column(
         modifier = Modifier
@@ -52,7 +61,7 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
     ) {
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Tab Selector for Stepper vs Diagram
+        // Tab Selector for Stepper, Diagram, and Liquid UX
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -76,13 +85,13 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
                         Icons.Default.MenuBook,
                         contentDescription = null,
                         tint = if (activeGuideTab == "stepper") Color.Black else NeonGreen,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "Interactive Guide",
+                        "Guide",
                         color = if (activeGuideTab == "stepper") Color.Black else Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -90,7 +99,7 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
 
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .weight(1.1f)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (activeGuideTab == "diagram") NeonGreen else Color.Transparent)
                     .clickable { activeGuideTab = "diagram" }
@@ -102,13 +111,39 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
                         Icons.Default.Schema,
                         contentDescription = null,
                         tint = if (activeGuideTab == "diagram") Color.Black else NeonGreen,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        "Platform Diagram",
+                        "Architecture",
                         color = if (activeGuideTab == "diagram") Color.Black else Color.White,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1.1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (activeGuideTab == "gooey") NeonGreen else Color.Transparent)
+                    .clickable { activeGuideTab = "gooey" }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.BubbleChart,
+                        contentDescription = null,
+                        tint = if (activeGuideTab == "gooey") Color.Black else NeonGreen,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "Liquid UX",
+                        color = if (activeGuideTab == "gooey") Color.Black else Color.White,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -120,14 +155,19 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
         AnimatedContent(
             targetState = activeGuideTab,
             transitionSpec = {
-                slideInHorizontally { width -> if (targetState == "diagram") width else -width } with
-                        slideOutHorizontally { width -> if (targetState == "diagram") -width else width }
+                val isGoingRight = (targetState == "diagram" && initialState == "stepper") ||
+                                   (targetState == "gooey" && (initialState == "stepper" || initialState == "diagram"))
+                if (isGoingRight) {
+                    slideInHorizontally { width -> width } with slideOutHorizontally { width -> -width }
+                } else {
+                    slideInHorizontally { width -> -width } with slideOutHorizontally { width -> width }
+                }
             }
         ) { targetTab ->
-            if (targetTab == "stepper") {
-                StepperGuideSection(viewModel, context)
-            } else {
-                InteractiveDiagramSection(context)
+            when (targetTab) {
+                "stepper" -> StepperGuideSection(viewModel, context)
+                "diagram" -> InteractiveDiagramSection(context)
+                "gooey" -> GooeySandboxSection(viewModel, context)
             }
         }
     }
@@ -1092,5 +1132,457 @@ fun FlowArrow() {
             close()
         }
         drawPath(path = path, color = neonColor)
+    }
+}
+
+// ==================== LIQUID GOOEY COMPONENT & SANDBOX ====================
+
+class BubbleAnimationState(
+    val id: Long,
+    val startX: Float,
+    val startY: Float,
+    val targetX: Float,
+    val targetY: Float,
+    val maxRadius: Float,
+    val durationMillis: Int = 600,
+    val delayMillis: Int = 0
+) {
+    val progress = Animatable(0f)
+
+    suspend fun animate() {
+        if (delayMillis > 0) {
+            delay(delayMillis.toLong())
+        }
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(durationMillis = durationMillis, easing = FastOutSlowInEasing)
+        )
+    }
+}
+
+@Composable
+fun GooeyLiquidButton(
+    modifier: Modifier = Modifier,
+    text: String,
+    onClick: () -> Unit,
+    buttonColor: Color = NeonGreen,
+    textColor: Color = Color.Black,
+    icon: ImageVector? = null,
+    blurRadius: Float = 15f,
+    contrast: Float = 30f,
+    offset: Float = -350f,
+    numSatellites: Int = 3,
+    bubbleColor: Color = buttonColor
+) {
+    val coroutineScope = rememberCoroutineScope()
+    val bubbles = remember { mutableStateListOf<BubbleAnimationState>() }
+    val localDensity = androidx.compose.ui.platform.LocalDensity.current
+
+    // Coordinates padding for canvas overflow (so bubbles splash outside the button smoothly)
+    val padXPx = remember { with(localDensity) { 30.dp.toPx() } }
+    val padYPx = remember { with(localDensity) { 15.dp.toPx() } }
+
+    val cornerRadius = 25.dp
+
+    // Draw parameters
+    Box(
+        modifier = modifier
+            .size(width = 260.dp, height = 80.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        // 1. Gooey layer (Blurred and Contrasted together on GPU RenderThread)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        try {
+                            val blurEffect = android.graphics.RenderEffect.createBlurEffect(
+                                blurRadius,
+                                blurRadius,
+                                android.graphics.Shader.TileMode.CLAMP
+                            )
+                            val alphaMatrix = floatArrayOf(
+                                1f, 0f, 0f, 0f, 0f,
+                                0f, 1f, 0f, 0f, 0f,
+                                0f, 0f, 1f, 0f, 0f,
+                                0f, 0f, 0f, contrast, offset
+                            )
+                            val colorFilterEffect = android.graphics.RenderEffect.createColorFilterEffect(
+                                android.graphics.ColorMatrixColorFilter(alphaMatrix)
+                            )
+                            val chain = android.graphics.RenderEffect.createChainEffect(colorFilterEffect, blurEffect)
+                            renderEffect = chain.asComposeRenderEffect()
+                        } catch (e: Exception) {
+                            // Fallback gracefully on error
+                        }
+                    }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val buttonWidth = size.width - 2 * padXPx
+                val buttonHeight = size.height - 2 * padYPx
+
+                // Draw button main background
+                drawRoundRect(
+                    color = buttonColor,
+                    topLeft = Offset(padXPx, padYPx),
+                    size = Size(buttonWidth, buttonHeight),
+                    cornerRadius = CornerRadius(cornerRadius.toPx(), cornerRadius.toPx())
+                )
+
+                // Draw active organic splash bubbles
+                bubbles.forEach { bubble ->
+                    val p = bubble.progress.value
+                    val currentX = bubble.startX + (bubble.targetX - bubble.startX) * p
+                    val currentY = bubble.startY + (bubble.targetY - bubble.startY) * p
+                    // Mathematical sine curve for smooth expanding & contraction of bubble: sin(p * PI)
+                    val scale = sin(p * Math.PI).toFloat()
+                    val radius = bubble.maxRadius * scale
+
+                    if (radius > 0.1f) {
+                        drawCircle(
+                            color = bubbleColor,
+                            radius = radius,
+                            center = Offset(currentX, currentY)
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. Crisp overlay text layer (unblurred for maximum readability/accessibility)
+        Box(
+            modifier = Modifier
+                .size(width = 200.dp, height = 50.dp)
+                .clip(RoundedCornerShape(cornerRadius))
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { localOffset ->
+                            // Translate tap position to canvas coordinates
+                            val canvasX = localOffset.x + padXPx
+                            val canvasY = localOffset.y + padYPx
+
+                            // Spawning bubbles
+                            val newBubbles = mutableListOf<BubbleAnimationState>()
+                            val tapTime = System.currentTimeMillis()
+
+                            // Add a major central splash bubble that merges into button body
+                            newBubbles.add(
+                                BubbleAnimationState(
+                                    id = tapTime,
+                                    startX = canvasX,
+                                    startY = canvasY,
+                                    targetX = canvasX + (size.width / 2f - canvasX) * 0.35f, // drifts toward center
+                                    targetY = canvasY + (size.height / 2f - canvasY) * 0.35f,
+                                    maxRadius = 38.dp.toPx(),
+                                    durationMillis = 650
+                                )
+                            )
+
+                            // Add minor satellite splash bubbles shooting outward
+                            for (i in 0 until numSatellites) {
+                                val angle = (Math.random() * 2 * Math.PI).toFloat()
+                                val distance = (40f + Math.random().toFloat() * 45f) // random travel distance
+                                val satTargetX = canvasX + cos(angle) * distance
+                                val satTargetY = canvasY + sin(angle) * distance
+
+                                newBubbles.add(
+                                    BubbleAnimationState(
+                                        id = tapTime + i + 1,
+                                        startX = canvasX,
+                                        startY = canvasY,
+                                        targetX = satTargetX,
+                                        targetY = satTargetY,
+                                        maxRadius = (8f + Math.random().toFloat() * 9f).dp.toPx(),
+                                        durationMillis = 500 + (Math.random() * 150).toInt(),
+                                        delayMillis = (Math.random() * 40).toInt()
+                                    )
+                                )
+                            }
+
+                            bubbles.addAll(newBubbles)
+                            newBubbles.forEach { bubble ->
+                                coroutineScope.launch {
+                                    bubble.animate()
+                                    bubbles.remove(bubble)
+                                }
+                            }
+
+                            // Trigger onClick callback
+                            onClick()
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (icon != null) {
+                    Icon(imageVector = icon, contentDescription = null, tint = textColor, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = text,
+                    color = textColor,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
+    // Sandbox adjustments state
+    var blurRadius by remember { mutableStateOf(20f) }
+    var contrast by remember { mutableStateOf(30f) }
+    var alphaOffset by remember { mutableStateOf(-350f) }
+    var numSatellites by remember { mutableStateOf(3) }
+    var selectedPresetName by remember { mutableStateOf("Mercury") }
+
+    // Floating sandbox decoration state
+    var clickCount by remember { mutableStateOf(0) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E24)),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "LIQUID METABALL SIMULATOR",
+                fontWeight = FontWeight.Black,
+                fontSize = 11.sp,
+                color = NeonGreen,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Tap the button below to witness a high-performance fluid gooey effect running fully on GPU RenderThread (60+ FPS).",
+                fontSize = 11.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // --- THE VISUAL BUTTON PLAYGROUND ---
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                GooeyLiquidButton(
+                    text = "PUNCH TIME IN",
+                    icon = Icons.Default.TouchApp,
+                    onClick = {
+                        clickCount++
+                        Toast.makeText(context, "Shift Punch Triggered! 🟢 Total Sandbox Taps: $clickCount", Toast.LENGTH_SHORT).show()
+                    },
+                    blurRadius = blurRadius,
+                    contrast = contrast,
+                    offset = alphaOffset,
+                    numSatellites = numSatellites,
+                    buttonColor = NeonGreen,
+                    textColor = Color.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- PRESETS ROW ---
+            Text(
+                text = "PHYSICS PRESETS",
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val presets = listOf(
+                    Triple("Mercury", 20f, 30f),
+                    Triple("Soft Lava", 35f, 15f),
+                    Triple("Water Drop", 12f, 40f),
+                    Triple("Gas Plasma", 28f, 25f)
+                )
+
+                presets.forEach { (name, b, c) ->
+                    val isSelected = selectedPresetName == name
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f))
+                            .border(1.dp, if (isSelected) NeonGreen else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                            .clickable {
+                                selectedPresetName = name
+                                blurRadius = b
+                                contrast = c
+                                alphaOffset = -c * 11.5f // proportional threshold offset
+                            }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = name,
+                            color = if (isSelected) NeonGreen else Color.White.copy(alpha = 0.6f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // --- SLIDERS SECTION ---
+            Text(
+                text = "GOOEY ENGINE FINE-TUNING",
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.align(Alignment.Start)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Slider 1: Blur Radius
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Blur Radius (feGaussianBlur)", fontSize = 11.sp, color = Color.White)
+                    Text("${blurRadius.toInt()}px", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
+                }
+                Slider(
+                    value = blurRadius,
+                    onValueChange = {
+                        blurRadius = it
+                        selectedPresetName = "Custom"
+                    },
+                    valueRange = 5f..50f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                )
+            }
+
+            // Slider 2: Contrast (feColorMatrix Matrix Value)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Contrast Multiplier (feColorMatrix)", fontSize = 11.sp, color = Color.White)
+                    Text("${contrast.toInt()}x", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
+                }
+                Slider(
+                    value = contrast,
+                    onValueChange = {
+                        contrast = it
+                        selectedPresetName = "Custom"
+                    },
+                    valueRange = 10f..60f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                )
+            }
+
+            // Slider 3: Alpha Offset (feColorMatrix Constant value)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Alpha Threshold (Offset)", fontSize = 11.sp, color = Color.White)
+                    Text("${alphaOffset.toInt()}", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
+                }
+                Slider(
+                    value = alphaOffset,
+                    onValueChange = {
+                        alphaOffset = it
+                        selectedPresetName = "Custom"
+                    },
+                    valueRange = -4000f..-100f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                )
+            }
+
+            // Slider 4: Satellite Splash Droplets
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Splash Satellite Droplets", fontSize = 11.sp, color = Color.White)
+                    Text("$numSatellites bubbles", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
+                }
+                Slider(
+                    value = numSatellites.toFloat(),
+                    onValueChange = {
+                        numSatellites = it.toInt()
+                        selectedPresetName = "Custom"
+                    },
+                    valueRange = 0f..6f,
+                    steps = 5,
+                    colors = SliderDefaults.colors(
+                        thumbColor = NeonGreen,
+                        activeTrackColor = NeonGreen,
+                        inactiveTrackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- TECHNICAL INFO EXPLANATION ---
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.02f)),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "⚙️ Under The Hood (Hardware Acceleration)",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Metaballs (organic liquid merging) are drawn on a single hardware-accelerated Skia graphics layer. First, we apply a high-radius blur filter. Second, we apply a Color Matrix filter that amplifies the Alpha channel contrast by 30x or 40x and shifts the threshold using offset, sharpening the blurred alpha outline instantly on the GPU (RenderThread) for perfect 60+ FPS.",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 9.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
     }
 }
