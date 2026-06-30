@@ -26,7 +26,60 @@ data class Holiday(
     val isNational: Boolean
 )
 
+data class CalendarEventNote(
+    val id: String = UUID.randomUUID().toString(),
+    val date: String, // yyyy-MM-dd
+    val title: String,
+    val description: String,
+    val time: String, // e.g., "10:00 AM"
+    val syncWithGoogleCalendar: Boolean = true,
+    val isNotificationActive: Boolean = true
+)
+
 class TimeTrackerViewModel(application: Application) : AndroidViewModel(application) {
+
+    var calendarNotes = mutableStateOf<List<CalendarEventNote>>(listOf(
+        CalendarEventNote(
+            date = "2026-06-29",
+            title = "HR Sync Meeting",
+            description = "Discuss timesheet compliance audit workflow with directors",
+            time = "10:00 AM",
+            syncWithGoogleCalendar = true
+        ),
+        CalendarEventNote(
+            date = "2026-06-30",
+            title = "Payroll Review",
+            description = "Finalize basic and overtime ledger calculation exports",
+            time = "02:30 PM",
+            syncWithGoogleCalendar = true
+        )
+    ))
+
+    var activeSimulatedNotification = mutableStateOf<CalendarEventNote?>(null)
+
+    fun addCalendarNote(date: String, title: String, description: String, time: String, sync: Boolean) {
+        val newNote = CalendarEventNote(
+            date = date,
+            title = title,
+            description = description,
+            time = time,
+            syncWithGoogleCalendar = sync
+        )
+        calendarNotes.value = calendarNotes.value + newNote
+        
+        // Trigger a simulated notification instantly
+        if (sync) {
+            activeSimulatedNotification.value = newNote
+        }
+    }
+
+    fun deleteCalendarNote(id: String) {
+        calendarNotes.value = calendarNotes.value.filter { it.id != id }
+    }
+    
+    fun dismissActiveSimulatedNotification() {
+        activeSimulatedNotification.value = null
+    }
 
     private val repository: TimeTrackerRepository
     
@@ -79,6 +132,34 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     // Active log for edit modal
     var selectedLogForEdit = mutableStateOf<TimeLogEntity?>(null)
+
+    // --- CYBER CLOCK SECURITY / TELEMETRY STATES ---
+    var geofenceRadius = mutableStateOf(100f) // Allowed radius in meters
+    var simulatedDistance = mutableStateOf(25f) // Simulated employee distance in meters
+    var isFaceRecognitionEnabled = mutableStateOf(true)
+    var isDeviceVerificationEnabled = mutableStateOf(true)
+    var isLiveLocationTrackingActive = mutableStateOf(true)
+    
+    // Security scan toggles
+    var isMockGpsActive = mutableStateOf(false)
+    var isRootedActive = mutableStateOf(false)
+    var isImpossibleTravelTriggered = mutableStateOf(false)
+    
+    // Simulation parameters
+    var registeredDeviceId = mutableStateOf("SECURE_MDM_ANDROID_84F9")
+    var currentSimulatedDevice = mutableStateOf("SECURE_MDM_ANDROID_84F9") // or "UNAPPROVED_MOCK_PHONE"
+    var currentSimulatedFaceName = mutableStateOf("Sarah Jenkins") // or "INTRUDER_FACE"
+    
+    // Interactive state for biometric dialog
+    var showFaceScannerForAction = mutableStateOf<String?>(null)
+    var isFaceScanMismatched = mutableStateOf(false)
+    
+    // Shift scheduler states
+    var selectedShiftTemplate = mutableStateOf("Manila Dev Shift") // Manila Dev Shift, Indore Day Flex, Night Ops
+    
+    // Live field locations
+    var liveFieldLat = mutableStateOf(14.5995)
+    var liveFieldLng = mutableStateOf(120.9842)
 
     // Combined Holiday list for Indore / India and Manila / Philippines regions
     val localHolidays = listOf(
@@ -635,18 +716,34 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     // Update Profile Information
-    fun updateProfileInfo(emergencyContact: String, contactPhone: String, email: String) {
+    fun updateProfileInfo(
+        emergencyContact: String,
+        contactPhone: String,
+        email: String,
+        phoneNumber: String,
+        address: String,
+        preferredName: String,
+        personalEmail: String,
+        picture: String,
+        emergencyRelationship: String
+    ) {
         employeeProfiles.value = employeeProfiles.value.map {
             if (it.name == currentUserName.value) {
                 it.copy(
                     emergencyContactName = emergencyContact,
                     emergencyContactPhone = contactPhone,
-                    email = email
+                    email = email,
+                    phoneNumber = phoneNumber,
+                    address = address,
+                    preferredName = preferredName,
+                    personalEmail = personalEmail,
+                    picture = picture,
+                    emergencyRelationship = emergencyRelationship
                 )
             } else it
         }
-        addAuditLog(currentUserName.value, "Updated emergency contact and profile details.")
-        addNotification("Self-Service", "Successfully updated emergency contact details.", isAlert = false)
+        addAuditLog(currentUserName.value, "Updated emergency contact and personal profile details.")
+        addNotification("Self-Service", "Successfully updated personal profile and contact details.", isAlert = false)
     }
 
     fun toggleOfflineMode(offline: Boolean) {
@@ -654,7 +751,8 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         if (offline) {
             addNotification("Network", "Working in Offline Simulation. Logs stored locally in room database.", isAlert = true)
         } else {
-            addNotification("Network", "Network restored. Active cloud synchronization enabled.", isAlert = false)
+            addNotification("Network", "Network restored. Performing background cloud sync...", isAlert = false)
+            performSync()
         }
     }
 
@@ -685,8 +783,49 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // Handles any clock punch event
+    // Handles any clock punch event with built-in security checks
     fun handlePunch(actionType: String) {
+        // 1. Rooted check
+        if (isRootedActive.value) {
+            addAuditLog(currentUserName.value, "BLOCKED PUNCH: Rooted/jailbroken device detected.")
+            addNotification("CyberSec Integrity", "PUNCH BLOCKED: Device Integrity Check Failed (Device is rooted/jailbroken).", isAlert = true)
+            return
+        }
+
+        // 2. Device register lock check
+        if (isDeviceVerificationEnabled.value && currentSimulatedDevice.value != registeredDeviceId.value) {
+            addAuditLog(currentUserName.value, "BLOCKED PUNCH: Unapproved hardware device '${currentSimulatedDevice.value}' used.")
+            addNotification("Device Lock", "PUNCH BLOCKED: Terminal not registered for this account. Allowed device ID: ${registeredDeviceId.value}", isAlert = true)
+            return
+        }
+
+        // 3. Geofencing check
+        if (simulatedDistance.value > geofenceRadius.value) {
+            addAuditLog(currentUserName.value, "BLOCKED PUNCH: Geofence violation. Distance: ${simulatedDistance.value}m, Max Radius: ${geofenceRadius.value}m.")
+            addNotification("Geofence", "PUNCH BLOCKED: You are outside the geofence perimeter (${simulatedDistance.value}m from hub, perimeter is ${geofenceRadius.value}m).", isAlert = true)
+            return
+        }
+
+        // 4. Biometric Face Recognition Check (If enabled and not yet completed)
+        if (isFaceRecognitionEnabled.value && showFaceScannerForAction.value == null) {
+            // Open the face recognition scan modal
+            showFaceScannerForAction.value = actionType
+            return
+        }
+
+        // 5. Impossible Travel Check (Simulation trigger)
+        if (isImpossibleTravelTriggered.value) {
+            addAuditLog(currentUserName.value, "SUSPICIOUS AUDIT: Impossible travel alert! Sarah Jenkins clocked in Manila (14.59) and Indore (22.71) in 2 mins.")
+            addNotification("Suspicious Alert", "🚨 IMPOSSIBLE TRAVEL DETECTED: Logged simultaneous presence in Manila & Indore. Audit flag raised!", isAlert = true)
+        }
+
+        // 6. Mock GPS Check
+        if (isMockGpsActive.value) {
+            addAuditLog(currentUserName.value, "SUSPICIOUS AUDIT: Spoofed mock coordinates detected via MockProvider interface.")
+            addNotification("Mock GPS Guard", "⚠️ SECURITY ALERT: Mock GPS provider active! Clock log flagged for HR manual inspection.", isAlert = true)
+        }
+
+        // Proceed to register punch
         viewModelScope.launch {
             // Ensure repository uses the correct logged-in user name
             val config = repository.getShiftConfig()
@@ -697,6 +836,17 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             val result = repository.registerPunch(actionType, isMockOffline.value)
             refreshActiveLog()
             
+            // Check for late check-in (clocking in after 09:15 AM)
+            if (actionType == "TIME_IN") {
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                val min = Calendar.getInstance().get(Calendar.MINUTE)
+                if (hour > 9 || (hour == 9 && min > 15)) {
+                    addNotification("Late Shift Alert", "⏰ LATE ATTENDANCE: Checked in late at ${String.format("%02d:%02d", hour, min)} AM. Standard shift starts at 09:00 AM.", isAlert = true)
+                } else {
+                    addNotification("Shift Alert", "Checked in on-time! Have a productive shift.", isAlert = false)
+                }
+            }
+
             val isAlert = result.contains("Please") || result.contains("Already")
             addNotification("Punch Clock", result, isAlert = isAlert)
 
@@ -707,6 +857,21 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
                 addNotification("Policy Guard", "Tea/Coffee break logged. Rest up to 30 minutes.", isAlert = false)
             }
         }
+    }
+
+    // Secondary bypass handle for completed scans
+    fun handlePunchAfterFaceRecognition(actionType: String) {
+        showFaceScannerForAction.value = null
+        if (isFaceScanMismatched.value) {
+            addAuditLog(currentUserName.value, "BLOCKED PUNCH: Face match biometric verification mismatch.")
+            addNotification("Security Shield", "PUNCH BLOCKED: Face Recognition Match failed. Unknown person or spoofing pattern detected.", isAlert = true)
+            return
+        }
+        
+        // Match succeeded, temporarily bypass face check and perform actual punch
+        isFaceRecognitionEnabled.value = false
+        handlePunch(actionType)
+        isFaceRecognitionEnabled.value = true
     }
 
     // Simulates syncing unsynced records to cloud database
@@ -844,6 +1009,12 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
                     val actualWorkHours = actualWorkMillis.toFloat() / 3600000f
                     if (actualWorkHours >= targetHours && actualWorkHours - targetHours < 0.01f) {
                         addNotification("Shift Complete", "Target shift duration reached! Clock out recommended.", isAlert = false)
+                    } else if (actualWorkHours > targetHours) {
+                        val otDiff = actualWorkHours - targetHours
+                        // Notify on initial overtime entry
+                        if (otDiff < 0.02f) {
+                            addNotification("Overtime Notice", "⚠️ OVERTIME ACTIVE: You have exceeded your target shift. Standard rate overtime calculation is active.", isAlert = true)
+                        }
                     }
                 } else {
                     activeTimerString.value = "00:00:00"

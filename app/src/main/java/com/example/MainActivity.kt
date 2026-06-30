@@ -26,7 +26,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -46,6 +48,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.database.ShiftConfigEntity
@@ -208,6 +211,233 @@ fun TimeTrackerApp(
         )
     }
 
+    // Biometric Face Recognition Simulation Dialog
+    val showFaceScanAction = viewModel.showFaceScannerForAction.value
+    if (showFaceScanAction != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { viewModel.showFaceScannerForAction.value = null }
+        ) {
+            var scanProgress by remember { mutableStateOf(0f) }
+            var isScanningFinished by remember { mutableStateOf(false) }
+
+            // Tick up scanning progress simulation
+            LaunchedEffect(showFaceScanAction) {
+                scanProgress = 0f
+                isScanningFinished = false
+                while (scanProgress < 1f) {
+                    delay(30)
+                    scanProgress += 0.04f
+                }
+                scanProgress = 1f
+                isScanningFinished = true
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.95f)),
+                border = BorderStroke(2.dp, if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "BIOMETRIC FACE NODE MATCHING",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                            letterSpacing = 1.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E).copy(alpha = 0.15f)
+                                    else Color(0xFF10B981).copy(alpha = 0.15f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (viewModel.isFaceScanMismatched.value) "SECURITY SECURE" else "SECURE NODAL",
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Authenticating identity for: ${viewModel.currentUserName.value}",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    // Styled viewfinder
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color.Black)
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Drawing simple canvas node lines and face grid
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            val w = size.width
+                            val h = size.height
+                            
+                            // Target Face Guide (Oval)
+                            drawOval(
+                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E).copy(alpha = 0.4f) else Color(0xFF10B981).copy(alpha = 0.4f),
+                                topLeft = Offset(w * 0.25f, h * 0.15f),
+                                size = Size(w * 0.5f, h * 0.7f),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 4f,
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                                )
+                            )
+
+                            // Nodal face dots simulation
+                            if (scanProgress > 0.1f) {
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.5f, h * 0.35f)) // nose
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.4f, h * 0.3f))  // left eye
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.6f, h * 0.3f))  // right eye
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.45f, h * 0.5f)) // left cheek
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.55f, h * 0.5f)) // right cheek
+                                drawCircle(Color(0xFF38BDF8), 6f, Offset(w * 0.5f, h * 0.65f)) // chin
+                            }
+
+                            // Dynamic Laser Line
+                            val laserY = h * scanProgress
+                            drawLine(
+                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFFCCFF00),
+                                start = Offset(0f, laserY),
+                                end = Offset(w, laserY),
+                                strokeWidth = 5f
+                            )
+                        }
+
+                        // Progress counter
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isScanningFinished && !viewModel.isFaceScanMismatched.value) Icons.Default.CheckCircle
+                                              else if (isScanningFinished && viewModel.isFaceScanMismatched.value) Icons.Default.Warning
+                                              else Icons.Default.Face,
+                                contentDescription = null,
+                                tint = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                                modifier = Modifier.size(36.dp)
+                            )
+                            Text(
+                                text = if (isScanningFinished) {
+                                    if (viewModel.isFaceScanMismatched.value) "BIOMETRIC MISMATCH" else "IDENTITY RECOGNIZED"
+                                } else "BIOMETRIC VECTOR SCANNING...",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "${(scanProgress * 100).toInt()}% MATCH RATE",
+                                fontSize = 10.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFFCCFF00)
+                            )
+                        }
+                    }
+
+                    // Interactive verification selection
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "SIMULATOR BIOMETRIC RESPONSE TARGET",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White.copy(alpha = 0.4f),
+                            letterSpacing = 0.5.sp
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = { viewModel.isFaceScanMismatched.value = false },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (!viewModel.isFaceScanMismatched.value) Color(0xFF10B981).copy(alpha = 0.2f) else Color.Transparent
+                                ),
+                                border = BorderStroke(1.dp, if (!viewModel.isFaceScanMismatched.value) Color(0xFF10B981) else Color.White.copy(alpha = 0.08f)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("Correct Face", fontSize = 10.sp, color = Color.White)
+                            }
+                            Button(
+                                onClick = { viewModel.isFaceScanMismatched.value = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E).copy(alpha = 0.2f) else Color.Transparent
+                                ),
+                                border = BorderStroke(1.dp, if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color.White.copy(alpha = 0.08f)),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(38.dp)
+                            ) {
+                                Text("Unknown Person", fontSize = 10.sp, color = Color.White)
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.showFaceScannerForAction.value = null },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.handlePunchAfterFaceRecognition(showFaceScanAction)
+                            },
+                            enabled = isScanningFinished,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFFCCFF00)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).testTag("confirm_face_biometrics_scan")
+                        ) {
+                            Text(
+                                text = if (viewModel.isFaceScanMismatched.value) "Submit (Block)" else "Clock Secure",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.Black
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (!isLoggedIn) {
         LoginScreen(
             themeName = viewModel.selectedTheme.value,
@@ -219,13 +449,22 @@ fun TimeTrackerApp(
             }
         )
     } else {
-        LiquidGlassBackground(
-            themeName = viewModel.selectedTheme.value,
-            modifier = modifier
-        ) {
-            Column(
-                modifier = Modifier.fillMaxSize()
+        Box(modifier = Modifier.fillMaxSize()) {
+            LiquidGlassBackground(
+                themeName = viewModel.selectedTheme.value,
+                modifier = modifier
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (viewDetailsLog != null || editLogState != null) {
+                                Modifier.blur(14.dp)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
             // App top-bar (Aesthetic Cyber Header)
             HeaderBar(
                 roleName = currentUserRole,
@@ -296,6 +535,7 @@ fun TimeTrackerApp(
                     }
                     "holidays" -> {
                         LocalHolidayCalendarScreen(
+                            viewModel = viewModel,
                             holidays = viewModel.localHolidays,
                             todayHoliday = viewModel.todayHoliday.value
                         )
@@ -359,6 +599,125 @@ fun TimeTrackerApp(
                 )
             }
         }
+
+        // Google Calendar Simulated Notification Overlay Banner
+        val activeNotif = viewModel.activeSimulatedNotification.value
+        if (activeNotif != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .align(Alignment.TopCenter)
+                    .zIndex(99f)
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Color(0xFF4285F4).copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Google Calendar Style Logo Icon
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(Color(0xFF4285F4), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "GOOGLE CALENDAR REMINDER",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF4285F4),
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = activeNotif.title,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = Color.White
+                                )
+                            }
+                            IconButton(onClick = { viewModel.dismissActiveSimulatedNotification() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Close",
+                                    tint = Color.White.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = Color.White.copy(alpha = 0.4f),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${activeNotif.date} at ${activeNotif.time}",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                        
+                        if (activeNotif.description.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = activeNotif.description,
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { viewModel.dismissActiveSimulatedNotification() }) {
+                                Text("Snooze", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Button(
+                                onClick = {
+                                    viewModel.dismissActiveSimulatedNotification()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4))
+                            ) {
+                                Text("Open Calendar", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Solid dim scrim on top of blurred backdrop to make dialog completely legible
+        if (viewDetailsLog != null || editLogState != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.55f))
+            )
+        }
+    }
     }
     }
 }
@@ -396,42 +755,10 @@ fun LoginScreen(
         ) {
         Spacer(modifier = Modifier.height(30.dp))
 
-        // Cyber Logo / Cycling Arc representation
-        Box(
-            modifier = Modifier
-                .size(100.dp)
-                .drawBehind {
-                    drawArc(
-                        color = Color(0xFF1E293B),
-                        startAngle = 0f,
-                        sweepAngle = 360f,
-                        useCenter = false,
-                        style = Stroke(width = 12f, cap = StrokeCap.Round)
-                    )
-                    drawArc(
-                        color = primaryColor,
-                        startAngle = -90f,
-                        sweepAngle = 260f,
-                        useCenter = false,
-                        style = Stroke(width = 12f, cap = StrokeCap.Round)
-                    )
-                    drawArc(
-                        color = Color(0xFF00E5FF),
-                        startAngle = 130f,
-                        sweepAngle = 90f,
-                        useCenter = false,
-                        style = Stroke(width = 6f, cap = StrokeCap.Round)
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.CloudQueue,
-                contentDescription = "Shift HR Logo",
-                tint = Color(0xFF38BDF8),
-                modifier = Modifier.size(40.dp)
-            )
-        }
+        // Premium Brand Logo Composable
+        ShiftHRLogo(
+            modifier = Modifier.size(115.dp)
+        )
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -795,6 +1122,13 @@ fun HeaderBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Mini Brand Logo Composable
+            MiniShiftLogo(
+                modifier = Modifier
+                    .padding(end = 12.dp)
+                    .size(38.dp)
+            )
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = displayName,
@@ -2682,9 +3016,24 @@ fun AuditHistoryItem(
 // ---------------------- SCREEN 4: LOCAL HOLIDAY CALENDAR SCREEN ----------------------
 @Composable
 fun LocalHolidayCalendarScreen(
+    viewModel: TimeTrackerViewModel,
     holidays: List<Holiday>,
     todayHoliday: Holiday?
 ) {
+    val context = LocalContext.current
+    var selectedDay by remember { mutableStateOf(29) } // Default to today's day (June 29)
+    val selectedDateStr = "2026-06-%02d".format(selectedDay)
+    
+    // Notes created for selected day
+    val notesForSelectedDay = viewModel.calendarNotes.value.filter { it.date == selectedDateStr }
+    val holidayForSelectedDay = holidays.find { it.date == selectedDateStr }
+
+    // Add note form state
+    var noteTitle by remember { mutableStateOf("") }
+    var noteDesc by remember { mutableStateOf("") }
+    var noteTime by remember { mutableStateOf("09:00 AM") }
+    var syncGoogleCalendar by remember { mutableStateOf(true) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2716,14 +3065,14 @@ fun LocalHolidayCalendarScreen(
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
-                            text = "INDORE CHRONO HUB",
+                            text = "CHRONO CALENDAR HUB",
                             fontWeight = FontWeight.Black,
                             fontSize = 10.sp,
                             color = Color(0xFFCCFF00),
                             letterSpacing = 1.5.sp
                         )
                         Text(
-                            text = "Local Holiday Calendar (2026)",
+                            text = "Interactive Calendar & Notes",
                             fontWeight = FontWeight.Black,
                             fontSize = 16.sp,
                             color = Color.White
@@ -2733,7 +3082,7 @@ fun LocalHolidayCalendarScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Timesheet integration honors gazetted Indian national holidays and Madhya Pradesh state local holidays. Enjoy healthy work-life balance!",
+                    text = "Timesheet integration honors gazetted Indian national holidays, state local holidays, and custom employee notes. Set reminders with Google Calendar style notifications!",
                     fontSize = 11.sp,
                     color = Color.White.copy(alpha = 0.5f)
                 )
@@ -2758,110 +3107,415 @@ fun LocalHolidayCalendarScreen(
             }
         }
 
+        // --- CALENDAR GRID CARD ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // Month Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "JUNE 2026",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                        color = Color.White,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "Active Reminders",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Days of week header
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    val daysOfWeek = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                    daysOfWeek.forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.4f),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Days Grid (June 2026 has 30 days and starts on Monday)
+                val daysInMonth = 30
+                val totalCells = 35 // 5 weeks of 7 days
+                
+                var currentDayNumber = 1
+                for (week in 0 until 5) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        for (dayOfWeek in 0 until 7) {
+                            if (currentDayNumber <= daysInMonth) {
+                                val dayNum = currentDayNumber
+                                val currentCellDateStr = "2026-06-%02d".format(dayNum)
+                                
+                                val hasHoliday = holidays.any { it.date == currentCellDateStr }
+                                val hasNotes = viewModel.calendarNotes.value.any { it.date == currentCellDateStr }
+                                val isSelected = dayNum == selectedDay
+
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(3.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(
+                                            when {
+                                                isSelected -> MaterialTheme.colorScheme.primary
+                                                dayNum == 29 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) // highlight today
+                                                else -> Color.White.copy(alpha = 0.02f)
+                                            }
+                                        )
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.04f),
+                                            RoundedCornerShape(10.dp)
+                                        )
+                                        .clickable { selectedDay = dayNum }
+                                        .padding(2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = dayNum.toString(),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected || dayNum == 29) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) Color.Black else Color.White
+                                        )
+                                        
+                                        // Indicator Dots
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            modifier = Modifier.padding(top = 2.dp)
+                                        ) {
+                                            if (hasHoliday) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(if (isSelected) Color.Black else Color(0xFFCCFF00))
+                                                )
+                                                Spacer(modifier = Modifier.width(2.dp))
+                                            }
+                                            if (hasNotes) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(if (isSelected) Color.Black else Color(0xFFE879F9))
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                currentDayNumber++
+                            } else {
+                                // Empty spacer for cells beyond June 30
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- SELECTED DAY ACTIONS / DETAIL CARD ---
         Text(
-            text = "UPCOMING REGIONAL BREAKS",
+            text = "AGENDA FOR %02d JUNE 2026".format(selectedDay),
             fontWeight = FontWeight.Black,
             fontSize = 11.sp,
             color = Color.White.copy(alpha = 0.4f),
             letterSpacing = 1.5.sp,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
 
-        // Holiday list
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
-            holidays.forEach { holiday ->
-                val isNational = holiday.isNational
-                val formattedDate = try {
-                    val inputSdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-                    val outSdf = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
-                    val dateObj = inputSdf.parse(holiday.date)
-                    if (dateObj != null) outSdf.format(dateObj) else holiday.date
-                } catch (e: Exception) {
-                    holiday.date
-                }
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isNational) Color(0xFF00E5FF).copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            Column(modifier = Modifier.padding(16.dp)) {
+                // 1. Holiday details if exists
+                if (holidayForSelectedDay != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF00E5FF).copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFF00E5FF).copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
                     ) {
-                        // Date Block Graphic
-                        Box(
-                            modifier = Modifier
-                                .size(54.dp)
-                                .background(
-                                    color = if (isNational) Color(0xFF00E5FF).copy(alpha = 0.1f) else Color.White.copy(alpha = 0.03f),
-                                    shape = RoundedCornerShape(12.dp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (holidayForSelectedDay.isNational) Icons.Default.Flag else Icons.Default.Celebration,
+                                contentDescription = null,
+                                tint = Color(0xFF00E5FF),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = holidayForSelectedDay.name,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
                                 )
-                                .border(
-                                    1.dp,
-                                    if (isNational) Color(0xFF00E5FF).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f),
-                                    shape = RoundedCornerShape(12.dp)
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = if (isNational) Icons.Default.Flag else Icons.Default.Celebration,
-                                    contentDescription = null,
-                                    tint = if (isNational) Color(0xFF00E5FF) else Color(0xFFCCFF00),
-                                    modifier = Modifier.size(20.dp)
+                                Text(
+                                    text = "Regional Gazette: ${holidayForSelectedDay.description}",
+                                    fontSize = 10.sp,
+                                    color = Color.White.copy(alpha = 0.6f)
                                 )
                             }
                         }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
+                // 2. Custom Notes / Events List
+                if (notesForSelectedDay.isEmpty() && holidayForSelectedDay == null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EventNote,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.2f),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "No notes or events scheduled for this day.",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.4f)
+                        )
+                    }
+                } else {
+                    notesForSelectedDay.forEach { note ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = holiday.name,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = Color.White
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            color = if (isNational) Color(0xFF00E5FF).copy(alpha = 0.12f) else Color(0xFFCCFF00).copy(alpha = 0.12f),
-                                            shape = RoundedCornerShape(4.dp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = note.title,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp,
+                                            color = Color.White
                                         )
-                                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                                ) {
-                                    Text(
-                                        text = if (isNational) "NATIONAL" else "REGIONAL",
-                                        color = if (isNational) Color(0xFF00E5FF) else Color(0xFFCCFF00),
-                                        fontSize = 7.sp,
-                                        fontWeight = FontWeight.Black
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = note.time,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    if (note.description.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = note.description,
+                                            fontSize = 11.sp,
+                                            color = Color.White.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                    if (note.syncWithGoogleCalendar) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.NotificationsActive,
+                                                contentDescription = null,
+                                                tint = Color(0xFF4285F4),
+                                                modifier = Modifier.size(11.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text(
+                                                text = "Google Calendar Reminders Active",
+                                                fontSize = 9.sp,
+                                                color = Color(0xFF4285F4),
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                IconButton(onClick = { viewModel.deleteCalendarNote(note.id) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete note",
+                                        tint = Color.White.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- ADD NEW EVENT / NOTE CARD ---
+        Text(
+            text = "SCHEDULE AN INDORE CHRONO REMINDER",
+            fontWeight = FontWeight.Black,
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.4f),
+            letterSpacing = 1.5.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 24.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Add Event Note",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = noteTitle,
+                    onValueChange = { noteTitle = it },
+                    placeholder = { Text("Event Name (e.g., Client sync, Team review)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = noteDesc,
+                    onValueChange = { noteDesc = it },
+                    placeholder = { Text("Details & description (Optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val times = listOf("09:00 AM", "12:00 PM", "02:30 PM", "05:00 PM")
+                    times.forEach { t ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (noteTime == t) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.03f))
+                                .border(1.dp, if (noteTime == t) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .clickable { noteTime = t }
+                                .padding(6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Text(
-                                text = formattedDate,
-                                fontSize = 11.sp,
-                                color = if (isNational) Color(0xFF00E5FF) else Color(0xFFCCFF00),
+                                text = t,
+                                fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(vertical = 2.dp)
-                            )
-                            Text(
-                                text = holiday.description,
-                                fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.4f)
+                                color = if (noteTime == t) Color.Black else Color.White
                             )
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = syncGoogleCalendar,
+                        onCheckedChange = { syncGoogleCalendar = it },
+                        colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Column {
+                        Text(
+                            text = "Notify Me Google Calendar Style",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Triggers an instant simulated notification banner",
+                            fontSize = 9.sp,
+                            color = Color.White.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = {
+                        if (noteTitle.isBlank()) {
+                            Toast.makeText(context, "Please enter an event name!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addCalendarNote(
+                                date = selectedDateStr,
+                                title = noteTitle,
+                                description = noteDesc,
+                                time = noteTime,
+                                sync = syncGoogleCalendar
+                            )
+                            Toast.makeText(context, "Reminder scheduled for June $selectedDay!", Toast.LENGTH_SHORT).show()
+                            noteTitle = ""
+                            noteDesc = ""
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Schedule Indore Reminder", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
@@ -3138,7 +3792,6 @@ fun SettingsScreen(
             }
         }
 
-        // Simulating offline switch (available to everyone for testing)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -3185,6 +3838,207 @@ fun SettingsScreen(
                         modifier = Modifier.testTag("remote_gps_switch"),
                         enabled = isAuthorized,
                         colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- GEOFENCE ADJUSTMENTS ---
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = Color(0xFFCCFF00), fontWeight = FontWeight.Bold)
+                    }
+                    Text("Defines boundary around authorized coordinate hubs.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Slider(
+                        value = viewModel.geofenceRadius.value,
+                        onValueChange = { viewModel.geofenceRadius.value = it },
+                        valueRange = 50f..500f,
+                        colors = SliderDefaults.colors(thumbColor = Color(0xFFCCFF00), activeTrackColor = Color(0xFFCCFF00))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                    }
+                    Text("Drag outward to test Geofence Out-Of-Bounds error logic.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Slider(
+                        value = viewModel.simulatedDistance.value,
+                        onValueChange = { viewModel.simulatedDistance.value = it },
+                        valueRange = 0f..400f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                            activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981)
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- ONE REGISTERED DEVICE LOCK ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("One Registered Device Matcher", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        Text("Authorized ID: ${viewModel.registeredDeviceId.value}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isDeviceVerificationEnabled.value,
+                        onCheckedChange = { viewModel.isDeviceVerificationEnabled.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                    )
+                }
+
+                if (viewModel.isDeviceVerificationEnabled.value) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Current Terminal hardware identity", fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f))
+                            Text(viewModel.currentSimulatedDevice.value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) Color(0xFF10B981) else Color(0xFFF43F5E))
+                        }
+                        Button(
+                            onClick = {
+                                if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) {
+                                    viewModel.currentSimulatedDevice.value = "UNAPPROVED_MOCK_HARDWARE_88X"
+                                } else {
+                                    viewModel.currentSimulatedDevice.value = viewModel.registeredDeviceId.value
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                            modifier = Modifier.height(30.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                        ) {
+                            Text(if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) "Simulate Spoof" else "Reset to Match", fontSize = 9.sp, color = Color.White)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- FACE RECOGNITION BIOMETRICS ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Secure Face Recognition Biometrics", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        Text("Verify vector points before completing clocks.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isFaceRecognitionEnabled.value,
+                        onCheckedChange = { viewModel.isFaceRecognitionEnabled.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- LIVE FIELD TRACKING ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Live Field Location Tracking", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                        Text("Push continuous field coords (lat: ${String.format("%.4f", viewModel.liveFieldLat.value)}, lng: ${String.format("%.4f", viewModel.liveFieldLng.value)})", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isLiveLocationTrackingActive.value,
+                        onCheckedChange = { viewModel.isLiveLocationTrackingActive.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // --- SUSPICIOUS ATTENDANCE SCANS ---
+                Text("SUSPICIOUS ATTENDANCE INTEGRITY DETECTORS", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFFF43F5E), letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Mock GPS Provider Detection", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text("Raise alarm for software-based location spoofing.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isMockGpsActive.value,
+                        onCheckedChange = { viewModel.isMockGpsActive.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Root / Jailbreak Shield Integrity", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text("Fail check entirely if custom binary partitions detected.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isRootedActive.value,
+                        onCheckedChange = { viewModel.isRootedActive.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Impossible Travel Time Window", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                        Text("Flag logs occurring across 2 remote hubs instantly.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                    }
+                    Switch(
+                        checked = viewModel.isImpossibleTravelTriggered.value,
+                        onCheckedChange = { viewModel.isImpossibleTravelTriggered.value = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
                     )
                 }
             }
@@ -3258,7 +4112,7 @@ fun RetroactiveEditDialog(
                 .fillMaxWidth()
                 .padding(8.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
             Column(
@@ -3376,6 +4230,110 @@ fun RetroactiveEditDialog(
 }
 
 @Composable
+fun ShiftHRLogo(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFFE2E8F0), RoundedCornerShape(24.dp))
+            .border(1.5.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(24.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF3B82F6), Color(0xFF14B8A6), Color(0x0014B8A6)),
+                    center = Offset(size.width * 0.65f, size.height * 0.35f),
+                    radius = size.width * 0.7f
+                ),
+                center = Offset(size.width * 0.65f, size.height * 0.35f),
+                radius = size.width * 0.7f
+            )
+
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF22C55E), Color(0xFF15803D), Color(0x0015803D)),
+                    center = Offset(size.width * 0.25f, size.height * 0.8f),
+                    radius = size.width * 0.45f
+                ),
+                center = Offset(size.width * 0.25f, size.height * 0.8f),
+                radius = size.width * 0.45f
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.padding(bottom = 6.dp)
+        ) {
+            Text(
+                text = "S",
+                color = Color.White,
+                fontSize = 52.sp,
+                fontWeight = FontWeight.Black,
+                fontFamily = FontFamily.SansSerif,
+                modifier = Modifier.padding(bottom = 0.dp)
+            )
+            Text(
+                text = "hift",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.SansSerif,
+                style = TextStyle(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(
+                            Color(0xFF6366F1),
+                            Color(0xFF8B5CF6),
+                            Color(0xFFEC4899),
+                            Color(0xFFF43F5E)
+                        )
+                    )
+                ),
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun MiniShiftLogo(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFFE2E8F0), CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+            .clip(CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF3B82F6), Color(0xFF14B8A6), Color(0x0014B8A6)),
+                    center = Offset(size.width * 0.65f, size.height * 0.35f),
+                    radius = size.width * 0.7f
+                ),
+                center = Offset(size.width * 0.65f, size.height * 0.35f),
+                radius = size.width * 0.7f
+            )
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(Color(0xFF22C55E), Color(0xFF15803D), Color(0x0015803D)),
+                    center = Offset(size.width * 0.25f, size.height * 0.8f),
+                    radius = size.width * 0.45f
+                ),
+                center = Offset(size.width * 0.25f, size.height * 0.8f),
+                radius = size.width * 0.45f
+            )
+        }
+        Text(
+            text = "S",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Black,
+            fontFamily = FontFamily.SansSerif
+        )
+    }
+}
+
+@Composable
 fun LogDetailDialog(
     log: TimeLogEntity,
     onDismiss: () -> Unit,
@@ -3396,7 +4354,7 @@ fun LogDetailDialog(
                 .fillMaxWidth()
                 .padding(8.dp),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)),
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
             Column(
@@ -3588,19 +4546,34 @@ fun exportLogsToCSV(logs: List<TimeLogEntity>, context: android.content.Context)
         csv.append("${log.id},${log.date},${log.employeeName},$tIn,$lOut,$lIn,$bOut,$bIn,$tOut,${log.hourlyRate},${log.isApproved},${if (log.isSynced) "Synced" else "Local Only"}\n")
     }
 
-    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-    val clip = android.content.ClipData.newPlainText("HR Timesheet CSV", csv.toString())
-    clipboard.setPrimaryClip(clip)
+    try {
+        val file = java.io.File(context.cacheDir, "Shift_HR_Ledger.csv")
+        java.io.FileOutputStream(file).use {
+            it.write(csv.toString().toByteArray())
+        }
 
-    Toast.makeText(context, "Spreadsheet CSV copied to clipboard!", Toast.LENGTH_LONG).show()
+        val uri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "com.example.fileprovider",
+            file
+        )
 
-    val shareIntent = android.content.Intent().apply {
-        action = android.content.Intent.ACTION_SEND
-        type = "text/plain"
-        putExtra(android.content.Intent.EXTRA_SUBJECT, "Chrono Ledger Timesheet Export")
-        putExtra(android.content.Intent.EXTRA_TEXT, csv.toString())
+        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("HR Timesheet CSV", csv.toString())
+        clipboard.setPrimaryClip(clip)
+
+        Toast.makeText(context, "Spreadsheet CSV copied & ready to share!", Toast.LENGTH_SHORT).show()
+
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/comma-separated-values"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Shift HR Timesheet Ledger")
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Timesheet Spreadsheet (Excel Form)"))
+    } catch (e: Exception) {
+        Toast.makeText(context, "Error converting to spreadsheet: ${e.message}", Toast.LENGTH_LONG).show()
     }
-    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Timesheet Spreadsheet Form"))
 }
 
 // ---------------------- COMPLIANCE DASHBOARD PLOTS & CHATS ----------------------

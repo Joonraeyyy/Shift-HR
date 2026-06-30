@@ -80,7 +80,57 @@ data class EmployeeProfile(
     val age: Int = 28,
     val phoneNumber: String = "+91 98765 43210",
     val picture: String = "",
-    val documents: List<String> = listOf("Employment_Contract.pdf", "Passport_Scan.pdf", "Tax_Declaration.pdf")
+    val documents: List<String> = listOf("Employment_Contract.pdf", "Passport_Scan.pdf", "Tax_Declaration.pdf"),
+
+    // --- NEW PROFESSIONAL STRUCTURE PROPERTIES WITH DEFAULTS ---
+    // 👤 Basic Information
+    val preferredName: String = "",
+    val gender: String = "Male",
+    val dob: String = "1997-05-15",
+    val civilStatus: String = "Single",
+    val nationality: String = "Indian",
+
+    // 💼 Employment Information
+    val team: String = "Core Platform",
+    val dateHired: String = "2023-01-15",
+    val supervisor: String = "Aditya Joshi (Director)",
+    val workLocation: String = "Indore Hub",
+    val shiftSchedule: String = "Manila Dev Shift",
+
+    // 📞 Contact Information
+    val personalEmail: String = "personal@gmail.com",
+    val address: String = "123 Hub Street, Indore",
+    val emergencyRelationship: String = "Spouse",
+
+    // 🪪 Government & Payroll Information
+    val taxId: String = "TIN-987-654-321",
+    val ssn: String = "SSN-12-3456789-0",
+    val healthInsurance: String = "HMO-77621-A",
+    val housingFund: String = "HF-9092-111",
+    val bankName: String = "State Bank of Indore",
+    val bankAccount: String = "99827162551",
+
+    // 📱 Attendance & Device
+    val registeredDevice: String = "SECURE_MDM_ANDROID_84F9",
+    val digitalId: String = "DIGI-ID-7721",
+    val nfcId: String = "NFC-TAG-772A",
+    val attendanceStatus: String = "Checked Out",
+    val assignedLocation: String = "Indore Hub",
+    val lastLogin: String = "2026-06-30 08:30 AM",
+
+    // 📅 Leave & Attendance Summary
+    val vacationLeaveBalance: Int = 15,
+    val sickLeaveBalance: Int = 10,
+    val otherLeaveBalances: Int = 5,
+    val totalLate: Int = 2,
+    val absences: Int = 0,
+    val overtimeHours: Double = 4.5,
+
+    // Account & Security
+    val username: String = "",
+    val twoFactorEnabled: Boolean = true,
+    val loginHistory: List<String> = listOf("2026-06-30 08:30 AM - Android 14", "2026-06-29 09:15 AM - Android 14"),
+    val accountStatus: String = "Active"
 )
 
 data class RegisteredUser(
