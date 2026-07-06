@@ -1,3 +1,15 @@
+Key Features
+
+Intelligent HR Insights: Built around an AI-driven core to assist with daily HR inquiries, documentation, and workflow automation.
+
+Performance Reports & Analytics: Deep dive into team metrics with built-in performance reporting and intuitive profile navigation features.
+
+Biometric Face Scanner: Secure, contact-free employee verification and attendance logging utilizing advanced facial recognition.
+
+NFC Support: Seamless physical asset tracking, badge scanning, or clock-in/clock-out triggers via Near Field Communication.
+
+Modern Android Architecture: Fully written in Kotlin with a highly optimized, reactive codebase.
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
