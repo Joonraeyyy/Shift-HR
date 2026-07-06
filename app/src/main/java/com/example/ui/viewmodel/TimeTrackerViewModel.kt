@@ -90,6 +90,7 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     // Screen states
     var currentScreen = mutableStateOf("clock") // clock, spreadsheet, hr_approval, settings, holidays
+    var selfServiceTab = mutableStateOf("leave") // leave, correction, claims, profile
     var isAdminMode = mutableStateOf(false) // Toggle helper (updates based on login role)
     
     // Sign-in states

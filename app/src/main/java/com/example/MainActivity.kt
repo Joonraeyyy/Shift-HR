@@ -484,7 +484,11 @@ fun TimeTrackerApp(
                 isOffline = viewModel.isMockOffline.value,
                 isSyncing = viewModel.isSyncing.value,
                 onLogout = { viewModel.logout() },
-                onSyncClick = { viewModel.performSync() }
+                onSyncClick = { viewModel.performSync() },
+                onProfileClick = {
+                    viewModel.currentScreen.value = "self_service"
+                    viewModel.selfServiceTab.value = "profile"
+                }
             )
 
             // Alerts section
@@ -589,6 +593,12 @@ fun TimeTrackerApp(
                         Column {
                             SaaSHeader(title = "AI Compliance assistant", onBack = { viewModel.currentScreen.value = "saas_hub" })
                             AiAssistantScreen(viewModel = viewModel)
+                        }
+                    }
+                    "performance_reports" -> {
+                        Column {
+                            SaaSHeader(title = "Performance appraisal", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            PerformanceReportingScreen(viewModel = viewModel)
                         }
                     }
                     "settings" -> {
@@ -1121,7 +1131,8 @@ fun HeaderBar(
     isOffline: Boolean,
     isSyncing: Boolean,
     onLogout: () -> Unit,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    onProfileClick: () -> Unit = {}
 ) {
     Card(
         modifier = Modifier
@@ -1147,7 +1158,12 @@ fun HeaderBar(
                     .size(38.dp)
             )
 
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onProfileClick() }
+                    .testTag("header_profile_click")
+            ) {
                 Text(
                     text = displayName,
                     fontWeight = FontWeight.Bold,

@@ -316,7 +316,7 @@ fun ProfileDetailRow(label: String, value: String) {
 // ---------------------- 2. EMPLOYEE SELF-SERVICE SCREEN ----------------------
 @Composable
 fun SelfServiceScreen(viewModel: TimeTrackerViewModel) {
-    var activeSubTab by remember { mutableStateOf("leave") } // leave, correction, claims, profile
+    val activeSubTab = viewModel.selfServiceTab.value
     val context = LocalContext.current
 
     Column(
@@ -353,7 +353,7 @@ fun SelfServiceScreen(viewModel: TimeTrackerViewModel) {
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
                         .background(if (activeSubTab == key) NeonGreen else Color.Transparent)
-                        .clickable { activeSubTab = key }
+                        .clickable { viewModel.selfServiceTab.value = key }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -3428,6 +3428,22 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                 icon = Icons.Default.AutoAwesome,
                 modifier = Modifier.weight(1f),
                 onClick = { viewModel.currentScreen.value = "ai_assistant" }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Performance & Printable Reports Tile
+            SaaSTileLauncher(
+                title = "Performance & Reports",
+                subtitle = "Printable performance reviews & company analytics",
+                icon = Icons.Default.Assessment,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { viewModel.currentScreen.value = "performance_reports" }
             )
         }
 
