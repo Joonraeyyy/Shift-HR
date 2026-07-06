@@ -20,6 +20,7 @@ Hardware APIs: Android Biometric Framework & NFC Core Library
 Quick Start (Local Setup)
 
 To get the project up and running locally on your machine, follow these steps:
+
 Prerequisites
 Android Studio (Latest Version recommended)
 A Gemini API Key
