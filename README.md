@@ -10,6 +10,20 @@ NFC Support: Seamless physical asset tracking, badge scanning, or clock-in/clock
 
 Modern Android Architecture: Fully written in Kotlin with a highly optimized, reactive codebase.
 
+Tech Stack & Architecture
+
+Language: 100% Kotlin
+Build System: Gradle (Kotlin DSL - build.gradle.kts)
+AI Backend: Integrated via Google Gemini API
+Hardware APIs: Android Biometric Framework & NFC Core Library
+
+Quick Start (Local Setup)
+
+To get the project up and running locally on your machine, follow these steps:
+Prerequisites
+Android Studio (Latest Version recommended)
+A Gemini API Key
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
 </div>
