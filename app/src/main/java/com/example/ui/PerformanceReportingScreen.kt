@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.ui.viewmodel.*
+import com.example.ui.theme.*
 import com.example.data.database.TimeLogEntity
 import java.io.File
 import java.io.FileOutputStream
@@ -90,6 +92,10 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
     val context = LocalContext.current
     val userRole = viewModel.currentUserRole.value
     val currentUserName = viewModel.currentUserName.value
+    
+    // Resolve dynamic Liquid Glass theme
+    val themeName = viewModel.selectedTheme.value
+    val themeColors = LiquidThemeRegistry.getThemeByName(themeName)
     
     // RBAC: Check if user belongs to the HR / Admin / Management Team
     val isHrOrAdmin = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
@@ -157,88 +163,106 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
             .verticalScroll(rememberScrollState())
             .padding(bottom = 24.dp)
     ) {
-        Text(
-            text = "Performance Appraisal & Reporting",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = AppNeonGreen,
-            modifier = Modifier.padding(vertical = 12.dp)
-        )
-
-        // Tabs Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AppCardGreyBg, RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            val tabs = listOf(
-                "individual" to "Individual Appraisal",
-                "organization" to "Company Executive Audit"
+        if (userRole == "EMPLOYEE") {
+            // For Employee role, just show the individual section directly, no tabs or extra title (matches screenshot exactly)
+            IndividualAppraisalSection(
+                context = context,
+                isHrOrAdmin = isHrOrAdmin,
+                profiles = profiles,
+                selectedProfile = selectedProfile,
+                onProfileSelected = { selectedProfile = it },
+                kpis = kpis,
+                historicalScores = historicalScores,
+                stats = profileStats,
+                userRole = userRole,
+                themeColors = themeColors
             )
-            tabs.forEach { (key, label) ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (activeTab == key) AppNeonGreen else Color.Transparent)
-                        .clickable { activeTab = key }
-                        .padding(vertical = 8.dp)
-                        .testTag("report_tab_$key"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+        } else {
+            // Admin/HR view has tabs and full functionality
+            Text(
+                text = "Performance Appraisal & Reporting",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = themeColors.primaryAccent,
+                modifier = Modifier.padding(vertical = 12.dp)
+            )
+
+            // Tabs Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(themeColors.cardSurface, RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val tabs = listOf(
+                    "individual" to "Individual Appraisal",
+                    "organization" to "Company Executive Audit"
+                )
+                tabs.forEach { (key, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeTab == key) themeColors.primaryAccent else Color.Transparent)
+                            .clickable { activeTab = key }
+                            .padding(vertical = 8.dp)
+                            .testTag("report_tab_$key"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (key == "organization" && !isHrOrAdmin) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = "RBAC Locked",
-                                tint = if (activeTab == key) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.4f),
-                                modifier = Modifier.size(12.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (key == "organization" && !isHrOrAdmin) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = "RBAC Locked",
+                                    tint = if (activeTab == key) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.4f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Text(
+                                text = label,
+                                color = if (activeTab == key) Color.Black else Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
                         }
-                        Text(
-                            text = label,
-                            color = if (activeTab == key) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        when (activeTab) {
-            "individual" -> {
-                IndividualAppraisalSection(
-                    context = context,
-                    isHrOrAdmin = isHrOrAdmin,
-                    profiles = profiles,
-                    selectedProfile = selectedProfile,
-                    onProfileSelected = { selectedProfile = it },
-                    kpis = kpis,
-                    historicalScores = historicalScores,
-                    stats = profileStats,
-                    userRole = userRole
-                )
-            }
-            "organization" -> {
-                if (!isHrOrAdmin) {
-                    // RBAC SECURED BLOCKED LOCK CARD
-                    RbacLockedView()
-                } else {
-                    OrganizationAuditSection(
+            when (activeTab) {
+                "individual" -> {
+                    IndividualAppraisalSection(
                         context = context,
-                        companyStats = companyStats,
-                        departmentTargets = departmentTargets,
-                        profiles = profiles
+                        isHrOrAdmin = isHrOrAdmin,
+                        profiles = profiles,
+                        selectedProfile = selectedProfile,
+                        onProfileSelected = { selectedProfile = it },
+                        kpis = kpis,
+                        historicalScores = historicalScores,
+                        stats = profileStats,
+                        userRole = userRole,
+                        themeColors = themeColors
                     )
+                }
+                "organization" -> {
+                    if (!isHrOrAdmin) {
+                        RbacLockedView(themeColors = themeColors)
+                    } else {
+                        OrganizationAuditSection(
+                            context = context,
+                            companyStats = companyStats,
+                            departmentTargets = departmentTargets,
+                            profiles = profiles,
+                            themeColors = themeColors
+                        )
+                    }
                 }
             }
         }
@@ -258,11 +282,14 @@ fun IndividualAppraisalSection(
     kpis: List<KpiCompetency>,
     historicalScores: List<HistoricalScore>,
     stats: PerformanceStats,
-    userRole: String
+    userRole: String,
+    themeColors: LiquidThemeColors
 ) {
     if (selectedProfile == null) return
 
     var expandedDropdown by remember { mutableStateOf(false) }
+    var isScoreCardExpanded by remember { mutableStateOf(false) }
+    var isTrendChartExpanded by remember { mutableStateOf(false) }
     val overallRating = remember(kpis) {
         kpis.map { it.managerScore * it.weight }.sum()
     }
@@ -272,8 +299,8 @@ fun IndividualAppraisalSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
@@ -303,16 +330,16 @@ fun IndividualAppraisalSection(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            focusedBorderColor = AppNeonGreen,
-                            unfocusedBorderColor = AppBorderGrey,
-                            focusedTrailingIconColor = AppNeonGreen
+                            focusedBorderColor = themeColors.primaryAccent,
+                            unfocusedBorderColor = themeColors.cardBorder,
+                            focusedTrailingIconColor = themeColors.primaryAccent
                         ),
                         textStyle = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     ExposedDropdownMenu(
                         expanded = expandedDropdown,
                         onDismissRequest = { expandedDropdown = false },
-                        modifier = Modifier.background(AppCardGreyBg)
+                        modifier = Modifier.background(themeColors.cardSurface.copy(alpha = 1f))
                     ) {
                         profiles.forEach { profile ->
                             DropdownMenuItem(
@@ -330,7 +357,7 @@ fun IndividualAppraisalSection(
                 Text(
                     text = "💼 Access Level: HR Admin / Supervisor (All Profiles Unlocked)",
                     fontSize = 10.sp,
-                    color = AppNeonGreen,
+                    color = themeColors.primaryAccent,
                     fontWeight = FontWeight.SemiBold
                 )
             } else {
@@ -345,7 +372,7 @@ fun IndividualAppraisalSection(
                     Icon(
                         imageVector = Icons.Default.VerifiedUser,
                         contentDescription = "Shield Verified",
-                        tint = AppNeonGreen,
+                        tint = themeColors.primaryAccent,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -374,8 +401,8 @@ fun IndividualAppraisalSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Row(
             modifier = Modifier
@@ -388,12 +415,12 @@ fun IndividualAppraisalSection(
             Column(modifier = Modifier.weight(1f)) {
                 Box(
                     modifier = Modifier
-                        .background(AppNeonGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                        .background(themeColors.primaryAccent.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = selectedProfile.id,
-                        color = AppNeonGreen,
+                        color = themeColors.primaryAccent,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -444,7 +471,7 @@ fun IndividualAppraisalSection(
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val angleProgress = (overallRating / 5.0f) * 260f
                     drawArc(
-                        color = AppNeonGreen,
+                        color = themeColors.primaryAccent,
                         startAngle = -220f,
                         sweepAngle = angleProgress,
                         useCenter = false,
@@ -475,8 +502,8 @@ fun IndividualAppraisalSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -488,12 +515,12 @@ fun IndividualAppraisalSection(
                     text = "Database Attendance Analytics (Live)",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AppNeonGreen
+                    color = themeColors.primaryAccent
                 )
                 Icon(
                     imageVector = Icons.Default.QueryStats,
                     contentDescription = "DB Stats",
-                    tint = AppNeonGreen,
+                    tint = themeColors.primaryAccent,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -521,7 +548,7 @@ fun IndividualAppraisalSection(
                     Text(text = "Overtime", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text(text = String.format("%.0f%%", stats.approvalRate), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = AppNeonGreen)
+                    Text(text = String.format("%.0f%%", stats.approvalRate), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.primaryAccent)
                     Text(text = "Approve Rate", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
                 }
             }
@@ -530,82 +557,100 @@ fun IndividualAppraisalSection(
 
     Spacer(modifier = Modifier.height(10.dp))
 
-    // KPI breakdown table
+    // KPI breakdown table - Expandable
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+            .padding(vertical = 6.dp)
+            .clickable { isScoreCardExpanded = !isScoreCardExpanded }
+            .testTag("kpi_breakdown_card_collapsible"),
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = "Core Competencies & Score Card",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "Comparison of employee self-evaluations against supervisor audits.",
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Table Headers
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.05f))
-                    .padding(vertical = 6.dp, horizontal = 8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "Competency / KPI", modifier = Modifier.weight(1.8f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                Text(text = "Self", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                Text(text = "Mgr", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = AppNeonGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                Text(text = "Var", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Core Competencies & Score Card",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Comparison of employee self-evaluations against supervisor audits.",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+                Icon(
+                    imageVector = if (isScoreCardExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isScoreCardExpanded) "Collapse" else "Expand",
+                    tint = themeColors.primaryAccent,
+                    modifier = Modifier.size(18.dp)
+                )
             }
 
-            // Alternating Row KPI table
-            kpis.forEachIndexed { index, kpi ->
-                val variance = kpi.managerScore - kpi.selfScore
-                val varianceColor = if (variance >= 0) AppNeonGreen else Color(0xFFFF5555)
-                val varianceText = if (variance >= 0) "+${String.format("%.1f", variance)}" else String.format("%.1f", variance)
-                
+            if (isScoreCardExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Table Headers
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (index % 2 == 0) Color.Transparent else Color.White.copy(alpha = 0.02f))
-                        .padding(vertical = 10.dp, horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .background(Color.White.copy(alpha = 0.05f))
+                        .padding(vertical = 6.dp, horizontal = 8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1.8f)) {
-                        Text(text = kpi.competency, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(text = kpi.description, fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(text = "Competency / KPI", modifier = Modifier.weight(1.8f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(text = "Self", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(text = "Mgr", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = themeColors.primaryAccent, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(text = "Var", modifier = Modifier.weight(0.7f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                }
+
+                // Alternating Row KPI table
+                kpis.forEachIndexed { index, kpi ->
+                    val variance = kpi.managerScore - kpi.selfScore
+                    val varianceColor = if (variance >= 0) themeColors.primaryAccent else Color(0xFFFF5555)
+                    val varianceText = if (variance >= 0) "+${String.format("%.1f", variance)}" else String.format("%.1f", variance)
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(if (index % 2 == 0) Color.Transparent else Color.White.copy(alpha = 0.02f))
+                            .padding(vertical = 10.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1.8f)) {
+                            Text(text = kpi.competency, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            Text(text = kpi.description, fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                        }
+                        Text(
+                            text = String.format("%.1f", kpi.selfScore),
+                            modifier = Modifier.weight(0.7f),
+                            fontSize = 11.sp,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = String.format("%.1f", kpi.managerScore),
+                            modifier = Modifier.weight(0.7f),
+                            fontSize = 11.sp,
+                            color = themeColors.primaryAccent,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            text = varianceText,
+                            modifier = Modifier.weight(0.7f),
+                            fontSize = 11.sp,
+                            color = varianceColor,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
                     }
-                    Text(
-                        text = String.format("%.1f", kpi.selfScore),
-                        modifier = Modifier.weight(0.7f),
-                        fontSize = 11.sp,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = String.format("%.1f", kpi.managerScore),
-                        modifier = Modifier.weight(0.7f),
-                        fontSize = 11.sp,
-                        color = AppNeonGreen,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        text = varianceText,
-                        modifier = Modifier.weight(0.7f),
-                        fontSize = 11.sp,
-                        color = varianceColor,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
-                    )
                 }
             }
         }
@@ -613,211 +658,229 @@ fun IndividualAppraisalSection(
 
     Spacer(modifier = Modifier.height(10.dp))
 
-    // Interactive Historical Progress Chart
+    // Interactive Historical Progress Chart - Expandable
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+            .padding(vertical = 6.dp)
+            .clickable { isTrendChartExpanded = !isTrendChartExpanded }
+            .testTag("historical_trend_card_collapsible"),
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = "Historical Score Progress Trend",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            Text(
-                text = "Performance reviews overall rating over the past five quarters.",
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.5f),
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // Canvas drawing for line graph
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .padding(vertical = 8.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val w = size.width
-                    val h = size.height
-                    
-                    // Margins for axes
-                    val marginX = 40.dp.toPx()
-                    val marginY = 20.dp.toPx()
-                    
-                    val graphW = w - marginX * 1.5f
-                    val graphH = h - marginY * 2f
-                    
-                    // Grid lines (y-axis lines for scores 3.0 to 5.0)
-                    val steps = 4
-                    for (i in 0..steps) {
-                        val scoreVal = 3.0f + i * 0.5f
-                        val y = h - marginY - (scoreVal - 3.0f) / 2.0f * graphH
-                        
-                        // horizontal guide lines
-                        drawLine(
-                            color = Color.White.copy(alpha = 0.08f),
-                            start = Offset(marginX, y),
-                            end = Offset(w - marginX * 0.5f, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                        
-                        // draw score labels
-                        drawContext.canvas.nativeCanvas.drawText(
-                            String.format("%.1f", scoreVal),
-                            10.dp.toPx(),
-                            y + 4.dp.toPx(),
-                            Paint().apply {
-                                color = android.graphics.Color.GRAY
-                                textSize = 8.dp.toPx()
-                                typeface = Typeface.DEFAULT_BOLD
-                            }
-                        )
-                    }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Historical Score Progress Trend",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Performance reviews overall rating over the past five quarters.",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+                Icon(
+                    imageVector = if (isTrendChartExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (isTrendChartExpanded) "Collapse" else "Expand",
+                    tint = themeColors.primaryAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
 
-                    // Plot the quarterly trend coordinates
-                    val pointCount = historicalScores.size
-                    val points = mutableListOf<Offset>()
-                    
-                    historicalScores.forEachIndexed { i, record ->
-                        val x = marginX + (i.toFloat() / (pointCount - 1).toFloat()) * graphW
-                        // map score 3.0f to 5.0f onto our pixel bounds
-                        val scoreNorm = (record.score - 3.0f) / 2.0f
-                        val y = h - marginY - scoreNorm * graphH
-                        points.add(Offset(x, y))
-                    }
+            if (isTrendChartExpanded) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    // Draw connection path
-                    if (points.isNotEmpty()) {
-                        val path = Path().apply {
-                            moveTo(points[0].x, points[0].y)
-                            for (idx in 1 until points.size) {
-                                lineTo(points[idx].x, points[idx].y)
-                            }
-                        }
+                // Canvas drawing for line graph
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .padding(vertical = 8.dp)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
                         
-                        // Line stroke
-                        drawPath(
-                            path = path,
-                            color = AppNeonGreen,
-                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
-                        )
+                        // Margins for axes
+                        val marginX = 40.dp.toPx()
+                        val marginY = 20.dp.toPx()
                         
-                        // Background gradient underneath line
-                        val gradientPath = Path().apply {
-                            moveTo(points[0].x, h - marginY)
-                            for (p in points) {
-                                lineTo(p.x, p.y)
-                            }
-                            lineTo(points.last().x, h - marginY)
-                            close()
-                        }
+                        val graphW = w - marginX * 1.5f
+                        val graphH = h - marginY * 2f
                         
-                        drawPath(
-                            path = gradientPath,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(AppNeonGreen.copy(alpha = 0.18f), Color.Transparent),
-                                startY = 0f,
-                                endY = h - marginY
-                            )
-                        )
-
-                        // Draw points and labels
-                        points.forEachIndexed { i, pt ->
-                            drawCircle(
-                                color = AppNeonGreen,
-                                radius = 4.dp.toPx(),
-                                center = pt
-                            )
-                            drawCircle(
-                                color = Color.White,
-                                radius = 2.dp.toPx(),
-                                center = pt
+                        // Grid lines (y-axis lines for scores 3.0 to 5.0)
+                        val steps = 4
+                        for (i in 0..steps) {
+                            val scoreVal = 3.0f + i * 0.5f
+                            val y = h - marginY - (scoreVal - 3.0f) / 2.0f * graphH
+                            
+                            // horizontal guide lines
+                            drawLine(
+                                color = Color.White.copy(alpha = 0.08f),
+                                start = Offset(marginX, y),
+                                end = Offset(w - marginX * 0.5f, y),
+                                strokeWidth = 1.dp.toPx()
                             )
                             
-                            // Quarter Label at bottom
+                            // draw score labels
                             drawContext.canvas.nativeCanvas.drawText(
-                                historicalScores[i].quarter,
-                                pt.x - 14.dp.toPx(),
-                                h - 4.dp.toPx(),
+                                String.format("%.1f", scoreVal),
+                                10.dp.toPx(),
+                                y + 4.dp.toPx(),
                                 Paint().apply {
-                                    color = android.graphics.Color.WHITE
-                                    textSize = 8.dp.toPx()
-                                }
-                            )
-
-                            // Rating score label above point
-                            drawContext.canvas.nativeCanvas.drawText(
-                                String.format("%.2f", historicalScores[i].score),
-                                pt.x - 12.dp.toPx(),
-                                pt.y - 8.dp.toPx(),
-                                Paint().apply {
-                                    color = android.graphics.Color.GREEN
+                                    color = android.graphics.Color.GRAY
                                     textSize = 8.dp.toPx()
                                     typeface = Typeface.DEFAULT_BOLD
                                 }
                             )
                         }
+
+                        // Plot the quarterly trend coordinates
+                        val pointCount = historicalScores.size
+                        val points = mutableListOf<Offset>()
+                        
+                        historicalScores.forEachIndexed { i, record ->
+                            val x = marginX + (i.toFloat() / (pointCount - 1).toFloat()) * graphW
+                            // map score 3.0f to 5.0f onto our pixel bounds
+                            val scoreNorm = (record.score - 3.0f) / 2.0f
+                            val y = h - marginY - scoreNorm * graphH
+                            points.add(Offset(x, y))
+                        }
+
+                        // Draw connection path
+                        if (points.isNotEmpty()) {
+                            val path = Path().apply {
+                                moveTo(points[0].x, points[0].y)
+                                for (idx in 1 until points.size) {
+                                    lineTo(points[idx].x, points[idx].y)
+                                }
+                            }
+                            
+                            // Line stroke
+                            drawPath(
+                                path = path,
+                                color = themeColors.primaryAccent,
+                                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                            
+                            // Background gradient underneath line
+                            val gradientPath = Path().apply {
+                                moveTo(points[0].x, h - marginY)
+                                for (p in points) {
+                                    lineTo(p.x, p.y)
+                                }
+                                lineTo(points.last().x, h - marginY)
+                                close()
+                            }
+                            
+                            drawPath(
+                                path = gradientPath,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(themeColors.primaryAccent.copy(alpha = 0.18f), Color.Transparent),
+                                    startY = 0f,
+                                    endY = h - marginY
+                                )
+                            )
+
+                            // Draw points and labels
+                            points.forEachIndexed { i, pt ->
+                                drawCircle(
+                                    color = themeColors.primaryAccent,
+                                    radius = 4.dp.toPx(),
+                                    center = pt
+                                )
+                                drawCircle(
+                                    color = Color.White,
+                                    radius = 2.dp.toPx(),
+                                    center = pt
+                                )
+                                
+                                // Quarter Label at bottom
+                                drawContext.canvas.nativeCanvas.drawText(
+                                    historicalScores[i].quarter,
+                                    pt.x - 14.dp.toPx(),
+                                    h - 4.dp.toPx(),
+                                    Paint().apply {
+                                        color = android.graphics.Color.WHITE
+                                        textSize = 8.dp.toPx()
+                                    }
+                                )
+
+                                // Rating score label above point
+                                drawContext.canvas.nativeCanvas.drawText(
+                                    String.format("%.2f", historicalScores[i].score),
+                                    pt.x - 12.dp.toPx(),
+                                    pt.y - 8.dp.toPx(),
+                                    Paint().apply {
+                                        color = themeColors.primaryAccent.toArgb()
+                                        textSize = 8.dp.toPx()
+                                        typeface = Typeface.DEFAULT_BOLD
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Action Row - PDF Download & Print Controls inside expand block
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val file = generateIndividualPerformancePdf(context, selectedProfile, kpis, stats, historicalScores, overallRating)
+                            if (file != null) {
+                                Toast.makeText(context, "PDF successfully printed! File saved in cache.", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "Failed to print PDF.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("download_individual_pdf_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primaryAccent),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Icon", tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Print Review PDF", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            val file = generateIndividualPerformancePdf(context, selectedProfile, kpis, stats, historicalScores, overallRating)
+                            if (file != null) {
+                                openPdfFile(context, file)
+                            } else {
+                                Toast.makeText(context, "Could not open document.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(44.dp)
+                            .testTag("share_individual_pdf_button"),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, themeColors.cardBorder)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Share Icon", tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("View & Share PDF", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        }
-    }
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    // Action Row - PDF Download & Print Controls
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Button(
-            onClick = {
-                val file = generateIndividualPerformancePdf(context, selectedProfile, kpis, stats, historicalScores, overallRating)
-                if (file != null) {
-                    Toast.makeText(context, "PDF successfully printed! File saved in cache.", Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(context, "Failed to print PDF.", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-                .testTag("download_individual_pdf_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = AppNeonGreen),
-            shape = RoundedCornerShape(10.dp)
-        ) {
-            Icon(Icons.Default.PictureAsPdf, contentDescription = "PDF Icon", tint = Color.Black)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("Print Review PDF", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        }
-
-        Button(
-            onClick = {
-                val file = generateIndividualPerformancePdf(context, selectedProfile, kpis, stats, historicalScores, overallRating)
-                if (file != null) {
-                    openPdfFile(context, file)
-                } else {
-                    Toast.makeText(context, "Could not open document.", Toast.LENGTH_SHORT).show()
-                }
-            },
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-                .testTag("share_individual_pdf_button"),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, AppBorderGrey)
-        ) {
-            Icon(Icons.Default.Share, contentDescription = "Share Icon", tint = Color.White)
-            Spacer(modifier = Modifier.width(6.dp))
-            Text("View & Share PDF", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -827,7 +890,8 @@ fun OrganizationAuditSection(
     context: Context,
     companyStats: PerformanceStats,
     departmentTargets: List<DepartmentTarget>,
-    profiles: List<EmployeeProfile>
+    profiles: List<EmployeeProfile>,
+    themeColors: LiquidThemeColors
 ) {
     // 1. Key Metrics Row
     Row(
@@ -844,8 +908,8 @@ fun OrganizationAuditSection(
                 modifier = Modifier
                     .weight(1f)
                     .height(90.dp),
-                colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-                border = BorderStroke(1.dp, AppBorderGrey)
+                colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+                border = BorderStroke(1.dp, themeColors.cardBorder)
             ) {
                 Column(
                     modifier = Modifier
@@ -854,7 +918,7 @@ fun OrganizationAuditSection(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(imageVector = icon, contentDescription = null, tint = AppNeonGreen, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = icon, contentDescription = null, tint = themeColors.primaryAccent, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(text = title, fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f), textAlign = TextAlign.Center)
                     Text(text = valStr, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, textAlign = TextAlign.Center)
@@ -870,8 +934,8 @@ fun OrganizationAuditSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
@@ -897,7 +961,7 @@ fun OrganizationAuditSection(
             ) {
                 Text(text = "Department", modifier = Modifier.weight(1.5f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
                 Text(text = "Target", modifier = Modifier.weight(0.8f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-                Text(text = "Actual", modifier = Modifier.weight(0.8f), fontSize = 10.sp, color = AppNeonGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                Text(text = "Actual", modifier = Modifier.weight(0.8f), fontSize = 10.sp, color = themeColors.primaryAccent, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                 Text(text = "Audit", modifier = Modifier.weight(0.9f), fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             }
 
@@ -912,7 +976,7 @@ fun OrganizationAuditSection(
                 ) {
                     Text(text = dept.department, modifier = Modifier.weight(1.5f), fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     Text(text = String.format("%.2f", dept.target), modifier = Modifier.weight(0.8f), fontSize = 11.sp, color = Color.White, textAlign = TextAlign.Center)
-                    Text(text = String.format("%.2f", dept.actual), modifier = Modifier.weight(0.8f), fontSize = 11.sp, color = AppNeonGreen, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                    Text(text = String.format("%.2f", dept.actual), modifier = Modifier.weight(0.8f), fontSize = 11.sp, color = themeColors.primaryAccent, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                     
                     Box(
                         modifier = Modifier
@@ -944,8 +1008,8 @@ fun OrganizationAuditSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
@@ -1028,7 +1092,7 @@ fun OrganizationAuditSection(
                     drawPath(
                         path = fillPath,
                         brush = Brush.verticalGradient(
-                            colors = listOf(AppNeonGreen.copy(alpha = 0.25f), Color.Transparent),
+                            colors = listOf(themeColors.primaryAccent.copy(alpha = 0.25f), Color.Transparent),
                             startY = h - marginY - graphH,
                             endY = h - marginY
                         )
@@ -1037,14 +1101,14 @@ fun OrganizationAuditSection(
                     // Draw the curve line
                     drawPath(
                         path = path,
-                        color = AppNeonGreen,
+                        color = themeColors.primaryAccent,
                         style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
                     )
 
                     // Mark Mean (mu) indicator
                     val muX = marginX + ((mu - minScore) / (maxScore - minScore)) * graphW
                     drawLine(
-                        color = AppNeonGreen.copy(alpha = 0.6f),
+                        color = themeColors.primaryAccent.copy(alpha = 0.6f),
                         start = Offset(muX, h - marginY - graphH),
                         end = Offset(muX, h - marginY),
                         strokeWidth = 1.5.dp.toPx(),
@@ -1057,7 +1121,7 @@ fun OrganizationAuditSection(
                         muX - 24.dp.toPx(),
                         h - marginY - graphH - 4.dp.toPx(),
                         Paint().apply {
-                            color = android.graphics.Color.GREEN
+                            color = themeColors.primaryAccent.toArgb()
                             textSize = 8.dp.toPx()
                             typeface = Typeface.DEFAULT_BOLD
                         }
@@ -1089,8 +1153,8 @@ fun OrganizationAuditSection(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(
@@ -1145,7 +1209,7 @@ fun OrganizationAuditSection(
                         Text(text = leader.first, fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                     }
 
-                    Text(text = leader.second, fontSize = 11.sp, color = AppNeonGreen, fontWeight = FontWeight.Bold)
+                    Text(text = leader.second, fontSize = 11.sp, color = themeColors.primaryAccent, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -1167,7 +1231,7 @@ fun OrganizationAuditSection(
             .fillMaxWidth()
             .height(48.dp)
             .testTag("download_company_pdf_button"),
-        colors = ButtonDefaults.buttonColors(containerColor = AppNeonGreen),
+        colors = ButtonDefaults.buttonColors(containerColor = themeColors.primaryAccent),
         shape = RoundedCornerShape(10.dp)
     ) {
         Icon(Icons.Default.Print, contentDescription = "Print Executive Report", tint = Color.Black)
@@ -1177,14 +1241,14 @@ fun OrganizationAuditSection(
 }
 
 @Composable
-fun RbacLockedView() {
+fun RbacLockedView(themeColors: LiquidThemeColors) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
             .height(280.dp),
-        colors = CardDefaults.cardColors(containerColor = AppCardGreyBg.copy(alpha = 0.6f)),
-        border = BorderStroke(1.dp, AppBorderGrey)
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface.copy(alpha = 0.6f)),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
     ) {
         Column(
             modifier = Modifier
@@ -1229,12 +1293,12 @@ fun RbacLockedView() {
                     .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
-                Icon(Icons.Default.Security, contentDescription = null, tint = AppNeonGreen, modifier = Modifier.size(12.dp))
+                Icon(Icons.Default.Security, contentDescription = null, tint = themeColors.primaryAccent, modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Policy compliance active for Sarah Jenkins",
                     fontSize = 9.sp,
-                    color = AppNeonGreen,
+                    color = themeColors.primaryAccent,
                     fontWeight = FontWeight.SemiBold
                 )
             }

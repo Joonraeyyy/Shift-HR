@@ -142,3 +142,12 @@ data class RegisteredUser(
     val companyCode: String
 )
 
+data class TeamSchedule(
+    val id: String,
+    val employeeName: String,
+    val department: String,
+    val date: String, // format "YYYY-MM-DD", e.g., "2026-06-29"
+    val shiftName: String // "Manila Dev Shift", "Indore Day Flex", "Night Ops", "Off"
+)
+
+

@@ -89,12 +89,12 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     val shiftConfig: StateFlow<ShiftConfigEntity>
 
     // Screen states
-    var currentScreen = mutableStateOf("clock") // clock, spreadsheet, hr_approval, settings, holidays
+    var currentScreen = mutableStateOf("performance_reports") // clock, spreadsheet, hr_approval, settings, holidays
     var selfServiceTab = mutableStateOf("leave") // leave, correction, claims, profile
     var isAdminMode = mutableStateOf(false) // Toggle helper (updates based on login role)
     
     // Sign-in states
-    var isLoggedIn = mutableStateOf(false)
+    var isLoggedIn = mutableStateOf(true)
     var currentUserRole = mutableStateOf("EMPLOYEE") // EMPLOYEE, SUPERVISOR, MANAGER, ADMIN_HR
     var currentUserName = mutableStateOf("Sarah Jenkins")
     var currentUserUsername = mutableStateOf("employee")
@@ -112,7 +112,26 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var weatherForecast = mutableStateOf<ForecastResponse?>(null)
 
     // Dynamic Liquid Glass Theme State
-    var selectedTheme = mutableStateOf("Sapphire Glass")
+    var selectedTheme = mutableStateOf("Emerald Glass")
+
+    // --- RANKING BOARD MANAGEMENT STATES ---
+    var postedRankingPeriod = mutableStateOf("Monthly") // Monthly, Every 3 Months, Quarterly, Yearly
+    var lastPostedRankingNotification = mutableStateOf<String?>(null)
+
+    fun postRankingPeriod(period: String) {
+        postedRankingPeriod.value = period
+        val msg = "Attention: New $period Rankings have been officially published and posted by Admin HR!"
+        lastPostedRankingNotification.value = msg
+        addNotification(
+            title = "Ranking Board Published",
+            message = "Admin HR has successfully posted the new $period rankings for review.",
+            isAlert = true
+        )
+    }
+
+    fun dismissRankingNotification() {
+        lastPostedRankingNotification.value = null
+    }
 
     // Local / Offline Simulation states
     var isMockOffline = mutableStateOf(false) // Simulates device losing network connection
@@ -129,7 +148,17 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     private var timerJob: Job? = null
 
     // System Notifications list
-    val notifications = mutableStateOf<List<NotificationItem>>(emptyList())
+    val notifications = mutableStateOf<List<NotificationItem>>(
+        listOf(
+            NotificationItem(
+                id = "security_check_init",
+                title = "SECURITY CHECK",
+                message = "Logged in successfully as Sarah Jenkins (EMPLOYEE)",
+                timestamp = System.currentTimeMillis(),
+                isAlert = false
+            )
+        )
+    )
 
     // --- REGIONAL & SCHEDULE SETTINGS ---
     var selectedCurrency = mutableStateOf("USD") // USD or PHP
@@ -244,6 +273,50 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var loansList = mutableStateOf<List<LoanRecord>>(listOf(
         LoanRecord(employeeName = "Sarah Jenkins", type = "Salary Advance", amount = 500.0, monthlyDeduction = 50.0, remaining = 350.0)
     ))
+
+    var teamSchedules = mutableStateOf<List<TeamSchedule>>(listOf(
+        // Default schedules for June 2026 (matching the main calendar month)
+        // Sarah Jenkins (Engineering)
+        TeamSchedule("ts1", "Sarah Jenkins", "Engineering", "2026-06-25", "Manila Dev Shift"),
+        TeamSchedule("ts2", "Sarah Jenkins", "Engineering", "2026-06-26", "Manila Dev Shift"),
+        TeamSchedule("ts3", "Sarah Jenkins", "Engineering", "2026-06-27", "Off"),
+        TeamSchedule("ts4", "Sarah Jenkins", "Engineering", "2026-06-28", "Off"),
+        TeamSchedule("ts5", "Sarah Jenkins", "Engineering", "2026-06-29", "Manila Dev Shift"),
+        TeamSchedule("ts6", "Sarah Jenkins", "Engineering", "2026-06-30", "Manila Dev Shift"),
+
+        // Robert Chen (Product Management)
+        TeamSchedule("ts7", "Robert Chen", "Product Management", "2026-06-25", "Indore Day Flex"),
+        TeamSchedule("ts8", "Robert Chen", "Product Management", "2026-06-26", "Indore Day Flex"),
+        TeamSchedule("ts9", "Robert Chen", "Product Management", "2026-06-27", "Off"),
+        TeamSchedule("ts10", "Robert Chen", "Product Management", "2026-06-28", "Off"),
+        TeamSchedule("ts11", "Robert Chen", "Product Management", "2026-06-29", "Indore Day Flex"),
+        TeamSchedule("ts12", "Robert Chen", "Product Management", "2026-06-30", "Night Ops"),
+
+        // Marcus Aurelius (HR Intern) (Human Resources)
+        TeamSchedule("ts13", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-25", "Indore Day Flex"),
+        TeamSchedule("ts14", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-26", "Indore Day Flex"),
+        TeamSchedule("ts15", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-27", "Off"),
+        TeamSchedule("ts16", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-28", "Off"),
+        TeamSchedule("ts17", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-29", "Indore Day Flex"),
+        TeamSchedule("ts18", "Marcus Aurelius (HR Intern)", "Human Resources", "2026-06-30", "Indore Day Flex"),
+
+        // Anjali Sharma (Management)
+        TeamSchedule("ts19", "Anjali Sharma", "Management", "2026-06-25", "Manila Dev Shift"),
+        TeamSchedule("ts20", "Anjali Sharma", "Management", "2026-06-26", "Manila Dev Shift"),
+        TeamSchedule("ts21", "Anjali Sharma", "Management", "2026-06-27", "Off"),
+        TeamSchedule("ts22", "Anjali Sharma", "Management", "2026-06-28", "Off"),
+        TeamSchedule("ts23", "Anjali Sharma", "Management", "2026-06-29", "Manila Dev Shift"),
+        TeamSchedule("ts24", "Anjali Sharma", "Management", "2026-06-30", "Manila Dev Shift"),
+
+        // Aditya Joshi (Director) (Administration)
+        TeamSchedule("ts25", "Aditya Joshi (Director)", "Administration", "2026-06-25", "Manila Dev Shift"),
+        TeamSchedule("ts26", "Aditya Joshi (Director)", "Administration", "2026-06-26", "Manila Dev Shift"),
+        TeamSchedule("ts27", "Aditya Joshi (Director)", "Administration", "2026-06-27", "Off"),
+        TeamSchedule("ts28", "Aditya Joshi (Director)", "Administration", "2026-06-28", "Off"),
+        TeamSchedule("ts29", "Aditya Joshi (Director)", "Administration", "2026-06-29", "Manila Dev Shift"),
+        TeamSchedule("ts30", "Aditya Joshi (Director)", "Administration", "2026-06-30", "Manila Dev Shift")
+    ))
+
 
     var employeeProfiles = mutableStateOf<List<EmployeeProfile>>(listOf(
         EmployeeProfile(
@@ -1070,6 +1143,30 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             }
         }
     }
+
+    // Update shift for a specific employee and date
+    fun updateEmployeeShift(employeeName: String, department: String, date: String, newShift: String, updatedBy: String) {
+        val currentList = teamSchedules.value.toMutableList()
+        val index = currentList.indexOfFirst { it.employeeName == employeeName && it.date == date }
+        if (index != -1) {
+            currentList[index] = currentList[index].copy(shiftName = newShift)
+        } else {
+            currentList.add(TeamSchedule(
+                id = java.util.UUID.randomUUID().toString(),
+                employeeName = employeeName,
+                department = department,
+                date = date,
+                shiftName = newShift
+            ))
+        }
+        teamSchedules.value = currentList
+
+        // Add audit log
+        addAuditLog(updatedBy, "Reassigned schedule for $employeeName on $date to $newShift.")
+        // Add notification
+        addNotification("Schedule Reassigned", "Shift for $employeeName on $date updated to $newShift.", isAlert = false)
+    }
+
 
     private fun loadMockWeather(city: String) {
         val cleanCityName = city.trim().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.ROOT) else it.toString() }

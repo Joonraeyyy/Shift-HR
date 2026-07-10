@@ -269,8 +269,10 @@ fun TimeTrackerApp(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Black,
                             color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981),
-                            letterSpacing = 1.sp
+                            letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f)
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Box(
                             modifier = Modifier
                                 .background(
@@ -284,7 +286,9 @@ fun TimeTrackerApp(
                                 text = if (viewModel.isFaceScanMismatched.value) "SECURITY SECURE" else "SECURE NODAL",
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981)
+                                color = if (viewModel.isFaceScanMismatched.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -559,6 +563,12 @@ fun TimeTrackerApp(
                     "saas_hub" -> {
                         SaaSHubScreen(viewModel = viewModel)
                     }
+                    "supervisor_schedule" -> {
+                        Column {
+                            SaaSHeader(title = "Supervisor Schedule Desk", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            SupervisorScheduleScreen(viewModel = viewModel)
+                        }
+                    }
                     "platform_guide" -> {
                         Column {
                             SaaSHeader(title = "Platform Guide & Architecture", onBack = { viewModel.currentScreen.value = "saas_hub" })
@@ -599,6 +609,12 @@ fun TimeTrackerApp(
                         Column {
                             SaaSHeader(title = "Performance appraisal", onBack = { viewModel.currentScreen.value = "saas_hub" })
                             PerformanceReportingScreen(viewModel = viewModel)
+                        }
+                    }
+                    "top5_dashboard" -> {
+                        Column {
+                            SaaSHeader(title = "Top 5 Employee Dashboards", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            Top5DashboardScreen(viewModel = viewModel)
                         }
                     }
                     "settings" -> {
@@ -1134,129 +1150,143 @@ fun HeaderBar(
     onSyncClick: () -> Unit,
     onProfileClick: () -> Unit = {}
 ) {
-    Card(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(12.dp),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        // Left Side: Avatar & Name/Badge Row
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.clickable { onProfileClick() }
         ) {
-            // Mini Brand Logo Composable
-            MiniShiftLogo(
+            // Glowing Avatar Circle with 'S'
+            Box(
                 modifier = Modifier
-                    .padding(end = 12.dp)
-                    .size(38.dp)
-            )
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onProfileClick() }
-                    .testTag("header_profile_click")
+                    .size(44.dp)
+                    .background(
+                        brush = Brush.linearGradient(
+                            colors = listOf(Color(0xFF00FF88), Color(0xFF00E5FF))
+                        ),
+                        shape = CircleShape
+                    )
+                    .padding(2.dp) // border thickness
+                    .background(Color(0xFF121318), CircleShape), // inner background
+                contentAlignment = Alignment.Center
             ) {
+                Text(
+                    text = if (displayName.isNotEmpty()) displayName.take(1).uppercase() else "S",
+                    color = Color(0xFF00E5FF),
+                    fontWeight = FontWeight.Black,
+                    fontSize = 18.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column {
                 Text(
                     text = displayName,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = 17.sp,
                     color = Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Employee Capsule
                     Box(
                         modifier = Modifier
                             .background(
-                                color = when (roleName) {
-                                    "ADMIN_HR" -> MaterialTheme.colorScheme.primary
-                                    "MANAGER" -> Color(0xFF00E5FF)
-                                    "SUPERVISOR" -> Color(0xFFF59E0B)
-                                    else -> Color(0xFF10B981)
-                                },
-                                shape = RoundedCornerShape(4.dp)
+                                color = Color(0xFF00FF88).copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(6.dp)
                             )
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                            .border(1.dp, Color(0xFF00FF88), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = roleName.replace("_", " "),
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 8.sp
+                            text = roleName.uppercase(),
+                            color = Color(0xFF00FF88),
+                            fontWeight = FontWeight.Black,
+                            fontSize = 9.sp
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Online indicator dot
                     Box(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(if (isOffline) Color(0xFFF43F5E) else Color(0xFF10B981))
+                            .background(if (isOffline) Color(0xFFF43F5E) else Color(0xFF00FF88))
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isOffline) "Offline" else "Online",
-                        fontSize = 10.sp,
+                        fontSize = 11.sp,
                         color = Color.White.copy(alpha = 0.6f)
                     )
                 }
             }
+        }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // Right Side: Refresh & Exit Buttons
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Sync / Refresh button (Square with rounded corners)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
+                    .clickable(enabled = !isOffline, onClick = onSyncClick),
+                contentAlignment = Alignment.Center
             ) {
-                // Rapid Sync button
-                IconButton(
-                    onClick = onSyncClick,
-                    modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.05f), CircleShape)
-                        .size(36.dp),
-                    enabled = !isOffline
-                ) {
-                    if (isSyncing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = "Sync",
-                            tint = if (isOffline) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                // Logout button
-                Button(
-                    onClick = onLogout,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFF43F5E).copy(alpha = 0.15f),
-                        contentColor = Color(0xFFF43F5E)
-                    ),
-                    border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.3f)),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp),
-                    modifier = Modifier.height(32.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PowerSettingsNew,
-                        contentDescription = "Logout",
-                        modifier = Modifier.size(14.dp)
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color(0xFF00FF88),
+                        strokeWidth = 2.dp
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Exit", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Sync,
+                        contentDescription = "Sync",
+                        tint = if (isOffline) Color.White.copy(alpha = 0.2f) else Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
+            }
+
+            // Exit button (Red capsule)
+            Row(
+                modifier = Modifier
+                    .height(36.dp)
+                    .background(Color(0xFFEF4444).copy(alpha = 0.12f), RoundedCornerShape(10.dp))
+                    .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                    .clickable(onClick = onLogout)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PowerSettingsNew,
+                    contentDescription = "Logout",
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Exit",
+                    color = Color(0xFFEF4444),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
@@ -1275,6 +1305,54 @@ fun NotificationsSection(
             .padding(horizontal = 12.dp)
     ) {
         val latest = notifications.first()
+        val isSecurityCheck = latest.title.equals("SECURITY CHECK", ignoreCase = true)
+        
+        val containerColor = if (isSecurityCheck) {
+            Color(0xFF041E15) // Deep rich green forest background
+        } else if (latest.isAlert) {
+            Color(0xFF3B1D22)
+        } else {
+            Color(0xFF1D352F)
+        }
+        
+        val borderColor = if (isSecurityCheck) {
+            Color(0xFF00FF88).copy(alpha = 0.5f) // Bright lime neon border
+        } else if (latest.isAlert) {
+            Color(0xFFF43F5E).copy(alpha = 0.4f)
+        } else {
+            Color(0xFF10B981).copy(alpha = 0.4f)
+        }
+        
+        val titleColor = if (isSecurityCheck) {
+            Color(0xFFCCFF00) // Lime yellow/green
+        } else if (latest.isAlert) {
+            Color(0xFFFFA5B5)
+        } else {
+            Color(0xFFCCFF00)
+        }
+        
+        val messageColor = if (isSecurityCheck) {
+            Color(0xFFCCFF00).copy(alpha = 0.85f)
+        } else {
+            Color.White.copy(alpha = 0.9f)
+        }
+        
+        val iconTint = if (isSecurityCheck) {
+            Color(0xFFCCFF00) // Lime yellow/green bell
+        } else if (latest.isAlert) {
+            Color(0xFFF43F5E)
+        } else {
+            Color(0xFFCCFF00)
+        }
+        
+        val iconVector = if (isSecurityCheck) {
+            Icons.Default.NotificationsActive
+        } else if (latest.isAlert) {
+            Icons.Default.Warning
+        } else {
+            Icons.Default.NotificationsActive
+        }
+
         AnimatedVisibility(
             visible = true,
             enter = fadeIn() + slideInVertically(),
@@ -1286,11 +1364,11 @@ fun NotificationsSection(
                     .padding(bottom = 8.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (latest.isAlert) Color(0xFF3B1D22) else Color(0xFF1D352F)
+                    containerColor = containerColor
                 ),
                 border = BorderStroke(
                     1.dp,
-                    if (latest.isAlert) Color(0xFFF43F5E).copy(alpha = 0.4f) else Color(0xFF10B981).copy(alpha = 0.4f)
+                    borderColor
                 )
             ) {
                 Row(
@@ -1305,9 +1383,9 @@ fun NotificationsSection(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = if (latest.isAlert) Icons.Default.Warning else Icons.Default.NotificationsActive,
+                            imageVector = iconVector,
                             contentDescription = null,
-                            tint = if (latest.isAlert) Color(0xFFF43F5E) else Color(0xFFCCFF00),
+                            tint = iconTint,
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1316,13 +1394,13 @@ fun NotificationsSection(
                                 text = latest.title.uppercase(),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 10.sp,
-                                color = if (latest.isAlert) Color(0xFFFFA5B5) else Color(0xFFCCFF00),
+                                color = titleColor,
                                 letterSpacing = 1.sp
                             )
                             Text(
                                 text = latest.message,
                                 fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.9f),
+                                color = messageColor,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -3527,6 +3605,58 @@ fun LocalHolidayCalendarScreen(
             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
+                // --- ASSIGNED WORK SHIFT DISPLAY ---
+                val employeeShift = viewModel.teamSchedules.value.find {
+                    it.employeeName == viewModel.currentUserName.value && it.date == selectedDateStr
+                }
+                
+                if (employeeShift != null) {
+                    val shiftName = employeeShift.shiftName
+                    val shiftColor = when (shiftName) {
+                        "Manila Dev Shift" -> Color(0xFF10B981) // Green
+                        "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
+                        "Night Ops" -> Color(0xFF8B5CF6) // Purple
+                        else -> Color(0xFF9CA3AF) // Gray
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .background(shiftColor.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .border(1.dp, shiftColor.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = shiftColor,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "ASSIGNED SHIFT: ${shiftName.uppercase()}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = shiftColor
+                                )
+                                Text(
+                                    text = when (shiftName) {
+                                        "Manila Dev Shift" -> "09:00 AM - 06:00 PM • Standard Compliance Sync"
+                                        "Indore Day Flex" -> "08:00 AM - 05:00 PM • Flex Hours Rule"
+                                        "Night Ops" -> "09:00 PM - 06:00 AM • Night Differential Bonus"
+                                        else -> "Rest Day • Off-Duty Weekend Policy"
+                                    },
+                                    fontSize = 10.sp,
+                                    color = Color.White.copy(alpha = 0.6f)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // 1. Holiday details if exists
                 if (holidayForSelectedDay != null) {
                     Box(
@@ -3971,6 +4101,12 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("EMPLOYEE PROFILE IDENTITY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "This sets the target name used for attendance logs in this administrative testing environment. Logged-in regular employees are automatically synced with their own names.",
+                    fontSize = 11.sp,
+                    color = Color.White.copy(alpha = 0.6f)
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = employeeName,
@@ -3998,7 +4134,15 @@ fun SettingsScreen(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("SHIFT RULE THRESHOLDS", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                Column {
+                    Text("SHIFT RULE THRESHOLDS", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Operational guardrails used to evaluate attendance compliance, validate active working hours, trigger lunch/break alarms, and calculate base wages.",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
 
                 OutlinedTextField(
                     value = shiftHours,

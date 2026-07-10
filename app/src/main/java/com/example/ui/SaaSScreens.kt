@@ -1,6 +1,8 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import android.nfc.NfcAdapter
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
@@ -11,6 +13,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -35,6 +38,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -1793,6 +1797,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
 fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
     val profiles by viewModel.employeeProfiles
     val myProfile = profiles.find { it.name == viewModel.currentUserName.value }
+    val activeLog by viewModel.activeTimeLog.collectAsState()
 
     if (myProfile != null) {
         // --- EDITABLE PERSONAL FIELDS STATES ---
@@ -1807,341 +1812,935 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
         var emergencyRel by remember { mutableStateOf(myProfile.emergencyRelationship) }
         var workEmail by remember { mutableStateOf(myProfile.email) }
 
+        // --- INTERACTIVE & SECURITY STATES ---
+        var activeSection by remember { mutableStateOf("personal") } // personal, employment, documents
+        var isPersonalUnlocked by remember { mutableStateOf(false) }
+        var isBankDetailsRevealed by remember { mutableStateOf(false) }
+        var areGovernmentIdsRevealed by remember { mutableStateOf(false) }
+
+        // Biometric dialog triggering states
+        var showBiometricCheck by remember { mutableStateOf(false) }
+        var biometricPromptText by remember { mutableStateOf("Verify Biometrics") }
+        var onBiometricSuccessAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+        // Preferences states
+        var pushNotificationsEnabled by remember { mutableStateOf(true) }
+        var darkModeOverride by remember { mutableStateOf(false) }
+        var biometricLoginEnabled by remember { mutableStateOf(true) }
+
+        // --- LOCAL BIOMETRIC SIMULATION DIALOG ---
+        if (showBiometricCheck) {
+            Dialog(onDismissRequest = { showBiometricCheck = false }) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF16161B)),
+                    border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.4f))
+                ) {
+                    var scanProgress by remember { mutableStateOf(0f) }
+                    var isFinished by remember { mutableStateOf(false) }
+
+                    LaunchedEffect(Unit) {
+                        scanProgress = 0f
+                        isFinished = false
+                        while (scanProgress < 1f) {
+                            kotlinx.coroutines.delay(40)
+                            scanProgress += 0.05f
+                        }
+                        scanProgress = 1f
+                        isFinished = true
+                        kotlinx.coroutines.delay(500)
+                        showBiometricCheck = false
+                        onBiometricSuccessAction?.invoke()
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .background(
+                                    if (isFinished) NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                                    CircleShape
+                                )
+                                .border(
+                                    2.dp,
+                                    if (isFinished) NeonGreen else Color.White.copy(alpha = 0.2f),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isFinished) Icons.Default.CheckCircle else Icons.Default.Fingerprint,
+                                contentDescription = null,
+                                tint = if (isFinished) NeonGreen else Color.White,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+
+                        Text(
+                            text = if (isFinished) "BIOMETRIC VERIFIED" else "BIOMETRIC AUTHENTICATION",
+                            color = if (isFinished) NeonGreen else Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Text(
+                            text = if (isFinished) "Identity authorized successfully." else "$biometricPromptText...",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 11.sp,
+                            textAlign = TextAlign.Center
+                        )
+
+                        if (!isFinished) {
+                            LinearProgressIndicator(
+                                progress = scanProgress,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = NeonGreen,
+                                trackColor = Color.White.copy(alpha = 0.1f)
+                            )
+                        } else {
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Main layout container
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Digital Badge
-            DigitalIDBadge(profile = myProfile, viewModel = viewModel, context = context)
-
-            // --- 👤 BASIC INFORMATION ---
+            
+            // ==================== 1. IDENTITY CARD (HERO COMPONENT) ====================
+            val currentLog = activeLog
+            val isClockedIn = currentLog != null && currentLog.timeIn != null && currentLog.timeOut == null
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.Black),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Person, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("👤 Basic Information", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                            .border(
+                                3.dp,
+                                if (isClockedIn) NeonGreen else Color.Gray,
+                                CircleShape
+                            )
+                            .padding(4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (myProfile.picture.isNotEmpty()) {
+                            coil.compose.AsyncImage(
+                                model = myProfile.picture,
+                                contentDescription = "Profile Photo",
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(CircleShape),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                error = androidx.compose.ui.graphics.painter.ColorPainter(Color.Transparent),
+                                placeholder = androidx.compose.ui.graphics.painter.ColorPainter(Color.Transparent)
+                            )
+                        } else {
+                            Text(
+                                text = myProfile.name.take(2).uppercase(),
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
 
-                    ProfileDetailRow("Employee ID", myProfile.id)
-                    ProfileDetailRow("Full Name", myProfile.name)
-                    ProfileDetailRow("Gender", myProfile.gender)
-                    ProfileDetailRow("Date of Birth", myProfile.dob)
-                    ProfileDetailRow("Age", "${myProfile.age} Yrs")
-                    ProfileDetailRow("Civil Status", myProfile.civilStatus)
-                    ProfileDetailRow("Nationality", myProfile.nationality)
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("EDITABLE DETAILS (BASIC)", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    
-                    OutlinedTextField(
-                        value = preferredName,
-                        onValueChange = { preferredName = it },
-                        label = { Text("Preferred Name/Nickname") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = pictureUrl,
-                        onValueChange = { pictureUrl = it },
-                        label = { Text("Profile Photo URL") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                }
-            }
+                    Spacer(modifier = Modifier.width(16.dp))
 
-            // --- 💼 EMPLOYMENT INFORMATION (READ ONLY) ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.BusinessCenter, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("💼 Employment Information", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("These corporate settings cannot be edited by employees.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    ProfileDetailRow("Position/Job Title", myProfile.position)
-                    ProfileDetailRow("Department", myProfile.department)
-                    ProfileDetailRow("Team", myProfile.team)
-                    ProfileDetailRow("Employment Status", myProfile.status)
-                    ProfileDetailRow("Date Hired", myProfile.dateHired)
-                    ProfileDetailRow("Supervisor/Manager", myProfile.supervisor)
-                    ProfileDetailRow("Work Location/Branch", myProfile.workLocation)
-                    ProfileDetailRow("Shift Schedule", myProfile.shiftSchedule)
-                }
-            }
-
-            // --- 📞 CONTACT INFORMATION ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Phone, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("📞 Contact & Emergency Information", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    OutlinedTextField(
-                        value = mobilePhone,
-                        onValueChange = { mobilePhone = it },
-                        label = { Text("Mobile Number") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = personalEmail,
-                        onValueChange = { personalEmail = it },
-                        label = { Text("Personal Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = workEmail,
-                        onValueChange = { workEmail = it },
-                        label = { Text("Company Work Email") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = currentAddress,
-                        onValueChange = { currentAddress = it },
-                        label = { Text("Current Address") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text("EMERGENCY CONTACT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    OutlinedTextField(
-                        value = emergencyName,
-                        onValueChange = { emergencyName = it },
-                        label = { Text("Emergency Contact Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = emergencyPhone,
-                        onValueChange = { emergencyPhone = it },
-                        label = { Text("Emergency Contact Number") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = emergencyRel,
-                        onValueChange = { emergencyRel = it },
-                        label = { Text("Relationship") },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
-                    )
-                }
-            }
-
-            // --- 🪪 GOVERNMENT & PAYROLL INFORMATION (READ ONLY) ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("🪪 Government & Payroll Settings", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Government credentials & accounts cannot be self-edited.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    ProfileDetailRow("Tax ID (TIN)", myProfile.taxId)
-                    ProfileDetailRow("Social Security Number", myProfile.ssn)
-                    ProfileDetailRow("Health Insurance Number", myProfile.healthInsurance)
-                    ProfileDetailRow("Housing Fund Number", myProfile.housingFund)
-                    ProfileDetailRow("Disbursement Bank Name", myProfile.bankName)
-                    ProfileDetailRow("Bank Account Number", myProfile.bankAccount)
-                }
-            }
-
-            // --- 📱 ATTENDANCE & DEVICE ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.SettingsCell, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("📱 Attendance & Device telemetry", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    ProfileDetailRow("Registered Hardware Lock", myProfile.registeredDevice)
-                    ProfileDetailRow("Digital Employee ID", myProfile.digitalId)
-                    ProfileDetailRow("Configured NFC Tag", myProfile.nfcId)
-                    ProfileDetailRow("Current Status", myProfile.attendanceStatus)
-                    ProfileDetailRow("Assigned Work Perimeter", myProfile.assignedLocation)
-                    ProfileDetailRow("Last Session Handshake", myProfile.lastLogin)
-                }
-            }
-
-            // --- 📅 LEAVE & ATTENDANCE SUMMARY ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.DateRange, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("📅 Leave & Attendance Balances", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    ProfileDetailRow("Vacation Leave Balance", "${myProfile.vacationLeaveBalance} Days Remaining")
-                    ProfileDetailRow("Sick Leave Balance", "${myProfile.sickLeaveBalance} Days Remaining")
-                    ProfileDetailRow("Other Leave Balance", "${myProfile.otherLeaveBalances} Days Remaining")
-                    ProfileDetailRow("Total Late Incidents", "${myProfile.totalLate} Times")
-                    ProfileDetailRow("Absence Count", "${myProfile.absences} Days")
-                    ProfileDetailRow("Accumulated Overtime Hours", "${myProfile.overtimeHours} Hrs")
-                }
-            }
-
-            // --- 📂 DOCUMENTS (READ ONLY WITH SIMULATED ACTIONS) ---
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Folder, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("📂 Official Corporate Documents", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("Securely download official company-approved employee forms.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    val secureDocs = listOf(
-                        "Shift_HR_Platform_Architecture.pdf" to "Shift HR Platform Architecture & Specifications PDF",
-                        "Employment_Contract.pdf" to "Employment Contract",
-                        "Passport_Scan.pdf" to "Government Passport ID",
-                        "Tax_Declaration.pdf" to "Tax Declaration Document",
-                        "Resume_Verified.pdf" to "Resume CV",
-                        "Annual_Evaluation_2025.pdf" to "Performance Evaluation (2025)",
-                        "Company_Code_Of_Ethics.pdf" to "Company Forms & Ethics Policy"
-                    )
-
-                    secureDocs.forEach { (filename, label) ->
+                    Column(modifier = Modifier.weight(1f)) {
+                        val pronouns = if (myProfile.gender.equals("Female", ignoreCase = true)) "(She/Her)" else "(He/Him)"
+                        Text(
+                            text = "${myProfile.name} $pronouns",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${myProfile.position} • ${myProfile.department}",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                                .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Article, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                                    Text(filename, fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f))
-                                }
-                            }
-                            IconButton(
-                                onClick = {
-                                    Toast.makeText(context, "Downloading verified secure file: $filename 📥", Toast.LENGTH_SHORT).show()
-                                },
-                                modifier = Modifier.size(24.dp)
+                            Box(
+                                modifier = Modifier
+                                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
-                                Icon(Icons.Default.Download, contentDescription = "Download Document", tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                Text(
+                                    text = "#${myProfile.id}",
+                                    color = Color.White.copy(alpha = 0.8f),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        if (isClockedIn) NeonGreen.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.05f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .border(
+                                        1.dp,
+                                        if (isClockedIn) NeonGreen.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (isClockedIn) "Clocked In • Regular" else "Clocked Out • Regular",
+                                    color = if (isClockedIn) NeonGreen else Color.White.copy(alpha = 0.6f),
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
             }
 
-            // --- 🔒 ACCOUNT & SECURITY ---
-            Card(
+            // ==================== 2. QUICK METRICS ROW ====================
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("🔒 Account & Login Security", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                // PTO Balance Card
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "PTO BALANCE",
+                            fontSize = 8.sp,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "14.5 Days",
+                            fontSize = 13.sp,
+                            color = NeonGreen,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-                    ProfileDetailRow("Registered Username", if (myProfile.username.isNotEmpty()) myProfile.username else viewModel.currentUserUsername.value)
-                    ProfileDetailRow("Login Password", "•••••••• (Encrypted)")
-                    ProfileDetailRow("Two-Factor Authentication", if (myProfile.twoFactorEnabled) "ACTIVE (MFA Secured)" else "INACTIVE")
-                    ProfileDetailRow("Account Status", myProfile.accountStatus.uppercase())
-                    
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text("RECENT SESSIONS HISTORY", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    myProfile.loginHistory.forEach { history ->
-                        Text("• $history", fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 2.dp))
+                // Hours This Week Card
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "WEEKLY HOURS",
+                            fontSize = 8.sp,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "32.5 / 40 Hrs",
+                            fontSize = 13.sp,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+
+                // Next Shift Card
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "NEXT SHIFT",
+                            fontSize = 8.sp,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "08:00 AM",
+                            fontSize = 13.sp,
+                            color = Color(0xFF38BDF8),
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
-            // Save Actions
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    viewModel.updateProfileInfo(
-                        emergencyContact = emergencyName,
-                        contactPhone = emergencyPhone,
-                        email = workEmail,
-                        phoneNumber = mobilePhone,
-                        address = currentAddress,
-                        preferredName = preferredName,
-                        personalEmail = personalEmail,
-                        picture = pictureUrl,
-                        emergencyRelationship = emergencyRel
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().testTag("save_profile_dossier_action"),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+            // ==================== 3. THUMB-FRIENDLY TABS ====================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("Save Dossier Changes", color = Color.Black, fontWeight = FontWeight.Bold)
+                val sections = listOf(
+                    "personal" to "Personal",
+                    "employment" to "Employment",
+                    "documents" to "Documents"
+                )
+                sections.forEach { (key, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeSection == key) NeonGreen else Color.Transparent)
+                            .clickable { activeSection = key }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (activeSection == key) Color.Black else Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // ==================== TAB CONTENT RENDERING ====================
+            when (activeSection) {
+                "personal" -> {
+                    // --- PERSONAL INFORMATION HUB CARD ---
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("👤 Personal Info Hub", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                }
+                                
+                                if (!isPersonalUnlocked) {
+                                    Button(
+                                        onClick = {
+                                            biometricPromptText = "Unlock Personal Info Hub for editing"
+                                            onBiometricSuccessAction = { isPersonalUnlocked = true }
+                                            showBiometricCheck = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Icon(Icons.Default.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Edit & Unlock", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            biometricPromptText = "Authorize profile changes update"
+                                            onBiometricSuccessAction = {
+                                                viewModel.updateProfileInfo(
+                                                    emergencyContact = emergencyName,
+                                                    contactPhone = emergencyPhone,
+                                                    email = workEmail,
+                                                    phoneNumber = mobilePhone,
+                                                    address = currentAddress,
+                                                    preferredName = preferredName,
+                                                    personalEmail = personalEmail,
+                                                    picture = pictureUrl,
+                                                    emergencyRelationship = emergencyRel
+                                                )
+                                                isPersonalUnlocked = false
+                                                Toast.makeText(context, "Secure cloud sync completed successfully! 🔒", Toast.LENGTH_SHORT).show()
+                                            }
+                                            showBiometricCheck = true
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(28.dp).testTag("save_profile_dossier_action")
+                                    ) {
+                                        Text("Save Changes", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            if (!isPersonalUnlocked) {
+                                // Locked state - displaying masked and clean data
+                                val maskedPhone = if (mobilePhone.length > 7) {
+                                    mobilePhone.take(mobilePhone.length - 4) + "••••"
+                                } else {
+                                    "•••• •••• •••"
+                                }
+                                val maskedPersonalEmail = if (personalEmail.contains("@")) {
+                                    personalEmail.take(1) + "•••••@" + personalEmail.substringAfter("@")
+                                } else {
+                                    "•••••@••••.com"
+                                }
+
+                                ProfileDetailRow("Preferred Name", preferredName.ifEmpty { "None Set" })
+                                ProfileDetailRow("Mobile Phone", maskedPhone)
+                                ProfileDetailRow("Corporate Email", workEmail)
+                                ProfileDetailRow("Personal Email", maskedPersonalEmail)
+                                ProfileDetailRow("Home Address", currentAddress)
+                                
+                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("EMERGENCY CONTACT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                        Text("$emergencyName ($emergencyRel)", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        Text(emergencyPhone, color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            Toast.makeText(context, "Initiating direct dial to emergency contact: $emergencyPhone 📞", Toast.LENGTH_LONG).show()
+                                        },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .background(NeonGreen.copy(alpha = 0.1f), CircleShape)
+                                            .border(1.dp, NeonGreen.copy(alpha = 0.3f), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Phone, contentDescription = "Call Emergency Contact", tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+
+                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+
+                                val maskedBank = if (myProfile.bankAccount.length > 4) {
+                                    "•••• " + myProfile.bankAccount.takeLast(4)
+                                } else {
+                                    "•••• 4321"
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text("DIRECT DEPOSIT ROUTING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                        Text(
+                                            text = if (isBankDetailsRevealed) "${myProfile.bankName} • ${myProfile.bankAccount}" else "${myProfile.bankName} • $maskedBank",
+                                            color = Color.White,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            biometricPromptText = if (isBankDetailsRevealed) "Encrypt bank details" else "Decrypt bank details via FaceID/Fingerprint"
+                                            onBiometricSuccessAction = { isBankDetailsRevealed = !isBankDetailsRevealed }
+                                            showBiometricCheck = true
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isBankDetailsRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = "Toggle Bank Details",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                            } else {
+                                // Unlocked Editable State
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OutlinedTextField(
+                                        value = preferredName,
+                                        onValueChange = { preferredName = it },
+                                        label = { Text("Preferred Name/Nickname") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = mobilePhone,
+                                        onValueChange = { mobilePhone = it },
+                                        label = { Text("Mobile Number") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = personalEmail,
+                                        onValueChange = { personalEmail = it },
+                                        label = { Text("Personal Email") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = currentAddress,
+                                        onValueChange = { currentAddress = it },
+                                        label = { Text("Home Address") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = pictureUrl,
+                                        onValueChange = { pictureUrl = it },
+                                        label = { Text("Profile Photo URL") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    
+                                    Divider(color = Color.White.copy(alpha = 0.05f))
+                                    Text("Emergency Contact Info", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                    
+                                    OutlinedTextField(
+                                        value = emergencyName,
+                                        onValueChange = { emergencyName = it },
+                                        label = { Text("Contact Name") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = emergencyRel,
+                                        onValueChange = { emergencyRel = it },
+                                        label = { Text("Relationship") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                    OutlinedTextField(
+                                        value = emergencyPhone,
+                                        onValueChange = { emergencyPhone = it },
+                                        label = { Text("Contact Phone") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // --- PH STATUTORY COMPLIANCE & GOVERNMENT IDS CARD ---
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "PH Statutory Compliance",
+                                        color = NeonGreen,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    // Verified Neon Green Badge
+                                    Box(
+                                        modifier = Modifier
+                                            .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("Verified ✓", color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    // Eye icon to reveal
+                                    IconButton(
+                                        onClick = {
+                                            biometricPromptText = if (areGovernmentIdsRevealed) "Obscure statutory IDs" else "Decrypt Statutory credentials"
+                                            onBiometricSuccessAction = { areGovernmentIdsRevealed = !areGovernmentIdsRevealed }
+                                            showBiometricCheck = true
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (areGovernmentIdsRevealed) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                            contentDescription = "Toggle statutory details",
+                                            tint = NeonGreen,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+
+                                    // Locked HR label
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "🔒 Compiled by HR",
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            val rawTin = if (myProfile.taxId.isNotEmpty()) myProfile.taxId else "123-456-789-000"
+                            val rawSsn = if (myProfile.ssn.isNotEmpty()) myProfile.ssn else "01-2345678-9"
+                            val rawHealth = if (myProfile.healthInsurance.isNotEmpty()) myProfile.healthInsurance else "12-345678901-2"
+                            val rawHousing = if (myProfile.housingFund.isNotEmpty()) myProfile.housingFund else "1020-3040-5060"
+
+                            val displayedTin = if (areGovernmentIdsRevealed) rawTin else "•••-•••-•••-000"
+                            val displayedSsn = if (areGovernmentIdsRevealed) rawSsn else "••-•••••••-9"
+                            val displayedHealth = if (areGovernmentIdsRevealed) rawHealth else "••-•••••••••-2"
+                            val displayedHousing = if (areGovernmentIdsRevealed) rawHousing else "••••-••••-5060"
+
+                            // List of clickable rows that prompt the user that it's HR compiled
+                            val promptMessage = "Government IDs are managed by HR. Contact your compliance officer to request changes."
+
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ClickableIdRow(label = "TIN (Tax Identification Number)", value = displayedTin, onClick = {
+                                    Toast.makeText(context, promptMessage, Toast.LENGTH_LONG).show()
+                                })
+                                ClickableIdRow(label = "SSS (Social Security System)", value = displayedSsn, onClick = {
+                                    Toast.makeText(context, promptMessage, Toast.LENGTH_LONG).show()
+                                })
+                                ClickableIdRow(label = "PhilHealth (PHIC Number)", value = displayedHealth, onClick = {
+                                    Toast.makeText(context, promptMessage, Toast.LENGTH_LONG).show()
+                                })
+                                ClickableIdRow(label = "Pag-IBIG (HDMF MID Number)", value = displayedHousing, onClick = {
+                                    Toast.makeText(context, promptMessage, Toast.LENGTH_LONG).show()
+                                })
+                            }
+                        }
+                    }
+                }
+                
+                "employment" -> {
+                    // --- EMPLOYMENT & COMPLIANCE DETAILS CARD ---
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.BusinessCenter, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("💼 Employment & Compliance", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("These settings are managed by your compliance officers.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            ProfileDetailRow("Position Title", myProfile.position)
+                            ProfileDetailRow("Department", myProfile.department)
+                            ProfileDetailRow("Team Group", myProfile.team)
+                            ProfileDetailRow("Date of Hire", myProfile.dateHired)
+                            ProfileDetailRow("Next Review Milestone", "2026-10-15 (Q3 Performance Appraisal)")
+                            
+                            // Geofence Hub assignment
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = "Authorized Perimeter", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("HQ - Branch A", color = NeonGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(text = myProfile.workLocation, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.White.copy(alpha = 0.05f))
+
+                            // Manager details with chat shortcut
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("DIRECT MANAGER", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                    Text(myProfile.supervisor, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Operations Director", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                                }
+                                IconButton(
+                                    onClick = {
+                                        Toast.makeText(context, "Opening secure chat with ${myProfile.supervisor}...", Toast.LENGTH_SHORT).show()
+                                        viewModel.currentScreen.value = "chat"
+                                    },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                                        .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                                ) {
+                                    Icon(Icons.Default.Message, contentDescription = "Message Manager", tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    // --- ATTENDANCE & DEVICE TELEMETRY CARD ---
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.SettingsCell, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("📱 Device telemetry & MDM Locks", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            ProfileDetailRow("Registered Hardware Lock", myProfile.registeredDevice)
+                            ProfileDetailRow("Digital Employee ID", myProfile.digitalId)
+                            ProfileDetailRow("Configured NFC Tag", myProfile.nfcId)
+                            ProfileDetailRow("Current Status", myProfile.attendanceStatus)
+                            ProfileDetailRow("Assigned Work Perimeter", myProfile.assignedLocation)
+                            ProfileDetailRow("Last Session Handshake", myProfile.lastLogin)
+                        }
+                    }
+                }
+                
+                "documents" -> {
+                    // --- DOCUMENT VAULT CARD ---
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Folder, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("📂 Document Vault & Payslips", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Securely download official company-approved employee forms.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            val secureDocs = listOf(
+                                "Shift_HR_Payslip_June_2026.pdf" to "Shift HR Digital Payslip (June 2026)",
+                                "Shift_HR_Payslip_May_2026.pdf" to "Shift HR Digital Payslip (May 2026)",
+                                "BIR_Tax_Form_2316_2025.pdf" to "Annual Income Tax Return (Form 2316)",
+                                "Employment_Contract.pdf" to "Employment Contract",
+                                "Passport_Scan.pdf" to "Government Passport ID Scan",
+                                "Company_Code_Of_Ethics.pdf" to "Company Forms & Ethics Policy"
+                            )
+
+                            secureDocs.forEach { (filename, label) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Article, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                            Text(filename, fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f))
+                                        }
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            Toast.makeText(context, "Downloading encrypted vault file: $filename 📥", Toast.LENGTH_SHORT).show()
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Download, contentDescription = "Download Document", tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // --- APP PREFERENCES CARD ---
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Settings, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("⚙️ Portal App Preferences", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Push Reminders", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Remind me to clock out at shift completion", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                                }
+                                Switch(
+                                    checked = pushNotificationsEnabled,
+                                    onCheckedChange = { pushNotificationsEnabled = it },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Dark Mode Override", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Force portal to stay in deep dark theme", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                                }
+                                Switch(
+                                    checked = darkModeOverride,
+                                    onCheckedChange = { darkModeOverride = it },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Biometric Sign-In", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text("Permit FaceID or Fingerprint login bypass", color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                                }
+                                Switch(
+                                    checked = biometricLoginEnabled,
+                                    onCheckedChange = { biometricLoginEnabled = it },
+                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     } else {
         Text("Dossier profile not found. Please contact administration.", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+    }
+}
+
+@Composable
+fun ClickableIdRow(label: String, value: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(vertical = 6.dp, horizontal = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(text = label, color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text(text = value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.2f),
+            modifier = Modifier.size(14.dp)
+        )
     }
 }
 
@@ -3440,10 +4039,32 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
             // Performance & Printable Reports Tile
             SaaSTileLauncher(
                 title = "Performance & Reports",
-                subtitle = "Printable performance reviews & company analytics",
+                subtitle = "Printable reviews & company analytics",
                 icon = Icons.Default.Assessment,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 onClick = { viewModel.currentScreen.value = "performance_reports" }
+            )
+
+            // Team Shift Calendar Tile
+            SaaSTileLauncher(
+                title = "Team Shift Calendar",
+                subtitle = "Calendar schedule desk & supervisor edit engine",
+                icon = Icons.Default.CalendarMonth,
+                modifier = Modifier.weight(1f),
+                onClick = { viewModel.currentScreen.value = "supervisor_schedule" }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Top 5 Dashboards Tile
+            SaaSTileLauncher(
+                title = "Top 5 Employee Dashboards",
+                subtitle = "Workforce performance, engagement, retention stability & continuous learning charts",
+                icon = Icons.Default.Leaderboard,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { viewModel.currentScreen.value = "top5_dashboard" }
             )
         }
 
@@ -3541,3 +4162,559 @@ fun SaaSTileLauncher(
         }
     }
 }
+
+@Composable
+fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
+    val context = LocalContext.current
+    val profiles by viewModel.employeeProfiles
+    val teamSchedules by viewModel.teamSchedules
+    val currentUserRole = viewModel.currentUserRole.value
+    val currentUserName = viewModel.currentUserName.value
+    
+    val myProfile = profiles.find { it.name == currentUserName }
+    val currentUserDept = myProfile?.department ?: "Administration"
+    
+    // Departments in company
+    val departments = listOf("All", "Engineering", "Human Resources", "Product Management", "Management", "Administration")
+    
+    // Default filter to current user's department if they are Supervisor or Manager
+    var selectedDeptFilter by remember { 
+        mutableStateOf(
+            if (currentUserRole == "ADMIN_HR" || currentUserRole == "MANAGER") "All" else currentUserDept
+        ) 
+    }
+    
+    // Define the 6 days of June 2026 we are scheduling (matching the seeded data and the main calendar month)
+    val daysRange = listOf(
+        "2026-06-25" to "Thu 25",
+        "2026-06-26" to "Fri 26",
+        "2026-06-27" to "Sat 27",
+        "2026-06-28" to "Sun 28",
+        "2026-06-29" to "Mon 29",
+        "2026-06-30" to "Tue 30"
+    )
+    
+    val shiftTypes = listOf("Manila Dev Shift", "Indore Day Flex", "Night Ops", "Off")
+    
+    val filteredProfiles = profiles.filter {
+        selectedDeptFilter == "All" || it.department == selectedDeptFilter
+    }
+    
+    // Active paint mode shift template
+    var activeShiftTemplate by remember { mutableStateOf("Manila Dev Shift") }
+    
+    // Real Drag and Drop Gesture State
+    var isDraggingShift by remember { mutableStateOf(false) }
+    var dragShiftName by remember { mutableStateOf<String?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+
+    fun canEdit(empDept: String): Boolean {
+        if (currentUserRole == "ADMIN_HR" || currentUserDept == "Human Resources" || currentUserDept == "Administration") {
+            return true
+        }
+        if ((currentUserRole == "SUPERVISOR" || currentUserRole == "MANAGER") && currentUserDept == empDept) {
+            return true
+        }
+        return false
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp)
+            .testTag("supervisor_schedule_container")
+    ) {
+        // INFO / ROLE AUTHORIZATION HEADER CARD
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(
+                            if (currentUserRole != "EMPLOYEE") NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (currentUserRole != "EMPLOYEE") Icons.Default.AdminPanelSettings else Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = if (currentUserRole != "EMPLOYEE") NeonGreen else Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "ROLE: $currentUserRole • DEPT: $currentUserDept",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonGreen,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = currentUserName,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = when (currentUserRole) {
+                            "ADMIN_HR" -> "Fully Authorized: Can edit shifts for all departments."
+                            "MANAGER" -> "Department Manager: Can edit shifts for employees in $currentUserDept."
+                            "SUPERVISOR" -> "Team Supervisor: Can edit shifts for employees in $currentUserDept."
+                            else -> "Read-Only Access: View assigned calendar shifts only."
+                        },
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        // --- DEPARTMENT FILTER TABS ---
+        Text(
+            text = "Filter by Department",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White.copy(alpha = 0.5f),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            departments.forEach { dept ->
+                val isSelected = selectedDeptFilter == dept
+                val isDeptAuthorized = currentUserRole == "ADMIN_HR" || currentUserDept == "Human Resources" || currentUserDept == "Administration" || dept == "All" || currentUserDept == dept
+                
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            when {
+                                isSelected -> NeonGreen.copy(alpha = 0.15f)
+                                else -> Color.White.copy(alpha = 0.04f)
+                            }
+                        )
+                        .border(
+                            1.dp,
+                            when {
+                                isSelected -> NeonGreen
+                                !isDeptAuthorized -> Color.White.copy(alpha = 0.02f)
+                                else -> Color.White.copy(alpha = 0.1f)
+                            },
+                            RoundedCornerShape(10.dp)
+                        )
+                        .clickable { selectedDeptFilter = dept }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!isDeptAuthorized && dept != "All") {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Locked",
+                                tint = Color.White.copy(alpha = 0.3f),
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = dept,
+                            color = if (isSelected) NeonGreen else if (!isDeptAuthorized) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.7f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- SCHEDULING INTERACTIVE CANVAS CARD ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "TEAM SHIFT MATRIX (JUNE 2026)",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            color = NeonGreen,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Interactive Scheduling Grid",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    if (currentUserRole != "EMPLOYEE") {
+                        Box(
+                            modifier = Modifier
+                                .background(NeonGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "🎨 Drag / Paint Mode",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonGreen
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // HORIZONTALLY SCROLLABLE GRID TABLE
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                ) {
+                    Column {
+                        // Table Header Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.04f))
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Employee Name Column Header
+                            Text(
+                                text = "Team Member",
+                                modifier = Modifier.width(130.dp).padding(start = 8.dp),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                            
+                            // Days Column Headers
+                            daysRange.forEach { (_, label) ->
+                                Text(
+                                    text = label,
+                                    modifier = Modifier.width(62.dp),
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White.copy(alpha = 0.5f)
+                                )
+                            }
+                        }
+
+                        // Table Body Rows
+                        if (filteredProfiles.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No team members found in this department.",
+                                    color = Color.White.copy(alpha = 0.4f),
+                                    fontSize = 11.sp
+                                )
+                            }
+                        } else {
+                            filteredProfiles.forEach { emp ->
+                                val isEmployeeEditable = canEdit(emp.department)
+                                
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(0.5.dp, Color.White.copy(alpha = 0.03f))
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Employee Header Cell
+                                    Column(modifier = Modifier.width(130.dp).padding(start = 8.dp)) {
+                                        Text(
+                                            text = emp.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = emp.department,
+                                            fontSize = 9.sp,
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+
+                                    // Day Cells
+                                    daysRange.forEach { (dateKey, _) ->
+                                        val activeSchedule = teamSchedules.find { 
+                                            it.employeeName == emp.name && it.date == dateKey 
+                                        }
+                                        val shiftName = activeSchedule?.shiftName ?: "Off"
+                                        
+                                        val cellColor = when (shiftName) {
+                                            "Manila Dev Shift" -> Color(0xFF10B981) // Green
+                                            "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
+                                            "Night Ops" -> Color(0xFF8B5CF6) // Purple
+                                            else -> Color(0xFF9CA3AF) // Gray
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(horizontal = 4.dp)
+                                                .width(54.dp)
+                                                .height(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(cellColor.copy(alpha = 0.15f))
+                                                .border(
+                                                    1.dp,
+                                                    if (isEmployeeEditable) cellColor.copy(alpha = 0.8f) else cellColor.copy(alpha = 0.2f),
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable {
+                                                    if (!isEmployeeEditable) {
+                                                        Toast.makeText(
+                                                            context, 
+                                                            "Locked: You cannot schedule ${emp.name} in ${emp.department}.", 
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    } else {
+                                                        // Apply active template click paint immediately!
+                                                        viewModel.updateEmployeeShift(
+                                                            emp.name,
+                                                            emp.department,
+                                                            dateKey,
+                                                            activeShiftTemplate,
+                                                            currentUserName
+                                                        )
+                                                        Toast.makeText(
+                                                            context, 
+                                                            "Assigned $activeShiftTemplate to ${emp.name}", 
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
+                                                }
+                                                .testTag("schedule_cell_${emp.name.replace(" ", "_")}_$dateKey"),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                Text(
+                                                    text = when (shiftName) {
+                                                        "Manila Dev Shift" -> "DEV"
+                                                        "Indore Day Flex" -> "FLEX"
+                                                        "Night Ops" -> "NIGHT"
+                                                        else -> "OFF"
+                                                    },
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = cellColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // --- SHIFT TEMPLATE ACTIVE PALETTE (FOR TAP PAINT & DRAG DROP) ---
+        if (currentUserRole != "EMPLOYEE") {
+            Text(
+                text = "⚡ Scheduling Toolbox (Paint Brush & Drag Source)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = NeonGreen,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
+            Text(
+                text = "1. Tap a shift template to select your paint-brush. 2. Tap any authorized employee cell to instantly paint/assign that shift!",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                border = BorderStroke(1.dp, BorderGrey)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        shiftTypes.forEach { shift ->
+                            val isSelected = activeShiftTemplate == shift
+                            val color = when (shift) {
+                                "Manila Dev Shift" -> Color(0xFF10B981)
+                                "Indore Day Flex" -> Color(0xFF00E5FF)
+                                "Night Ops" -> Color(0xFF8B5CF6)
+                                else -> Color(0xFF9CA3AF)
+                            }
+
+                            // Interactive Drag-and-Drop simulated source card
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isSelected) color.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.03f))
+                                    .border(
+                                        if (isSelected) 2.dp else 1.dp,
+                                        if (isSelected) color else Color.White.copy(alpha = 0.1f),
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { activeShiftTemplate = shift }
+                                    .pointerInput(shift) {
+                                        detectDragGestures(
+                                            onDragStart = {
+                                                isDraggingShift = true
+                                                dragShiftName = shift
+                                                dragOffset = Offset.Zero
+                                            },
+                                            onDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragOffset += dragAmount
+                                            },
+                                            onDragEnd = {
+                                                isDraggingShift = false
+                                                // When they drag and release, we perform drop simulation
+                                                val targetEmp = filteredProfiles.firstOrNull { canEdit(it.department) }
+                                                if (targetEmp != null) {
+                                                    viewModel.updateEmployeeShift(
+                                                        targetEmp.name,
+                                                        targetEmp.department,
+                                                        "2026-06-29",
+                                                        shift,
+                                                        currentUserName
+                                                    )
+                                                    Toast.makeText(
+                                                        context, 
+                                                        "Dropped & Assigned: $shift to ${targetEmp.name} on June 29!", 
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            }
+                                        )
+                                    }
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.DragIndicator,
+                                        contentDescription = "Drag Handle",
+                                        tint = color,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = when(shift) {
+                                            "Manila Dev Shift" -> "DEV"
+                                            "Indore Day Flex" -> "FLEX"
+                                            "Night Ops" -> "NIGHT"
+                                            else -> "OFF"
+                                        },
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = color
+                                    )
+                                    Text(
+                                        text = when(shift) {
+                                            "Manila Dev Shift" -> "09-18"
+                                            "Indore Day Flex" -> "08-17"
+                                            "Night Ops" -> "21-06"
+                                            else -> "REST"
+                                        },
+                                        fontSize = 8.sp,
+                                        color = Color.White.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Ghost element for drag and drop simulation feedback
+                    if (isDraggingShift) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(NeonGreen.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(modifier = Modifier.size(12.dp), color = NeonGreen, strokeWidth = 1.5.dp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "DRAGGING '${dragShiftName?.uppercase()}'. Release anywhere to apply to active department member!",
+                                    color = NeonGreen,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Read-Only employee notice
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .padding(14.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Read-Only",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Note: You are logged in with employee read-only privileges. Scheduling modification is reserved for Supervisors, Managers, and Admin/HR departments.",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+    }
+}
+
