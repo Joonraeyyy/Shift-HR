@@ -37,6 +37,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.database.TimeLogEntity
 import com.example.ui.viewmodel.*
 import com.google.accompanist.permissions.*
+import kotlinx.coroutines.delay
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -72,6 +74,86 @@ fun CoreHrScreen(viewModel: TimeTrackerViewModel) {
     val profiles by viewModel.employeeProfiles
     val context = LocalContext.current
 
+    val userRole = viewModel.currentUserRole.value
+    val currentUserName = viewModel.currentUserName.value
+
+    // Resolve current user profile & department
+    val currentUserProfile = remember(profiles, currentUserName) {
+        profiles.find { it.name.equals(currentUserName, ignoreCase = true) }
+    }
+    val userDept = currentUserProfile?.department ?: ""
+
+    // 1. Backend/Query-Level Restriction: Only see their own department if supervisor/manager
+    val authorizedProfiles = remember(profiles, userRole, userDept) {
+        if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+            profiles.filter { it.department.equals(userDept, ignoreCase = true) }
+        } else {
+            profiles
+        }
+    }
+
+    // Search and Debounce states
+    var searchQuery by remember { mutableStateOf("") }
+    var debouncedQuery by remember { mutableStateOf("") }
+    
+    LaunchedEffect(searchQuery) {
+        delay(300)
+        debouncedQuery = searchQuery
+    }
+
+    // Active dropdown filters states
+    var selectedDepartment by remember { mutableStateOf("All") }
+    var selectedPosition by remember { mutableStateOf("All") }
+    var selectedRole by remember { mutableStateOf("All") }
+    var selectedShift by remember { mutableStateOf("All") }
+
+    // Dropdown expanded states
+    var deptDropdownExpanded by remember { mutableStateOf(false) }
+    var posDropdownExpanded by remember { mutableStateOf(false) }
+    var roleDropdownExpanded by remember { mutableStateOf(false) }
+    var shiftDropdownExpanded by remember { mutableStateOf(false) }
+
+    // Helper to get role
+    fun getRoleForEmployee(profile: EmployeeProfile): String {
+        val user = viewModel.registeredUsers.value.find { it.name.equals(profile.name, ignoreCase = true) }
+        return user?.role ?: "EMPLOYEE"
+    }
+
+    // Dynamic lists for filters
+    val departments = remember(profiles) { listOf("All") + profiles.map { it.department }.distinct() }
+    val positions = remember(authorizedProfiles) { listOf("All") + authorizedProfiles.map { it.position }.distinct() }
+    val shifts = remember(authorizedProfiles) { listOf("All") + authorizedProfiles.map { it.shiftSchedule }.distinct() }
+    val roles = listOf("All", "ADMIN_HR", "MANAGER", "SUPERVISOR", "EMPLOYEE")
+
+    // Filter results
+    val filteredList = remember(authorizedProfiles, debouncedQuery, selectedDepartment, selectedPosition, selectedRole, selectedShift, viewModel.registeredUsers.value) {
+        authorizedProfiles.filter { profile ->
+            // Fuzzy match on name, department, position, role
+            val fuzzyMatch = if (debouncedQuery.isBlank()) {
+                true
+            } else {
+                val q = debouncedQuery.lowercase().trim()
+                val profileRole = getRoleForEmployee(profile)
+                profile.name.lowercase().contains(q) ||
+                profile.department.lowercase().contains(q) ||
+                profile.position.lowercase().contains(q) ||
+                profileRole.lowercase().contains(q)
+            }
+
+            val matchesDept = if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+                true // restricted to their own department already
+            } else {
+                selectedDepartment == "All" || profile.department.equals(selectedDepartment, ignoreCase = true)
+            }
+
+            val matchesPos = selectedPosition == "All" || profile.position.equals(selectedPosition, ignoreCase = true)
+            val matchesRole = selectedRole == "All" || getRoleForEmployee(profile).equals(selectedRole, ignoreCase = true)
+            val matchesShift = selectedShift == "All" || profile.shiftSchedule.equals(selectedShift, ignoreCase = true)
+
+            fuzzyMatch && matchesDept && matchesPos && matchesRole && matchesShift
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -96,83 +178,329 @@ fun CoreHrScreen(viewModel: TimeTrackerViewModel) {
                 fontSize = 14.sp,
                 color = Color.White.copy(alpha = 0.7f)
             )
-            Button(
-                onClick = { showIdCardGenerator = true },
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                shape = RoundedCornerShape(10.dp)
-            ) {
-                Icon(Icons.Default.Badge, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Generate ID", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            // Generate ID is only for Admin/HR or Staff
+            if (userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR") {
+                Button(
+                    onClick = { showIdCardGenerator = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Icon(Icons.Default.Badge, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Generate ID", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Employee Directory list
-        profiles.forEach { profile ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp)
-                    .clickable { selectedProfile = profile }
-                    .testTag("employee_card_${profile.id}"),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, if (selectedProfile?.id == profile.id) NeonGreen else BorderGrey)
-            ) {
+        // Search Input Box (Fuzzy matching + debouncing)
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Type name, department, role, position...", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(20.dp)) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.5f))
+                    }
+                }
+            },
+            singleLine = true,
+            textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .testTag("employee_search_input"),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = NeonGreen,
+                unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                focusedContainerColor = CardGreyBg,
+                unfocusedContainerColor = CardGreyBg
+            )
+        )
+
+        // Dropdown Search Filters Allowed (by role)
+        Text(
+            text = "Filter Directory",
+            fontSize = 11.sp,
+            color = Color.White.copy(alpha = 0.5f),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Department Filter (Only for Admin/HR or Regular Employee, hidden for supervisor/manager)
+            if (userRole != "MANAGER" && userRole != "SUPERVISOR") {
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .background(if (selectedDepartment != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                            .border(1.dp, if (selectedDepartment != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
+                            .clickable { deptDropdownExpanded = true }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Dept: $selectedDepartment",
+                            color = if (selectedDepartment != "All") NeonGreen else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                    }
+                    DropdownMenu(
+                        expanded = deptDropdownExpanded,
+                        onDismissRequest = { deptDropdownExpanded = false },
+                        modifier = Modifier.background(Color(0xFF1E1E22))
+                    ) {
+                        departments.forEach { dept ->
+                            DropdownMenuItem(
+                                text = { Text(dept, color = Color.White, fontSize = 11.sp) },
+                                onClick = {
+                                    selectedDepartment = dept
+                                    deptDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Position Filter
+            Box {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier
+                        .background(if (selectedPosition != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selectedPosition != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
+                        .clickable { posDropdownExpanded = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(44.dp)
-                            .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(22.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = profile.name.take(2).uppercase(),
-                            color = NeonGreen,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                    Text(
+                        text = "Pos: $selectedPosition",
+                        color = if (selectedPosition != "All") NeonGreen else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                }
+                DropdownMenu(
+                    expanded = posDropdownExpanded,
+                    onDismissRequest = { posDropdownExpanded = false },
+                    modifier = Modifier.background(Color(0xFF1E1E22))
+                ) {
+                    positions.forEach { pos ->
+                        DropdownMenuItem(
+                            text = { Text(pos, color = Color.White, fontSize = 11.sp) },
+                            onClick = {
+                                selectedPosition = pos
+                                posDropdownExpanded = false
+                            }
                         )
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(text = profile.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "${profile.position} | ${profile.department}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+            // Role Filter
+            Box {
+                Row(
+                    modifier = Modifier
+                        .background(if (selectedRole != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selectedRole != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
+                        .clickable { roleDropdownExpanded = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Role: $selectedRole",
+                        color = if (selectedRole != "All") NeonGreen else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                }
+                DropdownMenu(
+                    expanded = roleDropdownExpanded,
+                    onDismissRequest = { roleDropdownExpanded = false },
+                    modifier = Modifier.background(Color(0xFF1E1E22))
+                ) {
+                    roles.forEach { r ->
+                        DropdownMenuItem(
+                            text = { Text(r, color = Color.White, fontSize = 11.sp) },
+                            onClick = {
+                                selectedRole = r
+                                roleDropdownExpanded = false
+                            }
+                        )
                     }
+                }
+            }
 
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                when (profile.status) {
-                                    "Regular" -> Color(0xFF00FF88).copy(alpha = 0.15f)
-                                    "Probationary" -> Color(0xFFFFCC00).copy(alpha = 0.15f)
-                                    else -> Color(0xFF00E5FF).copy(alpha = 0.15f)
-                                },
-                                RoundedCornerShape(6.dp)
+            // Shift Filter
+            Box {
+                Row(
+                    modifier = Modifier
+                        .background(if (selectedShift != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .border(1.dp, if (selectedShift != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
+                        .clickable { shiftDropdownExpanded = true }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Shift: $selectedShift",
+                        color = if (selectedShift != "All") NeonGreen else Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                }
+                DropdownMenu(
+                    expanded = shiftDropdownExpanded,
+                    onDismissRequest = { shiftDropdownExpanded = false },
+                    modifier = Modifier.background(Color(0xFF1E1E22))
+                ) {
+                    shifts.forEach { sh ->
+                        DropdownMenuItem(
+                            text = { Text(sh, color = Color.White, fontSize = 11.sp) },
+                            onClick = {
+                                selectedShift = sh
+                                shiftDropdownExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Reset filters
+            val hasActiveFilters = selectedDepartment != "All" || selectedPosition != "All" || selectedRole != "All" || selectedShift != "All" || searchQuery.isNotEmpty()
+            if (hasActiveFilters) {
+                Text(
+                    text = "Clear All",
+                    color = Color.Red.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clickable {
+                            selectedDepartment = "All"
+                            selectedPosition = "All"
+                            selectedRole = "All"
+                            selectedShift = "All"
+                            searchQuery = ""
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Display results or empty state
+        if (filteredList.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.Default.SearchOff, contentDescription = null, tint = Color.White.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("No employees found matching the filters.", color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp)
+                }
+            }
+        } else {
+            filteredList.forEach { profile ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                        .clickable {
+                            if (userRole == "EMPLOYEE") {
+                                // Regular employee opens direct chat window!
+                                viewModel.activeRecipient.value = profile.name
+                                viewModel.currentScreen.value = "chat"
+                                Toast.makeText(context, "Opening direct secure chat with ${profile.name}...", Toast.LENGTH_SHORT).show()
+                            } else {
+                                selectedProfile = profile
+                            }
+                        }
+                        .testTag("employee_card_${profile.id}"),
+                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                    border = BorderStroke(1.dp, if (selectedProfile?.id == profile.id) NeonGreen else BorderGrey)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(22.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = profile.name.take(2).uppercase(),
+                                color = NeonGreen,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
                             )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = profile.status,
-                            color = when (profile.status) {
-                                "Regular" -> Color(0xFF00FF88)
-                                "Probationary" -> Color(0xFFFFCC00)
-                                else -> Color(0xFF00E5FF)
-                            },
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        }
+
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = profile.name, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "${profile.position} | ${profile.department}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                            
+                            // Visual indicator of role
+                            val profileRole = getRoleForEmployee(profile)
+                            Text(text = "Shift Schedule: ${profile.shiftSchedule} ($profileRole)", color = NeonGreen.copy(alpha = 0.65f), fontSize = 9.sp)
+                        }
+
+                        // Status Tag
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    when (profile.status) {
+                                        "Regular" -> Color(0xFF00FF88).copy(alpha = 0.15f)
+                                        "Probationary" -> Color(0xFFFFCC00).copy(alpha = 0.15f)
+                                        else -> Color(0xFF00E5FF).copy(alpha = 0.15f)
+                                    },
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = profile.status,
+                                color = when (profile.status) {
+                                    "Regular" -> Color(0xFF00FF88)
+                                    "Probationary" -> Color(0xFFFFCC00)
+                                    else -> Color(0xFF00E5FF)
+                                },
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
 
-        // Active Profile details view
+        // Active Profile details view (Dossier detail)
         selectedProfile?.let { profile ->
             Spacer(modifier = Modifier.height(16.dp))
             Card(
@@ -181,35 +509,114 @@ fun CoreHrScreen(viewModel: TimeTrackerViewModel) {
                 border = BorderStroke(1.dp, BorderGrey)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Employee Dossier: ${profile.name}", color = NeonGreen, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                    Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
+                    // Header varies by role authorization
+                    if (userRole == "ADMIN_HR") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "👑 SECURE FULL HR DOSSIER: ${profile.name}", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                        }
+                    } else if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Visibility, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "📋 DEPARTMENT DOSSIER (LIMITED): ${profile.name}", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Text(text = "Employee Dossier: ${profile.name}", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    HorizontalDivider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
 
                     ProfileDetailRow(label = "Employee ID", value = profile.id)
                     ProfileDetailRow(label = "Work Email", value = profile.email)
-                    ProfileDetailRow(label = "Emergency Contact", value = profile.emergencyContactName)
-                    ProfileDetailRow(label = "Emergency Phone", value = profile.emergencyContactPhone)
+                    ProfileDetailRow(label = "Primary Department", value = profile.department)
+                    ProfileDetailRow(label = "Designated Position", value = profile.position)
+                    ProfileDetailRow(label = "Reporting Supervisor", value = profile.supervisor)
+                    ProfileDetailRow(label = "Assigned Hub", value = profile.assignedLocation)
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(text = "Secure Document Vault", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(6.dp))
+                    // 1. ADMIN / HR: Shows Compensation and full docs
+                    if (userRole == "ADMIN_HR") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "💰 Compensation & Financial Ledger (HR Secure)", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                    profile.documents.forEach { docName ->
-                        Row(
+                        val basicRate = when (profile.name) {
+                            "Sarah Jenkins" -> "$32.50 / hr"
+                            "Robert Chen" -> "$45.00 / hr"
+                            "Anjali Sharma" -> "$60.00 / hr"
+                            "Aditya Joshi (Director)" -> "$85.00 / hr"
+                            else -> "$25.00 / hr"
+                        }
+                        ProfileDetailRow(label = "Basic Pay Rate", value = basicRate)
+                        ProfileDetailRow(label = "Bank Name", value = profile.bankName)
+                        ProfileDetailRow(label = "Bank Account Number", value = profile.bankAccount)
+                        ProfileDetailRow(label = "Tax ID (TIN Number)", value = profile.taxId)
+                        ProfileDetailRow(label = "SSN / Social Security Number", value = profile.ssn)
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "🗄️ Secure Document Vault", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        profile.documents.forEach { docName ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                                    .clickable {
+                                        Toast.makeText(context, "Downloading encrypted $docName...", Toast.LENGTH_SHORT).show()
+                                    },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Description, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(text = docName, color = Color.White, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.Download, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "⏰ Clocking Logs & Audit Trail", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(text = "Last verified login: ${profile.lastLogin}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                        Text(text = "SSID / MDM Fingerprint: ${profile.registeredDevice}", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    }
+
+                    // 2. MANAGER / SUPERVISOR: Shows performance, leave, hours worked (CONFIDENTIAL SALARY HIDDEN!)
+                    if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(text = "📈 Performance Review & Attendance Analytics", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        val performanceRating = when (profile.name) {
+                            "Sarah Jenkins" -> "4.9 / 5.0 (Exceptional)"
+                            "Marcus Aurelius (HR Intern)" -> "4.2 / 5.0 (Meeting Expectations)"
+                            else -> "4.7 / 5.0 (Strong)"
+                        }
+                        ProfileDetailRow(label = "Recent Performance Appraisal", value = performanceRating)
+                        ProfileDetailRow(label = "Vacation Leave Balance", value = "${profile.vacationLeaveBalance} Days")
+                        ProfileDetailRow(label = "Sick Leave Balance", value = "${profile.sickLeaveBalance} Days")
+                        ProfileDetailRow(label = "Total Late Clock-ins", value = "${profile.totalLate}")
+                        ProfileDetailRow(label = "Total Absences", value = "${profile.absences}")
+                        ProfileDetailRow(label = "Overtime Hours Logged", value = "${profile.overtimeHours} Hrs")
+                        
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                                .padding(10.dp)
-                                .clickable {
-                                    Toast.makeText(context, "Downloading encrypted $docName...", Toast.LENGTH_SHORT).show()
-                                },
-                            verticalAlignment = Alignment.CenterVertically
+                                .background(Color.Yellow.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.Yellow.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .padding(12.dp)
                         ) {
-                            Icon(Icons.Default.Description, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(text = docName, color = Color.White, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                            Icon(Icons.Default.Download, contentDescription = null, tint = Color.White.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                            Text(
+                                text = "🔒 Compensation fields are restricted & masked for Manager roles. Standard policy 2026.06 apply.",
+                                color = Color.Yellow,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium
+                            )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
                     }
                 }
             }
@@ -2980,7 +3387,38 @@ fun PayslipsHistoryView(viewModel: TimeTrackerViewModel, context: Context) {
 
 @Composable
 fun AnalyticsReportsView(viewModel: TimeTrackerViewModel, context: Context) {
-    val allLogs by viewModel.allTimeLogs.collectAsState()
+    val allLogsRaw by viewModel.allTimeLogs.collectAsState()
+
+    val currentUserRole = viewModel.currentUserRole.value
+    val currentUserName = viewModel.currentUserName.value
+    val userProfile = viewModel.employeeProfiles.value.find { it.name.equals(currentUserName, ignoreCase = true) }
+    val userDept = userProfile?.department ?: ""
+
+    val allLogs = allLogsRaw.filter { log ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        if (currentUserRole == "ADMIN_HR") {
+            true
+        } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+            empDept.equals(userDept, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            log.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
+
+    val filteredProfiles = viewModel.employeeProfiles.value.filter { profile ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(profile.name, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        if (currentUserRole == "ADMIN_HR") {
+            true
+        } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+            profile.department.equals(userDept, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            profile.name.equals(currentUserName, ignoreCase = true)
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -2999,17 +3437,29 @@ fun AnalyticsReportsView(viewModel: TimeTrackerViewModel, context: Context) {
 
             ReportDownloadRow(title = "Monthly Payroll Overview Ledger", onExport = {
                 val csv = "EmployeeName,Role,BasicPayRate,TotalLoggedShifts\n" +
-                        viewModel.employeeProfiles.value.joinToString("\n") { "${it.name},${it.position},25.0,${allLogs.filter { l -> l.employeeName == it.name }.size}" }
+                        filteredProfiles.joinToString("\n") { "${it.name},${it.position},25.0,${allLogs.filter { l -> l.employeeName == it.name }.size}" }
                 saveCSVToDownloads(context, "Monthly_Payroll_Ledger.csv", csv)
             })
 
             ReportDownloadRow(title = "Employee Absenteeism Report", onExport = {
-                val csv = "EmployeeName,Status,DaysAbsent\nSarah Jenkins,Regular,1\nRobert Chen,Regular,0\nAnjali Sharma,Regular,2"
+                val csv = if (currentUserRole == "ADMIN_HR") {
+                    "EmployeeName,Status,DaysAbsent\nSarah Jenkins,Regular,1\nRobert Chen,Regular,0\nAnjali Sharma,Regular,2"
+                } else {
+                    // For manager/supervisor, filter the rows based on authorized profiles
+                    "EmployeeName,Status,DaysAbsent\n" +
+                    filteredProfiles.joinToString("\n") { "${it.name},${it.status},${if (it.name == "Sarah Jenkins") 1 else 0}" }
+                }
                 saveCSVToDownloads(context, "Absenteeism_Report.csv", csv)
             })
 
             ReportDownloadRow(title = "Overtime Report", onExport = {
-                val csv = "EmployeeName,Date,OvertimeHoursEarned\nSarah Jenkins,2026-06-25,1.5\nRobert Chen,2026-06-26,0.8"
+                val csv = if (currentUserRole == "ADMIN_HR") {
+                    "EmployeeName,Date,OvertimeHoursEarned\nSarah Jenkins,2026-06-25,1.5\nRobert Chen,2026-06-26,0.8"
+                } else {
+                    // For manager/supervisor, filter
+                    "EmployeeName,Date,OvertimeHoursEarned\n" +
+                    filteredProfiles.filter { it.name == "Sarah Jenkins" }.joinToString("\n") { "${it.name},2026-06-25,1.5" }
+                }
                 saveCSVToDownloads(context, "Overtime_Audit.csv", csv)
             })
         }
@@ -3154,13 +3604,59 @@ fun AdminHubScreen(viewModel: TimeTrackerViewModel) {
 
 @Composable
 fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
-    val leaves by viewModel.leaveRequests
-    val corrections by viewModel.correctionRequests
-    val claims by viewModel.reimbursementRequests
+    val leavesRaw by viewModel.leaveRequests
+    val correctionsRaw by viewModel.correctionRequests
+    val claimsRaw by viewModel.reimbursementRequests
 
     val userRole = viewModel.currentUserRole.value
+    val currentUserName = viewModel.currentUserName.value
     val isAuthorized = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
     val currencySymbol = viewModel.getCurrencySymbol()
+
+    val userProfile = viewModel.employeeProfiles.value.find { it.name.equals(currentUserName, ignoreCase = true) }
+    val userDept = userProfile?.department ?: ""
+
+    val leaves = leavesRaw.filter { leave ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(leave.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(leave.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        if (userRole == "ADMIN_HR") {
+            true
+        } else if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+            empDept.equals(userDept, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            leave.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
+
+    val corrections = correctionsRaw.filter { req ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(req.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(req.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        if (userRole == "ADMIN_HR") {
+            true
+        } else if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+            empDept.equals(userDept, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            req.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
+
+    val claims = claimsRaw.filter { claim ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(claim.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(claim.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        if (userRole == "ADMIN_HR") {
+            true
+        } else if (userRole == "MANAGER" || userRole == "SUPERVISOR") {
+            empDept.equals(userDept, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            claim.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
 
     // Role-based Status Banner
     Card(

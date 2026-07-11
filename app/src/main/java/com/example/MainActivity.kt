@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme(themeName = themeName) {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    contentWindowInsets = WindowInsets.safeDrawing
+                    contentWindowInsets = WindowInsets.safeDrawing.exclude(WindowInsets.ime)
                 ) { innerPadding ->
                     TimeTrackerApp(
                         modifier = Modifier.padding(innerPadding),
@@ -219,7 +219,8 @@ fun TimeTrackerApp(
                 editLogState = it
                 viewDetailsLog = null
             },
-            currencySymbol = viewModel.getCurrencySymbol()
+            currencySymbol = viewModel.getCurrencySymbol(),
+            userRole = currentUserRole
         )
     }
 
@@ -501,6 +502,40 @@ fun TimeTrackerApp(
                 onDismiss = { viewModel.dismissNotification(it) }
             )
 
+            // Dynamic Department & Supervisor/Manager filtered logs
+            val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(currentUserName, ignoreCase = true) }
+            val userDepartment = currentUserProfile?.department ?: ""
+
+            val filteredPendingLogs = pendingLogs.filter { log ->
+                val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+                val empRole = empUser?.role ?: "EMPLOYEE"
+                val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+                val empDept = empProfile?.department ?: ""
+                
+                if (currentUserRole == "ADMIN_HR") {
+                    true
+                } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+                    empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+                } else {
+                    log.employeeName.equals(currentUserName, ignoreCase = true)
+                }
+            }
+
+            val filteredAllLogs = allLogs.filter { log ->
+                val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+                val empRole = empUser?.role ?: "EMPLOYEE"
+                val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+                val empDept = empProfile?.department ?: ""
+                
+                if (currentUserRole == "ADMIN_HR") {
+                    true
+                } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+                    empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+                } else {
+                    log.employeeName.equals(currentUserName, ignoreCase = true)
+                }
+            }
+
             // Content Screens switching
             Box(
                 modifier = Modifier
@@ -522,7 +557,7 @@ fun TimeTrackerApp(
                     }
                     "spreadsheet" -> {
                         SpreadsheetScreen(
-                            logs = allLogs,
+                            logs = filteredAllLogs,
                             shiftConfig = shiftConfig,
                             filterApproval = viewModel.filterApproval.value,
                             filterSync = viewModel.filterSync.value,
@@ -530,7 +565,7 @@ fun TimeTrackerApp(
                             onFilterApprovalChange = { viewModel.filterApproval.value = it },
                             onFilterSyncChange = { viewModel.filterSync.value = it },
                             onSearchQueryChange = { viewModel.searchQuery.value = it },
-                            onExportClick = { exportLogsToCSV(allLogs, context) },
+                            onExportClick = { exportLogsToCSV(filteredAllLogs, context) },
                             onRowClick = { viewDetailsLog = it },
                             viewModel = viewModel,
                             currentUserRole = currentUserRole,
@@ -544,8 +579,8 @@ fun TimeTrackerApp(
                     }
                     "hr_approval" -> {
                         AdminApprovalScreen(
-                            pendingLogs = pendingLogs,
-                            allLogs = allLogs,
+                            pendingLogs = filteredPendingLogs,
+                            allLogs = filteredAllLogs,
                             onApprove = { viewModel.approveLog(it) },
                             onReject = { rejectLogId = it },
                             onEdit = { editLogState = it },
@@ -638,7 +673,7 @@ fun TimeTrackerApp(
                 MainNavigationBar(
                     currentScreen = currentScreen,
                     userRole = currentUserRole,
-                    pendingCount = pendingLogs.size,
+                    pendingCount = filteredPendingLogs.size,
                     onTabSelected = { viewModel.currentScreen.value = it }
                 )
             }
@@ -4889,7 +4924,8 @@ fun LogDetailDialog(
     log: TimeLogEntity,
     onDismiss: () -> Unit,
     onEdit: (TimeLogEntity) -> Unit,
-    currencySymbol: String = "$"
+    currencySymbol: String = "$",
+    userRole: String = "EMPLOYEE"
 ) {
     val df = DecimalFormat("#.##")
     val totalMillis = if (log.timeIn != null && log.timeOut != null) {
@@ -5023,27 +5059,51 @@ fun LogDetailDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = { onEdit(log) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f).testTag("dialog_edit_log_action")
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Audit", fontSize = 12.sp)
-                    }
+                val isTargetSupervisorOrManager = log.employeeName.contains("Director", ignoreCase = true) || 
+                        log.employeeName.contains("Manager", ignoreCase = true) || 
+                        log.employeeName.contains("Supervisor", ignoreCase = true) || 
+                        log.employeeName == "Robert Chen" || 
+                        log.employeeName == "Anjali Sharma" || 
+                        log.employeeName == "Aditya Joshi" || 
+                        log.employeeName == "Aditya Joshi (Director)"
 
+                val isAuthorized = if (isTargetSupervisorOrManager) {
+                    userRole == "ADMIN_HR"
+                } else {
+                    userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
+                }
+                if (isAuthorized) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { onEdit(log) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f), contentColor = Color.White),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).testTag("dialog_edit_log_action")
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Audit", fontSize = 12.sp)
+                        }
+
+                        Button(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCCFF00)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Close Details", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                } else {
                     Button(
                         onClick = onDismiss,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFCCFF00)),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Close Details", fontSize = 12.sp, color = Color.Black, fontWeight = FontWeight.Bold)
                     }
@@ -5408,7 +5468,7 @@ fun ChatHubScreen(
         }
     }
     
-    Row(modifier = Modifier.fillMaxSize()) {
+    Row(modifier = Modifier.fillMaxSize().imePadding()) {
         Column(
             modifier = Modifier
                 .width(145.dp)
