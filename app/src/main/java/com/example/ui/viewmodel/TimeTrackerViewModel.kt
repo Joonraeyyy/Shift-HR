@@ -133,6 +133,88 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         lastPostedRankingNotification.value = null
     }
 
+    // --- INTERACTIVE AI DATA ANALYSIS STATES ---
+    var aiAnalysisText = mutableStateOf("")
+    var aiAnalysisLoading = mutableStateOf(false)
+    var aiAnalysisError = mutableStateOf<String?>(null)
+
+    fun analyzeWorkforceWithAi(periodType: String, metricsSummary: String) {
+        viewModelScope.launch {
+            aiAnalysisLoading.value = true
+            aiAnalysisError.value = null
+            try {
+                val prompt = """
+                    You are an elite HR People Analytics AI assistant.
+                    Analyze the following workforce comparison dataset for the period type: $periodType.
+                    
+                    Dataset details:
+                    $metricsSummary
+                    
+                    Please provide a comprehensive, executive HR report containing:
+                    1. 📈 WORKFORCE HIGHLIGHTS: A scannable evaluation of the talent trends (hires vs separations).
+                    2. 🎯 RETENTION & MOVEMENTS: Key insight into promotions, job transfers, and turnover rates.
+                    3. 💡 ACTIONABLE RECOMMENDATIONS: 2-3 specific recommendations to optimize stability and performance.
+                    
+                    Keep your tone highly professional, objective, and scannable. Write in a clear, formatted style. Limit to 200 words.
+                """.trimIndent()
+                
+                val result = com.example.data.GeminiServiceClient.generateAnalysis(prompt)
+                aiAnalysisText.value = result
+            } catch (e: Exception) {
+                // Fallback gracefully to professional local simulated analysis based on the selected period
+                val simulatedReport = getSimulatedAnalysisForPeriod(periodType)
+                aiAnalysisText.value = simulatedReport
+                aiAnalysisError.value = "Fallback active: ${e.message}"
+            } finally {
+                aiAnalysisLoading.value = false
+            }
+        }
+    }
+
+    fun getSimulatedAnalysisForPeriod(periodType: String): String {
+        return when (periodType.lowercase()) {
+            "yearly" -> """
+                📈 **WORKFORCE HIGHLIGHTS**
+                - Talent onboarding expanded significantly by +14% year-over-year, leading to a headcount increase. 
+                - Overall headcount remains healthy with a notable stabilization in the Engineering and Admin sectors.
+                
+                🎯 **RETENTION & MOVEMENTS**
+                - Annualized turnover decreased from **4.2% (2024)** to **2.25% (2026 YTD)**, demonstrating exceptional retention.
+                - Promotions surged to 12 active progressions, signaling a robust internal career progression framework.
+                
+                💡 **ACTIONABLE RECOMMENDATIONS**
+                1. **Continuous Growth**: Institutionalize mentoring for the 26 new hires to sustain peak performance.
+                2. **Skill Mapping**: Expand job-transfer opportunities to cross-train staff into high-priority operations.
+            """.trimIndent()
+            "quarterly" -> """
+                📈 **WORKFORCE HIGHLIGHTS**
+                - Q2 onboarding represented the peak expansion phase with 12 new hires, followed by a transition to Q3 consolidation (4 hires).
+                - Net additions have balanced out normal seasonal attrition patterns.
+                
+                🎯 **RETENTION & MOVEMENTS**
+                - Defended a low turnover rate of **0.8% in Q3**, down from Q2's 1.35%.
+                - Internally mobilized 12 employees via promotions during the first three quarters, improving vertical talent pipeline health.
+                
+                💡 **ACTIONABLE RECOMMENDATIONS**
+                1. **Onboarding Audit**: Review Q2 hiring feedback to refine integration structures.
+                2. **Retention Focus**: Implement mid-year career pulse-checks to identify candidates for upcoming Q4 promotion cycles.
+            """.trimIndent()
+            else -> """
+                📈 **WORKFORCE HIGHLIGHTS**
+                - Onboarding velocity remained steady with 6 new hires in June and 3 in July.
+                - Low attrition continues with only 1 separation reported in July, reflecting stable operational continuity.
+                
+                🎯 **RETENTION & MOVEMENTS**
+                - July's turnover rate holds at a record low of **0.18%**, compared to 0.22% in June.
+                - Core department alignment remains strong with 1 vertical promotion and 1 cross-departmental transfer executed.
+                
+                💡 **ACTIONABLE RECOMMENDATIONS**
+                1. **July cohort support**: Provide targeted training support for July's new hires.
+                2. **Role transfers**: Conduct structured surveys on July's job transfers to gauge role alignment and happiness.
+            """.trimIndent()
+        }
+    }
+
     // Local / Offline Simulation states
     var isMockOffline = mutableStateOf(false) // Simulates device losing network connection
     var isSyncing = mutableStateOf(false)
@@ -161,7 +243,7 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     )
 
     // --- REGIONAL & SCHEDULE SETTINGS ---
-    var selectedCurrency = mutableStateOf("USD") // USD or PHP
+    var selectedCurrency = mutableStateOf("PHP") // USD or PHP
     var currentScheduleType = mutableStateOf("Weekly") // Weekly, 15 Days, Monthly
 
     fun getCurrencySymbol(): String {
@@ -468,7 +550,7 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             initMessages()
             initBirthdays()
             fetchWeatherForecast(selectedWeatherCity.value)
-            addNotification("System", "Ready for cyber login. Select a role to log in.", isAlert = false)
+            addNotification("System", "Ready for secure login. Select a role to get started.", isAlert = false)
         }
     }
 
@@ -528,6 +610,88 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             timestamp = timeStr
         )
         messagesList.value = messagesList.value + newMsg
+    }
+
+    fun sendCoverRequest(recipient: String, date: String, shiftName: String) {
+        val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+        val timeStr = sdf.format(Date())
+        val requester = currentUserName.value
+        val text = "Hi! Could you please cover my shift on $date ($shiftName)?"
+        val newMsg = Message(
+            sender = requester,
+            recipient = recipient,
+            text = text,
+            timestamp = timeStr,
+            isSwapRequest = true,
+            swapDate = date,
+            swapShiftName = shiftName,
+            swapStatus = "PENDING",
+            swapRequester = requester,
+            swapCoverer = ""
+        )
+        messagesList.value = messagesList.value + newMsg
+    }
+
+    fun respondToCoverRequest(messageId: String, accept: Boolean) {
+        val currentMsgs = messagesList.value.toMutableList()
+        val index = currentMsgs.indexOfFirst { it.id == messageId }
+        if (index != -1) {
+            val msg = currentMsgs[index]
+            val nextStatus = if (accept) "ACCEPTED" else "REJECTED"
+            val updatedMsg = msg.copy(
+                swapStatus = nextStatus,
+                swapCoverer = currentUserName.value
+            )
+            currentMsgs[index] = updatedMsg
+            messagesList.value = currentMsgs
+            
+            if (accept) {
+                addNotification("Cover Request Accepted", "${currentUserName.value} accepted cover request for ${msg.swapRequester} on ${msg.swapDate}. Awaiting Supervisor approval.", isAlert = false)
+            } else {
+                addNotification("Cover Request Declined", "${currentUserName.value} declined cover request for ${msg.swapRequester} on ${msg.swapDate}.", isAlert = false)
+            }
+        }
+    }
+
+    fun approveShiftCover(messageId: String, approvedBy: String) {
+        val currentMsgs = messagesList.value.toMutableList()
+        val index = currentMsgs.indexOfFirst { it.id == messageId }
+        if (index != -1) {
+            val msg = currentMsgs[index]
+            val updatedMsg = msg.copy(swapStatus = "APPROVED")
+            currentMsgs[index] = updatedMsg
+            messagesList.value = currentMsgs
+            
+            // Reassign the shift!
+            val currentSchedules = teamSchedules.value.toMutableList()
+            val schedIndex = currentSchedules.indexOfFirst { 
+                it.employeeName == msg.swapRequester && it.date == msg.swapDate 
+            }
+            if (schedIndex != -1) {
+                val originalSched = currentSchedules[schedIndex]
+                currentSchedules[schedIndex] = originalSched.copy(employeeName = msg.swapCoverer)
+                teamSchedules.value = currentSchedules
+                
+                // Add logs & notifications
+                addAuditLog(approvedBy, "Approved shift cover: ${msg.swapCoverer} covers ${msg.swapRequester} on ${msg.swapDate}.")
+                addNotification("Shift Cover Approved", "${msg.swapCoverer} is now scheduled for ${msg.swapShiftName} on ${msg.swapDate}.", isAlert = false)
+            }
+        }
+    }
+
+    fun rejectShiftCover(messageId: String, rejectedBy: String) {
+        val currentMsgs = messagesList.value.toMutableList()
+        val index = currentMsgs.indexOfFirst { it.id == messageId }
+        if (index != -1) {
+            val msg = currentMsgs[index]
+            val updatedMsg = msg.copy(swapStatus = "REJECTED")
+            currentMsgs[index] = updatedMsg
+            messagesList.value = currentMsgs
+            
+            // Add logs & notifications
+            addAuditLog(rejectedBy, "Rejected shift cover request for ${msg.swapRequester} on ${msg.swapDate}.")
+            addNotification("Shift Cover Rejected", "Request for ${msg.swapCoverer} to cover ${msg.swapRequester} on ${msg.swapDate} was declined.", isAlert = true)
+        }
     }
 
     private fun checkTodayHoliday() {
@@ -1286,7 +1450,13 @@ data class Message(
     val recipient: String,
     val text: String,
     val timestamp: String,
-    val isSystem: Boolean = false
+    val isSystem: Boolean = false,
+    val isSwapRequest: Boolean = false,
+    val swapDate: String = "",
+    val swapShiftName: String = "",
+    val swapStatus: String = "", // "PENDING", "ACCEPTED", "APPROVED", "REJECTED"
+    val swapRequester: String = "",
+    val swapCoverer: String = ""
 )
 
 data class BirthdayInfo(

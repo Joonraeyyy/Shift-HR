@@ -260,7 +260,8 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
                             companyStats = companyStats,
                             departmentTargets = departmentTargets,
                             profiles = profiles,
-                            themeColors = themeColors
+                            themeColors = themeColors,
+                            viewModel = viewModel
                         )
                     }
                 }
@@ -378,14 +379,14 @@ fun IndividualAppraisalSection(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = selectedProfile.name,
+                            text = "Current Evaluation Status",
                             color = Color.White,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "🔐 Access Level: Employee Reviewee (Own Report Only)",
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = Color(0xFFE2E8F0),
                             fontSize = 10.sp
                         )
                     }
@@ -427,7 +428,7 @@ fun IndividualAppraisalSection(
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = selectedProfile.name,
+                    text = if (userRole == "EMPLOYEE") "Your Overview" else selectedProfile.name,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = Color.White
@@ -435,18 +436,18 @@ fun IndividualAppraisalSection(
                 Text(
                     text = selectedProfile.position,
                     fontSize = 12.sp,
-                    color = Color.White.copy(alpha = 0.7f),
+                    color = Color.White.copy(alpha = 0.85f),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Department: ${selectedProfile.department}",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.5f)
+                    color = Color(0xFFE2E8F0)
                 )
                 Text(
                     text = "Status: ${selectedProfile.status}",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.5f)
+                    color = Color(0xFFE2E8F0)
                 )
             }
 
@@ -525,9 +526,9 @@ fun IndividualAppraisalSection(
                 )
             }
             Text(
-                text = "Calculated in real-time from active SQLite ledger logs.",
+                text = "Attendance data syncs automatically with work logs.",
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.5f),
+                color = Color(0xFFE2E8F0),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -537,19 +538,19 @@ fun IndividualAppraisalSection(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = "${stats.totalShifts}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(text = "Total Shifts", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(text = "Total Shifts", fontSize = 9.sp, color = Color(0xFFE2E8F0))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = String.format("%.1f hrs", stats.totalHours), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(text = "Hours Worked", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(text = "Hours Worked", fontSize = 9.sp, color = Color(0xFFE2E8F0))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = String.format("%.1f hrs", stats.overtimeHours), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text(text = "Overtime", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(text = "Overtime", fontSize = 9.sp, color = Color(0xFFE2E8F0))
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                     Text(text = String.format("%.0f%%", stats.approvalRate), fontSize = 16.sp, fontWeight = FontWeight.Bold, color = themeColors.primaryAccent)
-                    Text(text = "Approve Rate", fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+                    Text(text = "Approve Rate", fontSize = 9.sp, color = Color(0xFFE2E8F0))
                 }
             }
         }
@@ -885,13 +886,25 @@ fun IndividualAppraisalSection(
     }
 }
 
+data class ComparativeMetrics(
+    val period: String,
+    val newHires: Int,
+    val separations: Int,
+    val turnoverRate: Double,
+    val promotions: Int,
+    val demotions: Int,
+    val jobTransfers: Int,
+    val avgScore: Double
+)
+
 @Composable
 fun OrganizationAuditSection(
     context: Context,
     companyStats: PerformanceStats,
     departmentTargets: List<DepartmentTarget>,
     profiles: List<EmployeeProfile>,
-    themeColors: LiquidThemeColors
+    themeColors: LiquidThemeColors,
+    viewModel: TimeTrackerViewModel
 ) {
     // 1. Key Metrics Row
     Row(
@@ -928,6 +941,302 @@ fun OrganizationAuditSection(
     }
 
     Spacer(modifier = Modifier.height(14.dp))
+
+    // --- INTERACTIVE TREND COMPARISON BLOCK ---
+    var selectedComparePeriod by remember { mutableStateOf("monthly") }
+    
+    val comparedList = remember(selectedComparePeriod) {
+        when (selectedComparePeriod) {
+            "yearly" -> listOf(
+                ComparativeMetrics("2024", 42, 18, 4.20, 15, 0, 4, 4.35),
+                ComparativeMetrics("2025", 48, 22, 3.80, 18, 1, 6, 4.48),
+                ComparativeMetrics("2026 (YTD)", 26, 12, 2.25, 12, 0, 3, 4.65)
+            )
+            "quarterly" -> listOf(
+                ComparativeMetrics("Q1 2026", 10, 4, 1.10, 4, 0, 1, 4.52),
+                ComparativeMetrics("Q2 2026", 12, 6, 1.35, 5, 0, 1, 4.61),
+                ComparativeMetrics("Q3 2026", 4, 2, 0.80, 3, 0, 1, 4.68)
+            )
+            else -> listOf(
+                ComparativeMetrics("May 2026", 5, 2, 0.45, 2, 0, 0, 4.58),
+                ComparativeMetrics("June 2026", 6, 1, 0.22, 3, 0, 1, 4.62),
+                ComparativeMetrics("July 2026", 3, 1, 0.18, 1, 0, 1, 4.70)
+            )
+        }
+    }
+
+    val aiAnalysisText by remember { viewModel.aiAnalysisText }
+    val aiAnalysisLoading by remember { viewModel.aiAnalysisLoading }
+    val aiAnalysisError by remember { viewModel.aiAnalysisError }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Intelligent Workforce Comparison",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Compare hires, attrition, promotions, and appraisal scores across periods.",
+                        fontSize = 9.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Period Selector Tabs
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .padding(2.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val periods = listOf("monthly" to "Monthly Assessment", "quarterly" to "Quarterly Audit", "yearly" to "Year-on-Year")
+                periods.forEach { (key, title) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(if (selectedComparePeriod == key) themeColors.primaryAccent else Color.Transparent)
+                            .clickable { selectedComparePeriod = key }
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = title,
+                            color = if (selectedComparePeriod == key) Color.Black else Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Comparative side-by-side columns
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                comparedList.forEach { row ->
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(160.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(8.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = row.period,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = themeColors.primaryAccent,
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+                            
+                            // Turnover gauge summary
+                            Column {
+                                Text(text = "Turnover Rate", fontSize = 8.sp, color = Color.White.copy(alpha = 0.6f))
+                                Text(
+                                    text = String.format("%.2f%%", row.turnoverRate),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = if (row.turnoverRate < 2.0) Color(0xFF00FF88) else Color(0xFFFFCC00)
+                                )
+                            }
+
+                            // Team Movements Summary
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = "👥 Hires/Attrition", fontSize = 7.sp, color = Color.White.copy(alpha = 0.6f))
+                                    Text(text = "${row.newHires}/${row.separations}", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = "⚡ Promo/Transf", fontSize = 7.sp, color = Color.White.copy(alpha = 0.6f))
+                                    Text(text = "${row.promotions}/${row.jobTransfers}", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = "⭐ Avg Appraisal", fontSize = 7.sp, color = Color.White.copy(alpha = 0.6f))
+                                    Text(text = String.format("%.2f", row.avgScore), fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = themeColors.primaryAccent)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
+
+    // 3. INTERACTIVE AI ANALYSIS WORKSPACE
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = themeColors.cardSurface),
+        border = BorderStroke(1.dp, themeColors.cardBorder)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "AI Icon",
+                    tint = themeColors.primaryAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "Interactive AI HR Insights Desk",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+
+            Text(
+                text = "Compile multi-period statistics and synthesize smart recommendations on retention & career stability.",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            )
+
+            if (aiAnalysisLoading) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = themeColors.primaryAccent, modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Synthesizing metrics via secure AI Studio connection...", fontSize = 10.sp, color = Color.White)
+                }
+            } else {
+                if (aiAnalysisText.isNotEmpty()) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "AI INTELLIGENCE REPORT (${selectedComparePeriod.uppercase()})",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = themeColors.primaryAccent
+                                )
+                                Text(
+                                    text = "⚡ Secure Sandbox Mode",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF00FF88)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = aiAnalysisText,
+                                fontSize = 10.5.sp,
+                                color = Color.White,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+
+                    // Print AI report button
+                    Button(
+                        onClick = {
+                            val file = generateAiAnalysisPdf(context, selectedComparePeriod, comparedList, aiAnalysisText)
+                            if (file != null) {
+                                openPdfFile(context, file)
+                            } else {
+                                Toast.makeText(context, "Could not generate printed PDF report.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Print AI Insights Executive Report to PDF", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                // Action to generate / regenerate
+                Button(
+                    onClick = {
+                        val metricsSummary = comparedList.joinToString("\n") { row ->
+                            "- Period: ${row.period} | Hires: ${row.newHires} | Separations: ${row.separations} | Turnover: ${row.turnoverRate}% | Promotions: ${row.promotions} | Transfers: ${row.jobTransfers} | Avg Appraisals: ${row.avgScore}"
+                        }
+                        viewModel.analyzeWorkforceWithAi(selectedComparePeriod, metricsSummary)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = themeColors.primaryAccent),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (aiAnalysisText.isEmpty()) "Trigger AI Analytical Recommendation" else "Regenerate Interactive AI Insights",
+                        color = Color.Black,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(10.dp))
 
     // 2. Department targets vs performance table
     Card(
@@ -1470,50 +1779,74 @@ fun generateIndividualPerformancePdf(
 ): File? {
     try {
         val pdfDocument = PdfDocument()
-        val paint = Paint()
-        val textPaint = Paint()
+
+        // Common Paints
+        val bgPaint = Paint().apply { color = android.graphics.Color.parseColor("#FBFBFD"); style = Paint.Style.FILL }
+        val blackPaint = Paint().apply { color = android.graphics.Color.parseColor("#111111"); style = Paint.Style.FILL }
+        val electricMintPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.FILL }
+        val cardFillPaint = Paint().apply { color = android.graphics.Color.parseColor("#F4F6F8"); style = Paint.Style.FILL }
+        val heroCalloutPaint = Paint().apply { color = android.graphics.Color.parseColor("#E8F8F0"); style = Paint.Style.FILL }
+        
+        val strokePaint = Paint().apply { color = android.graphics.Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        val gridPaint = Paint().apply { color = android.graphics.Color.parseColor("#CBD5E0"); style = Paint.Style.STROKE; strokeWidth = 0.5f }
+        val linePaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#00E676")
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            isAntiAlias = true
+        }
+        val whitePaint = Paint().apply { color = android.graphics.Color.WHITE; style = Paint.Style.FILL; isAntiAlias = true }
+        val nodeBorderPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = true }
+        
+        val textPaint = Paint().apply { color = android.graphics.Color.parseColor("#1A202C"); isAntiAlias = true }
+
+        val whiteTitlePaint = Paint().apply { color = android.graphics.Color.WHITE; textSize = 16f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+        val graySubtitlePaint = Paint().apply { color = android.graphics.Color.parseColor("#A0AEC0"); textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL); isAntiAlias = true }
+        val mintMetadataPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+
+        // Helper to draw dual band header
+        val drawHeader = { canvas: android.graphics.Canvas, title: String, subtitle: String ->
+            // Header block
+            canvas.drawRect(0f, 0f, 595f, 120f, blackPaint)
+            // Accent bar
+            canvas.drawRect(0f, 120f, 595f, 126f, electricMintPaint)
+            // Texts
+            canvas.drawText("SHIFT HR CORP", 54f, 65f, whiteTitlePaint)
+            canvas.drawText(title, 54f, 90f, graySubtitlePaint)
+            canvas.drawText(subtitle, 54f, 108f, mintMetadataPaint)
+        }
+
+        // Helper to draw footers
+        val drawFooter = { canvas: android.graphics.Canvas, pageNum: Int ->
+            canvas.drawLine(30f, 795f, 565f, 795f, strokePaint)
+            textPaint.color = android.graphics.Color.GRAY
+            textPaint.textSize = 7.5f
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText("Shift HR Corp Performance & Audit System  •  CONFIDENTIAL  •  Page $pageNum of 2", 130f, 812f, textPaint)
+        }
 
         // Page 1: Metadata, overall score, and KPI breakdown table
         val pageInfo1 = PdfDocument.PageInfo.Builder(595, 842, 1).create()
         val page1 = pdfDocument.startPage(pageInfo1)
         val canvas1 = page1.canvas
 
-        // 1. Draw header background bar
-        paint.color = android.graphics.Color.parseColor("#0F0F11") // Dark grey
-        canvas1.drawRect(0f, 0f, 595f, 100f, paint)
+        // Background
+        canvas1.drawRect(0f, 0f, 595f, 842f, bgPaint)
+        drawHeader(canvas1, "OFFICIAL PERFORMANCE EVALUATION REPORT", "CONFIDENTIAL DOSSIER")
 
-        // Accent lime line
-        paint.color = android.graphics.Color.parseColor("#00FF88") // Neon green accent
-        canvas1.drawRect(0f, 96f, 595f, 100f, paint)
+        // 3. Metadata Block (Two columns, inside a beautifully styled card)
+        canvas1.drawRoundRect(RectF(30f, 142f, 565f, 222f), 12f, 12f, cardFillPaint)
+        canvas1.drawRoundRect(RectF(30f, 142f, 565f, 222f), 12f, 12f, strokePaint)
 
-        // 2. Draw Company name and title
-        textPaint.color = android.graphics.Color.WHITE
-        textPaint.textSize = 20f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas1.drawText("SHIFT HR CORP", 30f, 45f, textPaint)
-
-        textPaint.color = android.graphics.Color.LTGRAY
-        textPaint.textSize = 10f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas1.drawText("OFFICIAL PERFORMANCE EVALUATION REPORT", 30f, 65f, textPaint)
-
-        textPaint.color = android.graphics.Color.parseColor("#00FF88")
-        textPaint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        canvas1.drawText("CONFIDENTIAL dossier", 30f, 82f, textPaint)
-
-        // 3. Metadata Block (Two columns)
-        paint.color = android.graphics.Color.parseColor("#F1F1F3") // Very light grey background for block
-        val metaRect = RectF(30f, 120f, 565f, 210f)
-        canvas1.drawRoundRect(metaRect, 8f, 8f, paint)
-
-        textPaint.color = android.graphics.Color.parseColor("#333333")
-        textPaint.textSize = 9f
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.textSize = 8.5f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         
-        // Metadata text columns
-        val rowY1 = 145f
-        val rowY2 = 165f
-        val rowY3 = 185f
+        val rowY1 = 165f
+        val rowY2 = 185f
+        val rowY3 = 205f
         
         canvas1.drawText("EMPLOYEE NAME:", 45f, rowY1, textPaint)
         canvas1.drawText("EMPLOYEE ID:", 45f, rowY2, textPaint)
@@ -1524,101 +1857,108 @@ fun generateIndividualPerformancePdf(
         canvas1.drawText("EMPLOYEE STATUS:", 300f, rowY3, textPaint)
 
         // Metadata values
-        textPaint.color = android.graphics.Color.BLACK
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas1.drawText(employee.name, 140f, rowY1, textPaint)
-        canvas1.drawText(employee.id, 140f, rowY2, textPaint)
-        canvas1.drawText(employee.department, 140f, rowY3, textPaint)
+        canvas1.drawText(employee.name, 145f, rowY1, textPaint)
+        canvas1.drawText(employee.id, 145f, rowY2, textPaint)
+        canvas1.drawText(employee.department, 145f, rowY3, textPaint)
 
-        canvas1.drawText(employee.position, 400f, rowY1, textPaint)
-        canvas1.drawText(SimpleDateFormat("MMMM dd, yyyy", Locale.US).format(Date()), 400f, rowY2, textPaint)
-        canvas1.drawText(employee.status, 400f, rowY3, textPaint)
+        canvas1.drawText(employee.position, 410f, rowY1, textPaint)
+        canvas1.drawText(SimpleDateFormat("MMMM dd, yyyy", Locale.US).format(Date()), 410f, rowY2, textPaint)
+        canvas1.drawText(employee.status, 410f, rowY3, textPaint)
 
         // 4. Large Score Callout Box
-        paint.color = android.graphics.Color.parseColor("#E6FFE6") // Soft light green
-        val scoreRect = RectF(30f, 230f, 565f, 300f)
-        canvas1.drawRoundRect(scoreRect, 8f, 8f, paint)
+        canvas1.drawRoundRect(RectF(30f, 238f, 565f, 304f), 12f, 12f, heroCalloutPaint)
+        canvas1.drawRoundRect(RectF(30f, 238f, 565f, 304f), 12f, 12f, strokePaint)
 
-        textPaint.color = android.graphics.Color.parseColor("#006633")
-        textPaint.textSize = 12f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas1.drawText("OVERALL APPRAISAL RATING:", 50f, 270f, textPaint)
-
-        textPaint.textSize = 30f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas1.drawText(String.format("%.2f", overallScore), 350f, 275f, textPaint)
-        
-        textPaint.textSize = 14f
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas1.drawText("/ 5.0", 420f, 272f, textPaint)
-
-        // 5. KPI Table Section Title
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas1.drawText("Competency Performance Breakdown Table", 30f, 335f, textPaint)
-
-        // Table Header
-        paint.color = android.graphics.Color.parseColor("#333333") // Dark Header background
-        val headerRect = RectF(30f, 350f, 565f, 375f)
-        canvas1.drawRect(headerRect, paint)
-
-        textPaint.color = android.graphics.Color.WHITE
+        textPaint.color = android.graphics.Color.parseColor("#008543")
         textPaint.textSize = 9f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas1.drawText("Competency Area", 40f, 366f, textPaint)
-        canvas1.drawText("Self Score", 320f, 366f, textPaint)
-        canvas1.drawText("Supervisor Score", 400f, 366f, textPaint)
-        canvas1.drawText("Variance", 500f, 366f, textPaint)
+        canvas1.drawText("OVERALL APPRAISAL RATING", 48f, 262f, textPaint)
+
+        val scoreSubTextPaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#1A202C")
+            textSize = 8f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+        canvas1.drawText("Securely compiled based on automated self-assessments and supervisor reviews.", 48f, 282f, scoreSubTextPaint)
+
+        val ratingTextPaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#008543")
+            textSize = 25f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        val appraisalScoreStr = String.format("%.2f", overallScore)
+        canvas1.drawText(appraisalScoreStr, 440f, 282f, ratingTextPaint)
+
+        val ratingLabelPaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#4A5568")
+            textSize = 10f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+        canvas1.drawText(" / 5.0", 508f, 278f, ratingLabelPaint)
+
+        // 5. KPI Table Section Title
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas1.drawText("Competency Performance Breakdown Matrix", 30f, 328f, textPaint)
+
+        // Table Header
+        canvas1.drawRect(30f, 342f, 565f, 360f, blackPaint)
+
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.textSize = 7.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas1.drawText("Competency Area", 40f, 354f, textPaint)
+        canvas1.drawText("Self Score", 320f, 354f, textPaint)
+        canvas1.drawText("Supervisor Score", 400f, 354f, textPaint)
+        canvas1.drawText("Variance", 500f, 354f, textPaint)
 
         // Rows
-        var currentY = 375f
+        var currentY = 360f
         kpis.forEachIndexed { i, kpi ->
-            val isEven = i % 2 == 0
-            paint.color = if (isEven) android.graphics.Color.parseColor("#F9F9FB") else android.graphics.Color.WHITE
-            val rowRect = RectF(30f, currentY, 565f, currentY + 45f)
-            canvas1.drawRect(rowRect, paint)
+            val isEven = i % 2 == 1
+            if (isEven) {
+                canvas1.drawRect(30f, currentY, 565f, currentY + 45f, cardFillPaint)
+            }
+            canvas1.drawLine(30f, currentY + 45f, 565f, currentY + 45f, strokePaint)
 
-            textPaint.color = android.graphics.Color.BLACK
+            textPaint.color = android.graphics.Color.parseColor("#1A202C")
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textPaint.textSize = 9f
-            canvas1.drawText(kpi.competency, 40f, currentY + 20f, textPaint)
+            textPaint.textSize = 8.5f
+            canvas1.drawText(kpi.competency, 40f, currentY + 18f, textPaint)
 
-            textPaint.color = android.graphics.Color.GRAY
+            textPaint.color = android.graphics.Color.parseColor("#4A5568")
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            textPaint.textSize = 7.5f
-            canvas1.drawText(kpi.description, 40f, currentY + 34f, textPaint)
+            textPaint.textSize = 7f
+            canvas1.drawText(kpi.description, 40f, currentY + 32f, textPaint)
 
-            textPaint.color = android.graphics.Color.BLACK
-            textPaint.textSize = 10f
+            textPaint.color = android.graphics.Color.parseColor("#1A202C")
+            textPaint.textSize = 8.5f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas1.drawText(String.format("%.1f", kpi.selfScore), 340f, currentY + 26f, textPaint)
-            canvas1.drawText(String.format("%.1f", kpi.managerScore), 420f, currentY + 26f, textPaint)
+            canvas1.drawText(String.format("%.1f", kpi.selfScore), 340f, currentY + 24f, textPaint)
+            canvas1.drawText(String.format("%.1f", kpi.managerScore), 420f, currentY + 24f, textPaint)
 
             // Variance color coding
             val variance = kpi.managerScore - kpi.selfScore
-            if (variance >= 0) {
-                textPaint.color = android.graphics.Color.parseColor("#008800")
-                canvas1.drawText("+${String.format("%.1f", variance)}", 510f, currentY + 26f, textPaint)
-            } else {
-                textPaint.color = android.graphics.Color.RED
-                canvas1.drawText(String.format("%.1f", variance), 510f, currentY + 26f, textPaint)
+            val varStr = if (variance >= 0) "+${String.format("%.1f", variance)}" else String.format("%.1f", variance)
+            val varColor = if (variance >= 0) "#008543" else "#DC2626"
+            
+            val varPaint = Paint().apply {
+                color = android.graphics.Color.parseColor(varColor)
+                textSize = 8.5f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                isAntiAlias = true
             }
-
-            // Divider line
-            paint.color = android.graphics.Color.parseColor("#EEEEEE")
-            canvas1.drawLine(30f, currentY + 45f, 565f, currentY + 45f, paint)
+            canvas1.drawText(varStr, 510f, currentY + 24f, varPaint)
 
             currentY += 45f
         }
 
-        // Draw footer page number
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 8f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas1.drawText("Page 1 of 2", 280f, 820f, textPaint)
-
+        drawFooter(canvas1, 1)
         pdfDocument.finishPage(page1)
 
         // ------------------ Page 2: Historical charts, database metrics, signatures ------------------
@@ -1626,158 +1966,142 @@ fun generateIndividualPerformancePdf(
         val page2 = pdfDocument.startPage(pageInfo2)
         val canvas2 = page2.canvas
 
-        // Header strip
-        paint.color = android.graphics.Color.parseColor("#0F0F11")
-        canvas2.drawRect(0f, 0f, 595f, 40f, paint)
-        paint.color = android.graphics.Color.parseColor("#00FF88")
-        canvas2.drawRect(0f, 38f, 595f, 40f, paint)
-
-        textPaint.color = android.graphics.Color.WHITE
-        textPaint.textSize = 11f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas2.drawText("SHIFT HR CORP — INDIVIDUAL APPRAISAL AUDIT", 30f, 25f, textPaint)
+        // Background & Header
+        canvas2.drawRect(0f, 0f, 595f, 842f, bgPaint)
+        drawHeader(canvas2, "INDIVIDUAL APPRAISAL AUDIT", "CONFIDENTIAL DOSSIER")
 
         // 1. Chart Section Title
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas2.drawText("Historical Evaluation Quarter-on-Quarter Progress", 30f, 75f, textPaint)
+        canvas2.drawText("Historical Evaluation Quarter-on-Quarter Progress", 30f, 150f, textPaint)
 
-        // Outline Chart Box
-        paint.style = Paint.Style.STROKE
-        paint.color = android.graphics.Color.LTGRAY
-        paint.strokeWidth = 1f
-        canvas2.drawRect(50f, 100f, 545f, 240f, paint)
-        paint.style = Paint.Style.FILL
+        // Rounded Chart container
+        canvas2.drawRoundRect(RectF(30f, 162f, 565f, 282f), 12f, 12f, cardFillPaint)
+        canvas2.drawRoundRect(RectF(30f, 162f, 565f, 282f), 12f, 12f, strokePaint)
 
-        // Draw grid lines
-        paint.color = android.graphics.Color.parseColor("#F0F0F0")
+        // Draw grid lines and labels
         for (i in 0..4) {
             val scoreVal = 3.0f + i * 0.5f
-            val y = 240f - (scoreVal - 3.0f) / 2.0f * 120f
-            canvas2.drawLine(50f, y, 545f, y, paint)
+            val y = 265f - (scoreVal - 3.0f) / 2.0f * 85f
+            canvas2.drawLine(55f, y, 540f, y, gridPaint)
 
-            textPaint.color = android.graphics.Color.GRAY
-            textPaint.textSize = 8f
+            textPaint.color = android.graphics.Color.parseColor("#718096")
+            textPaint.textSize = 7f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            canvas2.drawText(String.format("%.1f", scoreVal), 26f, y + 3f, textPaint)
+            canvas2.drawText(String.format("%.1f", scoreVal), 36f, y + 2.5f, textPaint)
         }
 
         // Plot line
-        paint.color = android.graphics.Color.parseColor("#00FF88") // Green line
-        paint.strokeWidth = 3f
         var prevX = 0f
         var prevY = 0f
         
         historicalScores.forEachIndexed { idx, record ->
-            val x = 50f + (idx.toFloat() / (historicalScores.size - 1).toFloat()) * 460f
+            val x = 55f + (idx.toFloat() / (historicalScores.size - 1).toFloat()) * 465f
             val scoreNorm = (record.score - 3.0f) / 2.0f
-            val y = 240f - scoreNorm * 120f
+            val y = 265f - scoreNorm * 85f
 
             if (idx > 0) {
-                canvas2.drawLine(prevX, prevY, x, y, paint)
+                canvas2.drawLine(prevX, prevY, x, y, linePaint)
             }
 
-            // Draw Point dot
-            val dotPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#006633")
-                style = Paint.Style.FILL
-            }
-            canvas2.drawCircle(x, y, 4f, dotPaint)
-            dotPaint.color = android.graphics.Color.WHITE
-            canvas2.drawCircle(x, y, 2f, dotPaint)
+            // Draw Node background & border
+            canvas2.drawCircle(x, y, 4.5f, whitePaint)
+            canvas2.drawCircle(x, y, 4.5f, nodeBorderPaint)
 
             // Draw Labels
-            textPaint.color = android.graphics.Color.BLACK
-            textPaint.textSize = 8f
+            textPaint.color = android.graphics.Color.parseColor("#111111")
+            textPaint.textSize = 7.5f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas2.drawText(String.format("%.2f", record.score), x - 10f, y - 8f, textPaint)
+            canvas2.drawText(String.format("%.2f", record.score), x - 10f, y - 7f, textPaint)
 
-            canvas2.drawText(record.quarter, x - 15f, 255f, textPaint)
+            textPaint.color = android.graphics.Color.parseColor("#4A5568")
+            textPaint.textSize = 7.5f
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas2.drawText(record.quarter, x - 15f, 274f, textPaint)
 
             prevX = x
             prevY = y
         }
 
         // 2. Database attendance stats
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas2.drawText("Dynamic SQLite Attendance Verification", 30f, 305f, textPaint)
 
         // Stats card box
-        paint.color = android.graphics.Color.parseColor("#F5F7FA")
-        val statsBox = RectF(30f, 320f, 565f, 420f)
-        canvas2.drawRoundRect(statsBox, 8f, 8f, paint)
+        canvas2.drawRoundRect(RectF(30f, 318f, 565f, 418f), 12f, 12f, cardFillPaint)
+        canvas2.drawRoundRect(RectF(30f, 318f, 565f, 418f), 12f, 12f, strokePaint)
 
         // Left Column: Roster stats
-        textPaint.color = android.graphics.Color.parseColor("#555555")
-        textPaint.textSize = 9f
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas2.drawText("TOTAL CLOCKED SHIFTS:", 50f, 350f, textPaint)
-        canvas2.drawText("TOTAL WORKED HOURS:", 50f, 370f, textPaint)
-        canvas2.drawText("OVERTIME HOURS (1.5x):", 50f, 390f, textPaint)
+        canvas2.drawText("TOTAL CLOCKED SHIFTS:", 50f, 345f, textPaint)
+        canvas2.drawText("TOTAL WORKED HOURS:", 50f, 365f, textPaint)
+        canvas2.drawText("OVERTIME HOURS (1.5x):", 50f, 385f, textPaint)
 
         // Right Column: Roster stats values
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 9.5f
-        canvas2.drawText("${stats.totalShifts} Roster Punches", 200f, 350f, textPaint)
-        canvas2.drawText(String.format("%.2f Total hours", stats.totalHours), 200f, 370f, textPaint)
-        canvas2.drawText(String.format("%.2f Overtime hours", stats.overtimeHours), 200f, 390f, textPaint)
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas2.drawText("${stats.totalShifts} Roster Punches", 200f, 345f, textPaint)
+        canvas2.drawText(String.format("%.2f Total hours", stats.totalHours), 200f, 365f, textPaint)
+        canvas2.drawText(String.format("%.2f Overtime hours", stats.overtimeHours), 200f, 385f, textPaint)
 
         // Middle Divider
-        paint.color = android.graphics.Color.LTGRAY
-        canvas2.drawLine(340f, 335f, 340f, 405f, paint)
+        canvas2.drawLine(340f, 332f, 340f, 404f, strokePaint)
 
         // Second column
-        textPaint.color = android.graphics.Color.parseColor("#555555")
-        canvas2.drawText("HOURLY COMP RATE:", 360f, 350f, textPaint)
-        canvas2.drawText("PUNCH APPROVAL RATE:", 360f, 370f, textPaint)
-        canvas2.drawText("TIMESHEET STATUS:", 360f, 390f, textPaint)
-
-        textPaint.color = android.graphics.Color.BLACK
-        canvas2.drawText(String.format("$%.2f / hr", stats.basicRate), 500f, 350f, textPaint)
-        canvas2.drawText(String.format("%.1f%% approved", stats.approvalRate), 500f, 370f, textPaint)
-        
-        textPaint.color = android.graphics.Color.parseColor("#008800")
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas2.drawText("AUDITED OK 🟢", 500f, 390f, textPaint)
+        canvas2.drawText("HOURLY COMP RATE:", 360f, 345f, textPaint)
+        canvas2.drawText("PUNCH APPROVAL RATE:", 360f, 365f, textPaint)
+        canvas2.drawText("TIMESHEET STATUS:", 360f, 385f, textPaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas2.drawText(String.format("$%.2f / hr", stats.basicRate), 500f, 345f, textPaint)
+        canvas2.drawText(String.format("%.1f%% approved", stats.approvalRate), 500f, 365f, textPaint)
+        
+        val auditPaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#008543")
+            textSize = 8.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            isAntiAlias = true
+        }
+        canvas2.drawText("AUDITED OK 🟢", 500f, 385f, auditPaint)
 
         // 3. Physical signatures block
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas2.drawText("Physical Document Attestation", 30f, 465f, textPaint)
 
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 9f
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         canvas2.drawText("By signing physically below, both employee and assessing director attest that the KPI and metrics", 30f, 485f, textPaint)
-        canvas2.drawText("listed above are evaluated fairly in compliance with ClauseOS guidelines and standard HR procedure.", 30f, 500f, textPaint)
+        canvas2.drawText("listed above are evaluated fairly in compliance with ClauseOS guidelines and standard HR procedure.", 30f, 498f, textPaint)
 
         // Signature lines
-        paint.color = android.graphics.Color.BLACK
-        paint.strokeWidth = 1f
-        canvas2.drawLine(50f, 620f, 250f, 620f, paint) // Employee Line
-        canvas2.drawLine(340f, 620f, 540f, 620f, paint) // Manager Line
+        canvas2.drawLine(50f, 620f, 250f, 620f, strokePaint) // Employee Line
+        canvas2.drawLine(340f, 620f, 540f, 620f, strokePaint) // Manager Line
 
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 9.5f
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.textSize = 8.5f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas2.drawText(employee.name, 50f, 638f, textPaint)
         canvas2.drawText("Aditya Joshi (Director)", 340f, 638f, textPaint)
 
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 8.5f
+        textPaint.color = android.graphics.Color.parseColor("#718096")
+        textPaint.textSize = 7.5f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
         canvas2.drawText("Employee Signature & Date", 50f, 652f, textPaint)
         canvas2.drawText("Assessing Manager Signature & Date", 340f, 652f, textPaint)
 
-        // Footer block
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 8f
-        canvas2.drawText("Page 2 of 2", 280f, 820f, textPaint)
-
+        drawFooter(canvas2, 2)
         pdfDocument.finishPage(page2)
 
         // Save PDF file to cache dir
@@ -1801,131 +2125,135 @@ fun generateCompanySummaryPdf(
 ): File? {
     try {
         val pdfDocument = PdfDocument()
-        val paint = Paint()
-        val textPaint = Paint()
+
+        // Common Paints
+        val bgPaint = Paint().apply { color = android.graphics.Color.parseColor("#FBFBFD"); style = Paint.Style.FILL }
+        val blackPaint = Paint().apply { color = android.graphics.Color.parseColor("#111111"); style = Paint.Style.FILL }
+        val electricMintPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.FILL }
+        val cardFillPaint = Paint().apply { color = android.graphics.Color.parseColor("#F4F6F8"); style = Paint.Style.FILL }
+        val heroCalloutPaint = Paint().apply { color = android.graphics.Color.parseColor("#E8F8F0"); style = Paint.Style.FILL }
+        
+        val strokePaint = Paint().apply { color = android.graphics.Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        val gridPaint = Paint().apply { color = android.graphics.Color.parseColor("#CBD5E0"); style = Paint.Style.STROKE; strokeWidth = 0.5f }
+        val linePaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#00E676")
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            isAntiAlias = true
+        }
+        
+        val textPaint = Paint().apply { color = android.graphics.Color.parseColor("#1A202C"); isAntiAlias = true }
+
+        val whiteTitlePaint = Paint().apply { color = android.graphics.Color.WHITE; textSize = 15f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+        val graySubtitlePaint = Paint().apply { color = android.graphics.Color.parseColor("#A0AEC0"); textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL); isAntiAlias = true }
+        val mintMetadataPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
 
         // Page 1 of Executive summary
         val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
         val page = pdfDocument.startPage(pageInfo)
         val canvas = page.canvas
 
-        // 1. Draw header background bar
-        paint.color = android.graphics.Color.parseColor("#0F0F11") // Dark grey
-        canvas.drawRect(0f, 0f, 595f, 100f, paint)
+        // Background
+        canvas.drawRect(0f, 0f, 595f, 842f, bgPaint)
 
-        // Accent lime line
-        paint.color = android.graphics.Color.parseColor("#00FF88") // Neon green
-        canvas.drawRect(0f, 96f, 595f, 100f, paint)
-
-        // 2. Title block
-        textPaint.color = android.graphics.Color.WHITE
-        textPaint.textSize = 20f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("SHIFT HR CORP", 30f, 45f, textPaint)
-
-        textPaint.color = android.graphics.Color.LTGRAY
-        textPaint.textSize = 10f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("ORGANIZATIONAL PERFORMANCE EXECUTIVE SUMMARY", 30f, 65f, textPaint)
-
-        textPaint.color = android.graphics.Color.parseColor("#00FF88")
-        textPaint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
-        canvas.drawText("HR AUDIT CORE MATRIX", 30f, 82f, textPaint)
+        // 1. Dual band header
+        canvas.drawRect(0f, 0f, 595f, 120f, blackPaint)
+        canvas.drawRect(0f, 120f, 595f, 126f, electricMintPaint)
+        canvas.drawText("SHIFT HR CORP", 54f, 65f, whiteTitlePaint)
+        canvas.drawText("ORGANIZATIONAL PERFORMANCE EXECUTIVE SUMMARY", 54f, 90f, graySubtitlePaint)
+        canvas.drawText("HR AUDIT CORE MATRIX", 54f, 108f, mintMetadataPaint)
 
         // 3. Key Metrics Grid Boxes (3 boxes side by side)
-        val boxWidth = 160f
-        val boxHeight = 70f
-        val gap = 15f
+        val boxWidth = 162f
+        val boxHeight = 65f
+        val gap = 12f
         
         val metricBoxes = listOf(
-            Triple("Evaluated Staff", "5 Employees", "#F5F7FA"),
-            Triple("Company Avg", "4.61 / 5.0", "#EBF3FF"),
-            Triple("Top Department", "Administration", "#E6FFE6")
+            Triple("Evaluated Staff", "5 Employees", cardFillPaint),
+            Triple("Company Avg", "4.61 / 5.0", heroCalloutPaint),
+            Triple("Top Department", "Administration", cardFillPaint)
         )
 
         metricBoxes.forEachIndexed { idx, item ->
             val left = 30f + idx * (boxWidth + gap)
-            val rect = RectF(left, 120f, left + boxWidth, 120f + boxHeight)
+            val rect = RectF(left, 142f, left + boxWidth, 142f + boxHeight)
             
-            paint.color = android.graphics.Color.parseColor(item.third)
-            canvas.drawRoundRect(rect, 6f, 6f, paint)
+            canvas.drawRoundRect(rect, 10f, 10f, item.third)
+            canvas.drawRoundRect(rect, 10f, 10f, strokePaint)
 
-            textPaint.color = android.graphics.Color.DKGRAY
-            textPaint.textSize = 8.5f
+            textPaint.color = android.graphics.Color.parseColor("#4A5568")
+            textPaint.textSize = 8f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas.drawText(item.first, left + 15f, 145f, textPaint)
+            canvas.drawText(item.first.uppercase(), left + 14f, 164f, textPaint)
 
-            textPaint.color = android.graphics.Color.BLACK
-            textPaint.textSize = 14f
+            val isGreen = item.third == heroCalloutPaint
+            textPaint.color = if (isGreen) android.graphics.Color.parseColor("#008543") else android.graphics.Color.parseColor("#111111")
+            textPaint.textSize = 12f
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            canvas.drawText(item.second, left + 15f, 172f, textPaint)
+            canvas.drawText(item.second, left + 14f, 188f, textPaint)
         }
 
         // 4. Department target comparison table
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Departmental Roster & Metric Benchmarks", 30f, 230f, textPaint)
+        canvas.drawText("Departmental Roster & Metric Benchmarks", 30f, 232f, textPaint)
 
         // Table Header
-        paint.color = android.graphics.Color.parseColor("#222222")
-        val headerRect = RectF(30f, 245f, 565f, 270f)
-        canvas.drawRect(headerRect, paint)
+        canvas.drawRect(30f, 245f, 565f, 263f, blackPaint)
 
         textPaint.color = android.graphics.Color.WHITE
-        textPaint.textSize = 9.5f
+        textPaint.textSize = 7.5f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Department Name", 40f, 262f, textPaint)
-        canvas.drawText("Target Score", 250f, 262f, textPaint)
-        canvas.drawText("Actual Score", 350f, 262f, textPaint)
-        canvas.drawText("Milestone Status", 450f, 262f, textPaint)
+        canvas.drawText("Department Name", 40f, 257f, textPaint)
+        canvas.drawText("Target Score", 250f, 257f, textPaint)
+        canvas.drawText("Actual Score", 350f, 257f, textPaint)
+        canvas.drawText("Milestone Status", 450f, 257f, textPaint)
 
         // Rows
-        var currentY = 270f
+        var currentY = 263f
         deptTargets.forEachIndexed { idx, dept ->
-            val isEven = idx % 2 == 0
-            paint.color = if (isEven) android.graphics.Color.parseColor("#F9F9FB") else android.graphics.Color.WHITE
-            val rowRect = RectF(30f, currentY, 565f, currentY + 30f)
-            canvas.drawRect(rowRect, paint)
+            val isEven = idx % 2 == 1
+            if (isEven) {
+                canvas.drawRect(30f, currentY, 565f, currentY + 30f, cardFillPaint)
+            }
+            canvas.drawLine(30f, currentY + 30f, 565f, currentY + 30f, strokePaint)
 
-            textPaint.color = android.graphics.Color.BLACK
+            textPaint.color = android.graphics.Color.parseColor("#111111")
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textPaint.textSize = 8f
             canvas.drawText(dept.department, 40f, currentY + 18f, textPaint)
 
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
             canvas.drawText(String.format("%.2f", dept.target), 260f, currentY + 18f, textPaint)
             
-            textPaint.color = android.graphics.Color.parseColor("#008800")
+            textPaint.color = android.graphics.Color.parseColor("#008543")
             textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             canvas.drawText(String.format("%.2f", dept.actual), 360f, currentY + 18f, textPaint)
 
             // Status Badge
-            val statusColor = if (dept.actual >= dept.target) "#006633" else "#886600"
+            val isMet = dept.actual >= dept.target
+            val statusColor = if (isMet) "#008543" else "#D97706"
             textPaint.color = android.graphics.Color.parseColor(statusColor)
             canvas.drawText(dept.status.uppercase(), 460f, currentY + 18f, textPaint)
-
-            paint.color = android.graphics.Color.parseColor("#EEEEEE")
-            canvas.drawLine(30f, currentY + 30f, 565f, currentY + 30f, paint)
 
             currentY += 30f
         }
 
         // 5. Normal curve Bell Curve drawing on PDF
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 14f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Whole Company Performance Normal Curve Distribution", 30f, 465f, textPaint)
+        canvas.drawText("Whole Company Performance Normal Curve Distribution", 30f, 470f, textPaint)
 
-        // Draw outer outline border
-        paint.style = Paint.Style.STROKE
-        paint.color = android.graphics.Color.LTGRAY
-        paint.strokeWidth = 1f
-        canvas.drawRect(50f, 485f, 545f, 620f, paint)
-        paint.style = Paint.Style.FILL
+        // Draw rounded container for chart
+        canvas.drawRoundRect(RectF(30f, 484f, 565f, 624f), 12f, 12f, cardFillPaint)
+        canvas.drawRoundRect(RectF(30f, 484f, 565f, 624f), 12f, 12f, strokePaint)
 
-        // Baseline tick labels
-        paint.color = android.graphics.Color.parseColor("#EAEAEA")
-        canvas.drawLine(50f, 610f, 545f, 610f, paint)
+        // Baseline grid line
+        canvas.drawLine(40f, 610f, 550f, 610f, gridPaint)
 
         // Draw normal curve bell lines
         val mu = 4.2f
@@ -1937,32 +2265,27 @@ fun generateCompanySummaryPdf(
         var prevX = 0f
         var prevY = 0f
         
-        paint.color = android.graphics.Color.parseColor("#006633") // Dark Green Curve
-        paint.strokeWidth = 2.5f
-
         for (i in 0..pointsCount) {
             val score = minScore + (i.toFloat() / pointsCount) * (maxScore - minScore)
             val exponent = -((score - mu).pow(2)) / (2 * sigma.pow(2))
             val freqNorm = exp(exponent) // value between 0.0 and 1.0
             
             val x = 50f + (i.toFloat() / pointsCount) * 495f
-            val y = 610f - freqNorm * 110f
+            val y = 605f - freqNorm * 100f
 
             if (i > 0) {
-                canvas.drawLine(prevX, prevY, x, y, paint)
+                canvas.drawLine(prevX, prevY, x, y, linePaint)
             }
             prevX = x
             prevY = y
         }
 
         // Draw Mean line indicator
-        paint.color = android.graphics.Color.GRAY
-        paint.strokeWidth = 1f
         val muX = 50f + ((mu - minScore) / (maxScore - minScore)) * 495f
-        canvas.drawLine(muX, 500f, muX, 610f, paint)
+        canvas.drawLine(muX, 500f, muX, 610f, gridPaint)
 
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 8.5f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 7.5f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas.drawText("Mean μ = 4.2", muX - 25f, 495f, textPaint)
 
@@ -1970,38 +2293,39 @@ fun generateCompanySummaryPdf(
         val ticks = listOf(3.0f, 3.5f, 4.0f, 4.5f, 5.0f)
         ticks.forEach { tick ->
             val tickX = 50f + ((tick - minScore) / (maxScore - minScore)) * 495f
-            textPaint.color = android.graphics.Color.DKGRAY
-            canvas.drawText(String.format("%.1f", tick), tickX - 8f, 634f, textPaint)
+            textPaint.color = android.graphics.Color.parseColor("#718096")
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText(String.format("%.1f", tick), tickX - 8f, 618f, textPaint)
         }
 
         // 6. Signatures and execution audits
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 12f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Executive Directorship Attestation", 30f, 680f, textPaint)
+        canvas.drawText("Executive Directorship Attestation", 30f, 678f, textPaint)
 
-        textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 9f
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
         textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("Report calculated and compiled securely under Shift HR Corp development roster rules.", 30f, 698f, textPaint)
+        canvas.drawText("Report calculated and compiled securely under Shift HR Corp development roster rules.", 30f, 695f, textPaint)
 
-        paint.color = android.graphics.Color.BLACK
-        paint.strokeWidth = 1f
-        canvas.drawLine(340f, 750f, 540f, 750f, paint)
+        canvas.drawLine(340f, 750f, 540f, 750f, strokePaint)
 
-        textPaint.color = android.graphics.Color.BLACK
-        textPaint.textSize = 9.5f
-        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("Aditya Joshi (Director of Operations)", 340f, 768f, textPaint)
-
-        textPaint.color = android.graphics.Color.GRAY
+        textPaint.color = android.graphics.Color.parseColor("#111111")
         textPaint.textSize = 8.5f
-        canvas.drawText("Executive Director Attestation Signature & Date", 340f, 782f, textPaint)
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Aditya Joshi (Director of Operations)", 340f, 765f, textPaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#718096")
+        textPaint.textSize = 7.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("Executive Director Attestation Signature & Date", 340f, 777f, textPaint)
 
         // Footer block
+        canvas.drawLine(30f, 795f, 565f, 795f, strokePaint)
         textPaint.color = android.graphics.Color.GRAY
-        textPaint.textSize = 8f
-        canvas.drawText("Organizational Audit Report — SHIFT HR CORP Confidential", 180f, 820f, textPaint)
+        textPaint.textSize = 7.5f
+        canvas.drawText("Organizational Audit Report — SHIFT HR CORP Confidential  •  Page 1 of 1", 145f, 812f, textPaint)
 
         pdfDocument.finishPage(page)
 
@@ -2038,3 +2362,197 @@ fun openPdfFile(context: Context, file: File) {
         Toast.makeText(context, "No PDF viewer available. File was printed securely to cache directory.", Toast.LENGTH_LONG).show()
     }
 }
+
+fun drawWrappedText(canvas: Canvas, text: String, x: Float, y: Float, width: Float, paint: Paint, lineHeight: Float): Float {
+    var currentY = y
+    val words = text.split(" ")
+    var line = StringBuilder()
+    for (word in words) {
+        val testLine = if (line.isEmpty()) word else "${line} $word"
+        val testLineWidth = paint.measureText(testLine)
+        if (testLineWidth > width) {
+            canvas.drawText(line.toString(), x, currentY, paint)
+            currentY += lineHeight
+            line = StringBuilder(word)
+        } else {
+            line.append(if (line.isEmpty()) "" else " ").append(word)
+        }
+    }
+    if (line.isNotEmpty()) {
+        canvas.drawText(line.toString(), x, currentY, paint)
+        currentY += lineHeight
+    }
+    return currentY
+}
+
+fun generateAiAnalysisPdf(
+    context: Context,
+    periodType: String,
+    metricsList: List<ComparativeMetrics>,
+    aiReportText: String
+): File? {
+    try {
+        val pdfDocument = PdfDocument()
+
+        // Common Paints
+        val bgPaint = Paint().apply { color = android.graphics.Color.parseColor("#FBFBFD"); style = Paint.Style.FILL }
+        val blackPaint = Paint().apply { color = android.graphics.Color.parseColor("#111111"); style = Paint.Style.FILL }
+        val electricMintPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.FILL }
+        val cardFillPaint = Paint().apply { color = android.graphics.Color.parseColor("#F4F6F8"); style = Paint.Style.FILL }
+        val heroCalloutPaint = Paint().apply { color = android.graphics.Color.parseColor("#E8F8F0"); style = Paint.Style.FILL }
+        
+        val strokePaint = Paint().apply { color = android.graphics.Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        
+        val textPaint = Paint().apply { color = android.graphics.Color.parseColor("#1A202C"); isAntiAlias = true }
+
+        val whiteTitlePaint = Paint().apply { color = android.graphics.Color.WHITE; textSize = 15f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+        val graySubtitlePaint = Paint().apply { color = android.graphics.Color.parseColor("#A0AEC0"); textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL); isAntiAlias = true }
+        val mintMetadataPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+
+        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        // Background
+        canvas.drawRect(0f, 0f, 595f, 842f, bgPaint)
+
+        // 1. Dual band header
+        canvas.drawRect(0f, 0f, 595f, 120f, blackPaint)
+        canvas.drawRect(0f, 120f, 595f, 126f, electricMintPaint)
+        canvas.drawText("SHIFT HR CORP", 54f, 55f, whiteTitlePaint)
+        canvas.drawText("AI-POWERED WORKFORCE DYNAMICS & EXECUTIVE REPORT", 54f, 80f, graySubtitlePaint)
+        canvas.drawText("PERIOD: ${periodType.uppercase()} TREND ASSESSMENT  •  CONFIDENTIAL DOSSIER", 54f, 102f, mintMetadataPaint)
+
+        // Date generated on right side of header
+        val headerDatePaint = Paint().apply {
+            color = android.graphics.Color.parseColor("#A0AEC0")
+            textSize = 7.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            isAntiAlias = true
+        }
+        canvas.drawText("Generated: " + SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(Date()), 430f, 35f, headerDatePaint)
+
+        // 2. Comparative Table Title
+        var currentY = 155f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Historical Dataset Comparison (${periodType.replaceFirstChar { it.uppercase() }})", 30f, currentY, textPaint)
+        currentY += 15f
+
+        // Draw Table Header
+        canvas.drawRect(30f, currentY, 565f, currentY + 20f, blackPaint)
+
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.textSize = 7.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Period", 38f, currentY + 14f, textPaint)
+        canvas.drawText("New Hires", 120f, currentY + 14f, textPaint)
+        canvas.drawText("Separations", 200f, currentY + 14f, textPaint)
+        canvas.drawText("Turnover Rate", 280f, currentY + 14f, textPaint)
+        canvas.drawText("Promotions", 370f, currentY + 14f, textPaint)
+        canvas.drawText("Job Transfers", 450f, currentY + 14f, textPaint)
+        canvas.drawText("Avg Score", 515f, currentY + 14f, textPaint)
+        currentY += 20f
+
+        // Draw Table Rows
+        metricsList.forEachIndexed { idx, row ->
+            val isEven = idx % 2 == 1
+            if (isEven) {
+                canvas.drawRect(30f, currentY, 565f, currentY + 20f, cardFillPaint)
+            }
+            canvas.drawLine(30f, currentY + 20f, 565f, currentY + 20f, strokePaint)
+
+            textPaint.color = android.graphics.Color.parseColor("#1A202C")
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textPaint.textSize = 8f
+            canvas.drawText(row.period, 38f, currentY + 14f, textPaint)
+
+            textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText("${row.newHires}", 120f, currentY + 14f, textPaint)
+            canvas.drawText("${row.separations}", 200f, currentY + 14f, textPaint)
+            canvas.drawText(String.format("%.2f%%", row.turnoverRate), 280f, currentY + 14f, textPaint)
+            canvas.drawText("${row.promotions}", 370f, currentY + 14f, textPaint)
+            canvas.drawText("${row.jobTransfers}", 450f, currentY + 14f, textPaint)
+            canvas.drawText(String.format("%.2f", row.avgScore), 515f, currentY + 14f, textPaint)
+
+            currentY += 20f
+        }
+
+        currentY += 25f
+
+        // 3. Draw AI Report Insights Block
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Interactive AI Analytical Recommendations", 30f, currentY, textPaint)
+        currentY += 15f
+
+        // Background box for AI Insights (Soft styled green card for consistency)
+        val aiBoxHeight = 350f
+        canvas.drawRoundRect(RectF(30f, currentY, 565f, currentY + aiBoxHeight), 12f, 12f, heroCalloutPaint)
+        canvas.drawRoundRect(RectF(30f, currentY, 565f, currentY + aiBoxHeight), 12f, 12f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#004D26")
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL)
+
+        // Split report into lines and draw with wrap text
+        var textY = currentY + 20f
+        val cleanReportText = aiReportText.replace("\r", "").replace("**", "").replace("*", "")
+        val paragraphs = cleanReportText.split("\n")
+        
+        paragraphs.forEach { paragraph ->
+            if (paragraph.trim().isNotEmpty()) {
+                textY = drawWrappedText(canvas, paragraph.trim(), 45f, textY, 490f, textPaint, 12.5f)
+                textY += 5f // space between paragraphs
+            }
+        }
+
+        // 4. Attestation & Signatures
+        var sigY = currentY + aiBoxHeight + 25f
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 10f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Administrative Audit Certification", 30f, sigY, textPaint)
+        sigY += 14f
+
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("This official intelligence summary leverages real-time enterprise databases and state-of-the-art secure AI frameworks.", 30f, sigY, textPaint)
+
+        sigY += 45f
+        canvas.drawLine(340f, sigY, 540f, sigY, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#111111")
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Shift HR Audit Operations Board", 340f, sigY + 14f, textPaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#718096")
+        textPaint.textSize = 7.5f
+        canvas.drawText("Authorized Administrator Signature Panel", 340f, sigY + 25f, textPaint)
+
+        // Footer block
+        canvas.drawLine(30f, 795f, 565f, 795f, strokePaint)
+        textPaint.color = android.graphics.Color.GRAY
+        textPaint.textSize = 7.5f
+        canvas.drawText("Enterprise HR Intelligent Audit — SHIFT HR CORP Confidential  •  Page 1 of 1", 140f, 812f, textPaint)
+
+        pdfDocument.finishPage(page)
+
+        // Save PDF file to cache dir
+        val file = File(context.cacheDir, "Workforce_AI_Analytics_Report.pdf")
+        val fileOutputStream = FileOutputStream(file)
+        pdfDocument.writeTo(fileOutputStream)
+        pdfDocument.close()
+        fileOutputStream.close()
+
+        return file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
+    }
+}
+

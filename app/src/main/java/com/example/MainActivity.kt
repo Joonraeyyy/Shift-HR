@@ -1443,13 +1443,13 @@ fun NotificationsSection(
                     }
                     IconButton(
                         onClick = { onDismiss(latest.id) },
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Dismiss",
-                            tint = Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(14.dp)
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -1481,8 +1481,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_clock")
         )
@@ -1495,8 +1495,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_spreadsheet")
         )
@@ -1509,8 +1509,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_chat")
         )
@@ -1536,8 +1536,8 @@ fun MainNavigationBar(
                     selectedIconColor = Color.Black,
                     selectedTextColor = primaryColor,
                     indicatorColor = primaryColor,
-                    unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                    unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                    unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                    unselectedTextColor = Color.White.copy(alpha = 0.7f)
                 ),
                 modifier = Modifier.testTag("tab_hr_approval")
             )
@@ -1551,8 +1551,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_saas_hub")
         )
@@ -1565,8 +1565,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_holidays")
         )
@@ -1579,8 +1579,8 @@ fun MainNavigationBar(
                 selectedIconColor = Color.Black,
                 selectedTextColor = primaryColor,
                 indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.4f),
-                unselectedTextColor = Color.White.copy(alpha = 0.4f)
+                unselectedIconColor = Color.White.copy(alpha = 0.7f),
+                unselectedTextColor = Color.White.copy(alpha = 0.7f)
             ),
             modifier = Modifier.testTag("tab_settings")
         )
@@ -5439,6 +5439,7 @@ fun ChatHubScreen(
 
     val currentUserName = viewModel.currentUserName.value
     var contactSearchQuery by remember { mutableStateOf("") }
+    var showRequestCoverDialog by remember { mutableStateOf(false) }
 
     val filteredContacts = contacts.filter { contact ->
         contact.first != currentUserName && (
@@ -5611,6 +5612,31 @@ fun ChatHubScreen(
                             fontSize = 10.sp
                         )
                     }
+
+                    if (activeRecipientName != "All Employees") {
+                        Spacer(modifier = Modifier.weight(1f))
+                        Button(
+                            onClick = { showRequestCoverDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.height(32.dp).testTag("request_cover_toolbar_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SwapHoriz,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Request Cover",
+                                color = Color.Black,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
             
@@ -5711,11 +5737,165 @@ fun ChatHubScreen(
                                                 modifier = Modifier.padding(bottom = 2.dp)
                                             )
                                         }
-                                        Text(
-                                            text = msg.text,
-                                            color = Color.White,
-                                            fontSize = 12.sp
-                                        )
+                                        if (msg.isSwapRequest) {
+                                            Column(modifier = Modifier.width(220.dp)) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(bottom = 8.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.SwapHoriz,
+                                                        contentDescription = null,
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "SHIFT COVER REQUEST",
+                                                        fontWeight = FontWeight.Black,
+                                                        fontSize = 10.sp,
+                                                        color = MaterialTheme.colorScheme.primary,
+                                                        letterSpacing = 0.5.sp
+                                                    )
+                                                }
+
+                                                Text(
+                                                    text = if (isMe) "You requested coverage for:" else "${msg.sender} requested coverage for:",
+                                                    fontSize = 11.sp,
+                                                    color = Color.White.copy(alpha = 0.7f),
+                                                    modifier = Modifier.padding(bottom = 4.dp)
+                                                )
+
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                                        .padding(8.dp)
+                                                ) {
+                                                    Column {
+                                                        Text(
+                                                            text = msg.swapDate,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 12.sp,
+                                                            color = Color.White
+                                                        )
+                                                        Text(
+                                                            text = msg.swapShiftName,
+                                                            fontSize = 10.sp,
+                                                            color = Color.White.copy(alpha = 0.6f)
+                                                        )
+                                                    }
+                                                }
+
+                                                Spacer(modifier = Modifier.height(8.dp))
+
+                                                when (msg.swapStatus) {
+                                                    "PENDING" -> {
+                                                        if (isMe) {
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(6.dp))
+                                                                    .padding(6.dp),
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Text(
+                                                                    text = "⌛ Awaiting coworker accept",
+                                                                    color = Color.White.copy(alpha = 0.5f),
+                                                                    fontSize = 9.5.sp,
+                                                                    fontWeight = FontWeight.Bold
+                                                                )
+                                                            }
+                                                        } else {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                                            ) {
+                                                                Button(
+                                                                    onClick = { viewModel.respondToCoverRequest(msg.id, false) },
+                                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
+                                                                    contentPadding = PaddingValues(vertical = 4.dp),
+                                                                    shape = RoundedCornerShape(6.dp),
+                                                                    modifier = Modifier.weight(1f).height(28.dp).testTag("decline_cover_btn")
+                                                                ) {
+                                                                    Text("Decline", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                                Button(
+                                                                    onClick = { viewModel.respondToCoverRequest(msg.id, true) },
+                                                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
+                                                                    contentPadding = PaddingValues(vertical = 4.dp),
+                                                                    shape = RoundedCornerShape(6.dp),
+                                                                    modifier = Modifier.weight(1.2f).height(28.dp).testTag("accept_cover_btn")
+                                                                ) {
+                                                                    Text("Accept Cover", color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    "ACCEPTED" -> {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFFFFA629).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                                                .border(1.dp, Color(0xFFFFA629).copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                                .padding(6.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "⏳ Accepted by ${msg.swapCoverer}. Awaiting final approval.",
+                                                                color = Color(0xFFFFA629),
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
+                                                    "APPROVED" -> {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFF00FF88).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                                                .border(1.dp, Color(0xFF00FF88).copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                                .padding(6.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "✅ Approved! ${msg.swapCoverer} scheduled.",
+                                                                color = Color(0xFF00FF88),
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
+                                                    "REJECTED" -> {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .background(Color(0xFFFF5555).copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                                                .border(1.dp, Color(0xFFFF5555).copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                                                .padding(6.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "❌ Declined / Rejected",
+                                                                color = Color(0xFFFF5555),
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                textAlign = TextAlign.Center
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        } else {
+                                            Text(
+                                                text = msg.text,
+                                                color = Color.White,
+                                                fontSize = 12.sp
+                                            )
+                                        }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = msg.timestamp,
@@ -5808,5 +5988,79 @@ fun ChatHubScreen(
                 }
             }
         }
+    }
+
+    if (showRequestCoverDialog) {
+        val myShifts = viewModel.teamSchedules.value.filter { it.employeeName == currentUserName && it.shiftName != "Off" }
+        AlertDialog(
+            onDismissRequest = { showRequestCoverDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Select Shift to Cover", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                }
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Choose one of your scheduled shifts to request coverage from $activeRecipientName.",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    
+                    if (myShifts.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("No scheduled shifts found to cover.", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.heightIn(max = 200.dp)
+                        ) {
+                            items(myShifts) { shift ->
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.sendCoverRequest(activeRecipientName, shift.date, shift.shiftName)
+                                            showRequestCoverDialog = false
+                                        }
+                                        .testTag("shift_item_${shift.date}"),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(shift.date, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            Text(shift.shiftName, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
+                                        }
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRequestCoverDialog = false }) {
+                    Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                }
+            },
+            containerColor = Color(0xFF1E293B),
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }

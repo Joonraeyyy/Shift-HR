@@ -48,6 +48,13 @@ import com.example.data.database.TimeLogEntity
 import com.example.ui.viewmodel.*
 import com.google.accompanist.permissions.*
 import kotlinx.coroutines.delay
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import android.graphics.RectF
+import android.content.Intent
+import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -2908,7 +2915,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.BusinessCenter, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("💼 Employment & Compliance", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                Text("Employment & Compliance", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text("These settings are managed by your compliance officers.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
@@ -3154,7 +3161,7 @@ fun ClickableIdRow(label: String, value: String, onClick: () -> Unit) {
 // ---------------------- 3. PAYROLL & REPORTS SCREEN ----------------------
 @Composable
 fun PayrollScreen(viewModel: TimeTrackerViewModel) {
-    var activeSubView by remember { mutableStateOf("calc") } // calc, payslips, reports
+    var activeSubView by remember { mutableStateOf("calc") } // calc, ph_compliance, payslips, reports
     val context = LocalContext.current
 
     Column(
@@ -3171,34 +3178,70 @@ fun PayrollScreen(viewModel: TimeTrackerViewModel) {
             modifier = Modifier.padding(vertical = 12.dp)
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(CardGreyBg, RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+        Column(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            val sections = listOf(
-                "calc" to "Salary Calculator",
-                "payslips" to "My Payslips",
-                "reports" to "Analytics Reports"
-            )
-            sections.forEach { (key, label) ->
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (activeSubView == key) NeonGreen else Color.Transparent)
-                        .clickable { activeSubView = key }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        color = if (activeSubView == key) Color.Black else Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CardGreyBg, RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val row1 = listOf(
+                    "calc" to "Salary Calculator",
+                    "ph_compliance" to "PH Compliance & 13th Month"
+                )
+                row1.forEach { (key, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeSubView == key) NeonGreen else Color.Transparent)
+                            .clickable { activeSubView = key }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (activeSubView == key) Color.Black else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(CardGreyBg, RoundedCornerShape(10.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                val row2 = listOf(
+                    "payslips" to "My Payslips",
+                    "reports" to "Analytics Reports"
+                )
+                row2.forEach { (key, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (activeSubView == key) NeonGreen else Color.Transparent)
+                            .clickable { activeSubView = key }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (activeSubView == key) Color.Black else Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
@@ -3208,6 +3251,9 @@ fun PayrollScreen(viewModel: TimeTrackerViewModel) {
         when (activeSubView) {
             "calc" -> {
                 SalaryCalculatorView(viewModel, context)
+            }
+            "ph_compliance" -> {
+                PhComplianceView(viewModel, context)
             }
             "payslips" -> {
                 PayslipsHistoryView(viewModel, context)
@@ -3683,6 +3729,62 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
             )
         }
     }
+
+    // 0. Shift Cover Requests
+    Text("Pending Shift Swap & Cover Requests", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    Spacer(modifier = Modifier.height(6.dp))
+    val pendingCovers = viewModel.messagesList.value.filter { it.isSwapRequest && it.swapStatus == "ACCEPTED" }
+    if (pendingCovers.isEmpty()) {
+        Text("No pending shift cover requests.", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+    } else {
+        pendingCovers.forEach { msg ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("pending_cover_card_${msg.id}"),
+                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                border = BorderStroke(1.dp, BorderGrey)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text("Requester: ${msg.swapRequester}", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Coverer: ${msg.swapCoverer}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("Shift: ${msg.swapShiftName} on ${msg.swapDate}", color = Color.White.copy(alpha = 0.8f), fontSize = 11.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        Button(
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.rejectShiftCover(msg.id, currentUserName) 
+                                }
+                            },
+                            enabled = isAuthorized,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Reject", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { 
+                                if (isAuthorized) {
+                                    viewModel.approveShiftCover(msg.id, currentUserName) 
+                                }
+                            },
+                            enabled = isAuthorized,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
+                            shape = RoundedCornerShape(6.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                            modifier = Modifier.height(28.dp)
+                        ) {
+                            Text("Approve", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Spacer(modifier = Modifier.height(16.dp))
 
     // 1. Leave approvals list
     Text("Pending Leave & Shift Change Requests", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -4659,6 +4761,71 @@ fun SaaSTileLauncher(
     }
 }
 
+// Simple Quadruple helper class for type safety
+data class Quadruple<out A, out B, out C, out D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
+
+@Composable
+fun HeatmapPill(count: Int, isWeekend: Boolean) {
+    val (bgColor, borderColor, textColor, label) = when {
+        count == 0 -> {
+            if (isWeekend) {
+                Quadruple(
+                    Color.White.copy(alpha = 0.02f),
+                    Color.White.copy(alpha = 0.05f),
+                    Color.White.copy(alpha = 0.3f),
+                    "REST"
+                )
+            } else {
+                Quadruple(
+                    Color(0xFFFF3B30).copy(alpha = 0.12f),
+                    Color(0xFFFF3B30).copy(alpha = 0.3f),
+                    Color(0xFFFF453A),
+                    "⚠️ GAP (0)"
+                )
+            }
+        }
+        count == 1 -> {
+            Quadruple(
+                Color(0xFFFF9F0A).copy(alpha = 0.12f),
+                Color(0xFFFF9F0A).copy(alpha = 0.3f),
+                Color(0xFFFFA629),
+                "⚠️ LOW (1)"
+            )
+        }
+        else -> {
+            Quadruple(
+                Color(0xFF10B981).copy(alpha = 0.12f),
+                Color(0xFF10B981).copy(alpha = 0.3f),
+                Color(0xFF34D399),
+                "🟢 COVERED ($count)"
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .padding(horizontal = 4.dp)
+            .width(110.dp)
+            .height(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(6.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = textColor
+        )
+    }
+}
+
 @Composable
 fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
     val context = LocalContext.current
@@ -4698,11 +4865,74 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
     
     // Active paint mode shift template
     var activeShiftTemplate by remember { mutableStateOf("Manila Dev Shift") }
+    var viewMode by remember { mutableStateOf("gantt") }
     
     // Real Drag and Drop Gesture State
     var isDraggingShift by remember { mutableStateOf(false) }
     var dragShiftName by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+
+    // Dynamic coverage counts per day
+    // Each day is "YYYY-MM-DD" -> Map of "Morning" to count, "Afternoon" to count, "Night" to count
+    val coverageStats = remember(filteredProfiles, teamSchedules) {
+        daysRange.associate { (dateKey, _) ->
+            var morning = 0
+            var afternoon = 0
+            var night = 0
+            
+            filteredProfiles.forEach { emp ->
+                val activeSchedule = teamSchedules.find { 
+                    it.employeeName == emp.name && it.date == dateKey 
+                }
+                val shiftName = activeSchedule?.shiftName ?: "Off"
+                when (shiftName) {
+                    "Manila Dev Shift" -> {
+                        morning++
+                        afternoon++
+                    }
+                    "Indore Day Flex" -> {
+                        morning++
+                        afternoon++
+                    }
+                    "Night Ops" -> {
+                        night++
+                    }
+                }
+            }
+            
+            dateKey to Triple(morning, afternoon, night)
+        }
+    }
+
+    val staffingAlerts = remember(coverageStats, selectedDeptFilter) {
+        val alerts = mutableListOf<String>()
+        val weekdayKeys = listOf("2026-06-25", "2026-06-26", "2026-06-29", "2026-06-30") // Mon, Tue, Thu, Fri
+        
+        weekdayKeys.forEach { dateKey ->
+            val stats = coverageStats[dateKey]
+            if (stats != null) {
+                val (morning, afternoon, _) = stats
+                val dayLabel = when (dateKey) {
+                    "2026-06-25" -> "Thursday Morning (June 25)"
+                    "2026-06-26" -> "Friday Morning (June 26)"
+                    "2026-06-29" -> "Monday Morning (June 29)"
+                    "2026-06-30" -> "Tuesday Morning (June 30)"
+                    else -> "Weekday Morning"
+                }
+                val deptSuffixed = if (selectedDeptFilter == "All") "" else " in $selectedDeptFilter"
+                
+                if (morning == 0) {
+                    alerts.add("⚠️ Critical staffing gap on $dayLabel$deptSuffixed (0 active staff on shift).")
+                }
+                
+                val afternoonLabel = dayLabel.replace("Morning", "Afternoon")
+                if (afternoon == 0) {
+                    alerts.add("⚠️ Critical staffing gap on $afternoonLabel$deptSuffixed (0 active staff on shift).")
+                }
+            }
+        }
+        alerts
+    }
 
     fun canEdit(empDept: String): Boolean {
         if (currentUserRole == "ADMIN_HR" || currentUserDept == "Human Resources" || currentUserDept == "Administration") {
@@ -4850,7 +5080,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -4870,13 +5100,21 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                         )
                     }
                     if (currentUserRole != "EMPLOYEE") {
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .background(NeonGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
+                            Icon(
+                                imageVector = Icons.Default.Brush,
+                                contentDescription = null,
+                                modifier = Modifier.size(10.dp),
+                                tint = NeonGreen
+                            )
                             Text(
-                                text = "🎨 Drag / Paint Mode",
+                                text = "Paint Brush Active",
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NeonGreen
@@ -4885,7 +5123,49 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                // View Mode Toggle (Grid vs Gantt Timeline)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("grid" to "Standard Grid", "gantt" to "Gantt Timeline").forEach { (mode, label) ->
+                        val isSelected = viewMode == mode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else Color.Transparent)
+                                .border(1.dp, if (isSelected) NeonGreen else Color.Transparent, RoundedCornerShape(6.dp))
+                                .clickable { viewMode = mode }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (mode == "grid") Icons.Default.DateRange else Icons.Default.Analytics,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isSelected) NeonGreen else Color.White.copy(alpha = 0.6f)
+                                )
+                                Text(
+                                    text = label,
+                                    color = if (isSelected) NeonGreen else Color.White.copy(alpha = 0.6f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 // HORIZONTALLY SCROLLABLE GRID TABLE
                 Box(
@@ -4911,11 +5191,12 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 color = Color.White.copy(alpha = 0.5f)
                             )
                             
-                            // Days Column Headers
+                            // Days Column Headers (Width dynamically adjusts to match cells below)
                             daysRange.forEach { (_, label) ->
+                                val headerWidth = if (viewMode == "gantt") 80.dp else 62.dp
                                 Text(
                                     text = label,
-                                    modifier = Modifier.width(62.dp),
+                                    modifier = Modifier.width(headerWidth),
                                     textAlign = TextAlign.Center,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -4982,11 +5263,14 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                             else -> Color(0xFF9CA3AF) // Gray
                                         }
 
+                                        val cellWidth = if (viewMode == "gantt") 72.dp else 54.dp
+                                        val cellHeight = if (viewMode == "gantt") 44.dp else 34.dp
+
                                         Box(
                                             modifier = Modifier
                                                 .padding(horizontal = 4.dp)
-                                                .width(54.dp)
-                                                .height(34.dp)
+                                                .width(cellWidth)
+                                                .height(cellHeight)
                                                 .clip(RoundedCornerShape(8.dp))
                                                 .background(cellColor.copy(alpha = 0.15f))
                                                 .border(
@@ -5020,23 +5304,354 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                 .testTag("schedule_cell_${emp.name.replace(" ", "_")}_$dateKey"),
                                             contentAlignment = Alignment.Center
                                         ) {
-                                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                Text(
-                                                    text = when (shiftName) {
-                                                        "Manila Dev Shift" -> "DEV"
-                                                        "Indore Day Flex" -> "FLEX"
-                                                        "Night Ops" -> "NIGHT"
-                                                        else -> "OFF"
-                                                    },
-                                                    fontSize = 9.sp,
-                                                    fontWeight = FontWeight.ExtraBold,
-                                                    color = cellColor
-                                                )
+                                            if (viewMode == "gantt") {
+                                                Column(
+                                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 2.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                                    verticalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = when (shiftName) {
+                                                                "Manila Dev Shift" -> "DEV"
+                                                                "Indore Day Flex" -> "FLEX"
+                                                                "Night Ops" -> "NIGHT"
+                                                                else -> "OFF"
+                                                            },
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            color = cellColor
+                                                        )
+                                                        Text(
+                                                            text = when (shiftName) {
+                                                                "Manila Dev Shift" -> "09-18"
+                                                                "Indore Day Flex" -> "08-17"
+                                                                "Night Ops" -> "21-06"
+                                                                else -> "REST"
+                                                            },
+                                                            fontSize = 7.sp,
+                                                            color = Color.White.copy(alpha = 0.5f)
+                                                        )
+                                                    }
+
+                                                    // Visual 24-hour horizontal track & pill
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(5.dp)
+                                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(2.5.dp))
+                                                            .padding(horizontal = 1.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        when (shiftName) {
+                                                            "Indore Day Flex" -> {
+                                                                Spacer(modifier = Modifier.weight(8f))
+                                                                Box(modifier = Modifier.weight(9f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Spacer(modifier = Modifier.weight(7f))
+                                                            }
+                                                            "Manila Dev Shift" -> {
+                                                                Spacer(modifier = Modifier.weight(9f))
+                                                                Box(modifier = Modifier.weight(9f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Spacer(modifier = Modifier.weight(6f))
+                                                            }
+                                                            "Night Ops" -> {
+                                                                Box(modifier = Modifier.weight(6f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Spacer(modifier = Modifier.weight(15f))
+                                                                Box(modifier = Modifier.weight(3f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                            }
+                                                            else -> {
+                                                                Box(modifier = Modifier.weight(24f).height(1.dp).background(Color.White.copy(alpha = 0.15f)))
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Text(
+                                                        text = when (shiftName) {
+                                                            "Manila Dev Shift" -> "DEV"
+                                                            "Indore Day Flex" -> "FLEX"
+                                                            "Night Ops" -> "NIGHT"
+                                                            else -> "OFF"
+                                                        },
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = cellColor
+                                                    )
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                Divider(color = BorderGrey, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // --- COVERAGE HEATMAP DESK ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DEPARTMENT COVERAGE HEATMAP",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            color = NeonGreen,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "Daily Staffing Headcount & Gaps",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Selected Dept: $selectedDeptFilter",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Scrollable Heatmap Table
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                ) {
+                    Column {
+                        // Heatmap Header Row
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.04f))
+                                .padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Day",
+                                modifier = Modifier.width(90.dp).padding(start = 8.dp),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "Morning (08a-12p)",
+                                modifier = Modifier.width(110.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "Afternoon (12p-06p)",
+                                modifier = Modifier.width(110.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                            Text(
+                                text = "Night (06p-12a)",
+                                modifier = Modifier.width(110.dp),
+                                textAlign = TextAlign.Center,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+
+                        // Heatmap Rows
+                        daysRange.forEach { (dateKey, label) ->
+                            val stats = coverageStats[dateKey] ?: Triple(0, 0, 0)
+                            val (morning, afternoon, night) = stats
+                            
+                            val isWeekend = label.startsWith("Sat") || label.startsWith("Sun")
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(0.5.dp, Color.White.copy(alpha = 0.03f))
+                                    .background(if (isWeekend) Color.White.copy(alpha = 0.01f) else Color.Transparent)
+                                    .padding(vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Day Name
+                                Column(modifier = Modifier.width(90.dp).padding(start = 8.dp)) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isWeekend) Color.White.copy(alpha = 0.4f) else Color.White
+                                    )
+                                    if (isWeekend) {
+                                        Text(
+                                            text = "Weekend",
+                                            fontSize = 8.sp,
+                                            color = Color.White.copy(alpha = 0.3f)
+                                        )
+                                    }
+                                }
+
+                                // Morning Cell
+                                HeatmapPill(count = morning, isWeekend = isWeekend)
+                                
+                                // Afternoon Cell
+                                HeatmapPill(count = afternoon, isWeekend = isWeekend)
+
+                                // Night Cell
+                                HeatmapPill(count = night, isWeekend = isWeekend)
+                            }
+                        }
+                    }
+                }
+
+                // --- STAFFING INSIGHTS SECTION ---
+                if (staffingAlerts.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFF3B30).copy(alpha = 0.08f)),
+                        border = BorderStroke(1.dp, Color(0xFFFF3B30).copy(alpha = 0.25f))
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Alert",
+                                    tint = Color(0xFFFF453A),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "COVERAGE DEFICIT DETECTED",
+                                    color = Color(0xFFFF453A),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            staffingAlerts.take(3).forEach { alert ->
+                                Text(
+                                    text = "• $alert",
+                                    color = Color.White.copy(alpha = 0.85f),
+                                    fontSize = 10.5.sp,
+                                    lineHeight = 14.sp,
+                                    modifier = Modifier.padding(vertical = 1.dp)
+                                )
+                            }
+                            
+                            if (currentUserRole != "EMPLOYEE") {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            // Quick resolve Tuesday morning gap!
+                                            // Identify which departments need it
+                                            val pmEmployee = filteredProfiles.find { it.department == "Product Management" }
+                                            if (pmEmployee != null) {
+                                                viewModel.updateEmployeeShift(
+                                                    pmEmployee.name,
+                                                    pmEmployee.department,
+                                                    "2026-06-30",
+                                                    "Indore Day Flex",
+                                                    currentUserName
+                                                )
+                                                Toast.makeText(
+                                                    context,
+                                                    "Tuesday morning gap resolved! Assigned Indore Day Flex shift to ${pmEmployee.name}.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            } else {
+                                                // General quick fix
+                                                val engEmployee = filteredProfiles.find { it.department == "Engineering" }
+                                                if (engEmployee != null) {
+                                                    viewModel.updateEmployeeShift(
+                                                        engEmployee.name,
+                                                        engEmployee.department,
+                                                        "2026-06-30",
+                                                        "Manila Dev Shift",
+                                                        currentUserName
+                                                    )
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Tuesday morning gap resolved! Assigned Manila Dev Shift to ${engEmployee.name}.",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF453A)),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.height(30.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FlashOn,
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Auto-Resolve Tuesday Gap",
+                                            color = Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = NeonGreen.copy(alpha = 0.05f)),
+                        border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.2f))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Optimal",
+                                tint = NeonGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "All weekday shifts fully covered! No coverage gaps detected.",
+                                color = NeonGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -5211,6 +5826,993 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
+    val profiles = viewModel.employeeProfiles.value
+    
+    // Choose selected employee
+    var selectedEmpName by remember { mutableStateOf(viewModel.currentUserName.value) }
+    val empProfile = profiles.find { it.name.equals(selectedEmpName, ignoreCase = true) }
+    
+    // Form Inputs
+    var monthlySalaryInput by remember { mutableStateOf("45000") }
+    var employmentCase by remember { mutableStateOf("regular") } // regular, new_joiner, maternity, resigned
+    var monthsWorked by remember { mutableStateOf(12f) }
+    var maternityWeeksOff by remember { mutableStateOf(8f) }
+    var separationMonth by remember { mutableStateOf(8f) } // August default separation
+    
+    // Sync monthly salary when employee profile changes
+    LaunchedEffect(selectedEmpName) {
+        empProfile?.let {
+            val baseRate = if (it.department.contains("Engineering")) "85000" else "45000"
+            monthlySalaryInput = baseRate
+        }
+    }
+
+    val salary = monthlySalaryInput.toDoubleOrNull() ?: 0.0
+
+    // PH Contribution Math (2026 guidelines)
+    // SSS (MSC max 30K, 4.5% EE, 9.5% ER)
+    val sssMsc = minOf(salary, 30000.0)
+    val sssEe = sssMsc * 0.045
+    val sssEr = sssMsc * 0.095
+
+    // PhilHealth (MSC floor 10K, ceil 100K, 2.5% EE, 2.5% ER)
+    val phMsc = salary.coerceIn(10000.0, 100000.0)
+    val phEe = phMsc * 0.025
+    val phEr = phMsc * 0.025
+
+    // Pag-IBIG (MSC max 10K, 2% EE, 2% ER, max 200)
+    val pagIbigEe = minOf(salary * 0.02, 200.0)
+    val pagIbigEr = minOf(salary * 0.02, 200.0)
+
+    // BIR Withholding Tax
+    val birTaxable = maxOf(0.0, salary - (sssEe + phEe + pagIbigEe))
+    val tax = when {
+        birTaxable <= 20833.0 -> 0.0
+        birTaxable <= 33333.0 -> (birTaxable - 20833.0) * 0.15
+        birTaxable <= 66667.0 -> 1875.0 + (birTaxable - 33333.0) * 0.20
+        birTaxable <= 166667.0 -> 8541.67 + (birTaxable - 66667.0) * 0.25
+        birTaxable <= 666667.0 -> 33541.67 + (birTaxable - 166667.0) * 0.30
+        else -> 183541.67 + (birTaxable - 66667.0) * 0.35
+    }
+
+    val totalDeductions = sssEe + phEe + pagIbigEe + tax
+    val netMonthlyPay = salary - totalDeductions
+
+    // 13th Month Pay Calculation
+    val totalWorkedMonths = when (employmentCase) {
+        "regular" -> 12.0
+        "new_joiner" -> monthsWorked.toDouble()
+        "maternity" -> (monthsWorked.toDouble() - (maternityWeeksOff.toDouble() / 4.33)).coerceIn(1.0, 12.0)
+        "resigned" -> separationMonth.toDouble()
+        else -> 12.0
+    }
+
+    val grossYearlyEarnings = salary * totalWorkedMonths
+    val bonus13th = grossYearlyEarnings / 12.0
+    val exempt13th = minOf(bonus13th, 90000.0)
+    val taxable13th = maxOf(0.0, bonus13th - 90000.0)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        
+        // --- SECTION 1: HEADER & LIVE COMPLIANCE STATUS ---
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.VerifiedUser,
+                            contentDescription = "Verified Logo",
+                            tint = NeonGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "Compliance On Autopilot",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "Locked with DOLE standard tax tables (TRAIN Law & PhilHealth 2026)",
+                                color = Color.White.copy(alpha = 0.5f),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF00FF88).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("PH-COMPLIANT", color = Color(0xFF00FF88), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 12.dp))
+                
+                // Employee Selection Dropdown
+                Text("Select Target Employee Profile", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .border(1.dp, BorderGrey, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                            .clickable {
+                                val nameList = profiles.map { it.name }
+                                val idx = nameList.indexOf(selectedEmpName)
+                                selectedEmpName = if (idx == -1 || idx == nameList.size - 1) nameList.firstOrNull() ?: "Active User" else nameList[idx + 1]
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(selectedEmpName, color = Color.White, fontSize = 12.sp)
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = NeonGreen)
+                        }
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .border(1.dp, BorderGrey, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = monthlySalaryInput,
+                            onValueChange = { monthlySalaryInput = it },
+                            textStyle = TextStyle(color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.fillMaxWidth(),
+                            decorationBox = { innerTextField ->
+                                if (monthlySalaryInput.isEmpty()) {
+                                    Text("Enter Basic Salary (₱)", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp)
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("₱ ", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    innerTextField()
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- SECTION 2: CONTRIBUTION BREAKDOWN CHART ---
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Deduction Breakdown & Take-home Pay", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(14.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier.size(100.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Canvas(modifier = Modifier.size(90.dp)) {
+                            val total = sssEe + phEe + pagIbigEe + tax + netMonthlyPay
+                            var startAngle = -90f
+                            
+                            val netAngle = if (total > 0) (netMonthlyPay / total).toFloat() * 360f else 360f
+                            val taxAngle = if (total > 0) (tax / total).toFloat() * 360f else 0f
+                            val sssAngle = if (total > 0) (sssEe / total).toFloat() * 360f else 0f
+                            val phAngle = if (total > 0) (phEe / total).toFloat() * 360f else 0f
+                            val piAngle = if (total > 0) (pagIbigEe / total).toFloat() * 360f else 0f
+                            
+                            // Net Pay (Mint Neon Green)
+                            drawArc(
+                                color = Color(0xFF00FF88),
+                                startAngle = startAngle,
+                                sweepAngle = netAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx())
+                            )
+                            startAngle += netAngle
+                            
+                            // BIR Tax (Yellow)
+                            drawArc(
+                                color = Color(0xFFFFCC00),
+                                startAngle = startAngle,
+                                sweepAngle = taxAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx())
+                            )
+                            startAngle += taxAngle
+
+                            // SSS (Blue)
+                            drawArc(
+                                color = Color(0xFF2A80FF),
+                                startAngle = startAngle,
+                                sweepAngle = sssAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx())
+                            )
+                            startAngle += sssAngle
+
+                            // PhilHealth (Green)
+                            drawArc(
+                                color = Color(0xFF00AA55),
+                                startAngle = startAngle,
+                                sweepAngle = phAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx())
+                            )
+                            startAngle += phAngle
+
+                            // Pag-IBIG (Orange)
+                            drawArc(
+                                color = Color(0xFFFF6B2A),
+                                startAngle = startAngle,
+                                sweepAngle = piAngle,
+                                useCenter = false,
+                                style = Stroke(width = 8.dp.toPx())
+                            )
+                        }
+                        
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val percentNet = if (salary > 0) (netMonthlyPay / salary) * 100 else 100.0
+                            Text(String.format("%.0f%%", percentNet), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                            Text("Take-Home", color = Color.White.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(18.dp))
+                    
+                    // Side details
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        LegendRow(color = Color(0xFF00FF88), label = "Net Take-Home Pay", value = String.format("₱%,.2f", netMonthlyPay))
+                        LegendRow(color = Color(0xFFFFCC00), label = "BIR Tax Withheld", value = String.format("₱%,.2f", tax))
+                        LegendRow(color = Color(0xFF2A80FF), label = "SSS Contribution", value = String.format("₱%,.2f", sssEe))
+                        LegendRow(color = Color(0xFF00AA55), label = "PhilHealth Premium", value = String.format("₱%,.2f", phEe))
+                        LegendRow(color = Color(0xFFFF6B2A), label = "Pag-IBIG Contribution", value = String.format("₱%,.2f", pagIbigEe))
+                    }
+                }
+                
+                Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 12.dp))
+                
+                // Employer counterpart calculations
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Total Employer Counterpart Contribution:", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                    Text(
+                        String.format("₱%,.2f", sssEr + phEr + pagIbigEr),
+                        color = NeonGreen,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        // --- SECTION 3: 13TH MONTH MULTI-CASE ENGINE ---
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    "13th Month Pay Calculator (PD 851)",
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    "Prorated calculations tailored for multiple workforce scenarios.",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(bottom = 10.dp)
+                )
+                
+                // Scenarios tab selector row
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp)).padding(2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val cases = listOf(
+                        "regular" to "Active Full",
+                        "new_joiner" to "New Joiner",
+                        "maternity" to "Maternity",
+                        "resigned" to "Resigned"
+                    )
+                    cases.forEach { (key, label) ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (employmentCase == key) NeonGreen else Color.Transparent)
+                                .clickable { employmentCase = key }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (employmentCase == key) Color.Black else Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Render controls based on scenario chosen
+                when (employmentCase) {
+                    "new_joiner" -> {
+                        Column {
+                            Text(String.format("Months Worked: %.1f Months", monthsWorked), color = Color.White, fontSize = 11.sp)
+                            Slider(
+                                value = monthsWorked,
+                                onValueChange = { monthsWorked = it },
+                                valueRange = 1f..12f,
+                                steps = 11,
+                                colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+                            )
+                        }
+                    }
+                    "maternity" -> {
+                        Column {
+                            Text(String.format("Months with Company: %.0f Months", monthsWorked), color = Color.White, fontSize = 11.sp)
+                            Slider(
+                                value = monthsWorked,
+                                onValueChange = { monthsWorked = it },
+                                valueRange = 1f..12f,
+                                steps = 11,
+                                colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(String.format("Unpaid Maternity Leave: %.1f Weeks", maternityWeeksOff), color = Color.White, fontSize = 11.sp)
+                            Slider(
+                                value = maternityWeeksOff,
+                                onValueChange = { maternityWeeksOff = it },
+                                valueRange = 0f..16f,
+                                steps = 16,
+                                colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+                            )
+                        }
+                    }
+                    "resigned" -> {
+                        Column {
+                            Text(String.format("Separation month: %s", getMonthName(separationMonth.toInt())), color = Color.White, fontSize = 11.sp)
+                            Slider(
+                                value = separationMonth,
+                                onValueChange = { separationMonth = it },
+                                valueRange = 1f..12f,
+                                steps = 11,
+                                colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+                            )
+                        }
+                    }
+                    "regular" -> {
+                        Text(
+                            "Standard active full-year tenure (12 calendar months of computation). No adjustments needed.",
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 8.dp))
+                
+                // Result Summary
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Total Calculated Months:", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text(String.format("%.2f Months", totalWorkedMonths), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Gross Basic Yearly Compensation:", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text(String.format("₱%,.2f", grossYearlyEarnings), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("Calculated 13th Month Pay:", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format("₱%,.2f", bonus13th), color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                }
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // Exemption alert block
+                val isFullyExempt = bonus13th <= 90000.0
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            if (isFullyExempt) Color(0xFF00FF88).copy(alpha = 0.1f) else Color(0xFFFF9900).copy(alpha = 0.1f),
+                            RoundedCornerShape(8.dp)
+                        )
+                        .border(1.dp, if (isFullyExempt) Color(0xFF00FF88).copy(alpha = 0.4f) else Color(0xFFFF9900).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .padding(10.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isFullyExempt) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = if (isFullyExempt) Color(0xFF00FF88) else Color(0xFFFF9900),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                if (isFullyExempt) "100% Tax-Free Exemption" else "Prone to Excess BIR Compensation Tax",
+                                color = if (isFullyExempt) Color(0xFF00FF88) else Color(0xFFFF9900),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            if (isFullyExempt) "The full amount is exempt from income tax since it falls below the ₱90,000 threshold under the TRAIN Law."
+                            else "The portion exceeding the ₱90,000 exemption limit (₱${String.format("%,.2f", taxable13th)}) will be aggregated to taxable compensations.",
+                            color = Color.White.copy(alpha = 0.6f),
+                            fontSize = 9.sp,
+                            lineHeight = 12.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // --- SECTION 4: PH GOVERNMENT DOCUMENT VAULT ---
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+            border = BorderStroke(1.dp, BorderGrey)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Download, contentDescription = null, tint = NeonGreen)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Official PH Document Vault", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                    "Generate and print government-compliant BIR certificates or contribution files in one click.",
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+                
+                // Form PDF Generation Buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val file = generateBir2316PdfFile(context, selectedEmpName, salary, sssEe, phEe, pagIbigEe, tax, bonus13th)
+                            if (file != null) {
+                                openPdfFile(context, file)
+                                Toast.makeText(context, "BIR 2316 Generated successfully!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Error generating BIR 2316.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Print BIR 2316", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Button(
+                        onClick = {
+                            val file = generateBir1601CPdfFile(context, salary, tax)
+                            if (file != null) {
+                                openPdfFile(context, file)
+                                Toast.makeText(context, "BIR 1601-C Generated successfully!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Error generating BIR 1601-C.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    ) {
+                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Print BIR 1601-C", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // Contribution CSV download list
+                ContributionExportItem(
+                    title = "SSS R-5 Remittance (CSV Format)",
+                    onExport = {
+                        val csv = "Employee Name,Sss Number,Gross Salary,EE Share,ER Share,Total Remitted\n" +
+                                "${selectedEmpName},552-3318-9921,${String.format("%.2f", salary)},${String.format("%.2f", sssEe)},${String.format("%.2f", sssEr)},${String.format("%.2f", sssEe + sssEr)}\n"
+                        saveCSVToDownloads(context, "SSS_R5_Remittance.csv", csv)
+                    }
+                )
+                ContributionExportItem(
+                    title = "PhilHealth RF-1 Remittance (CSV Format)",
+                    onExport = {
+                        val csv = "Contributor Name,PhilHealth Number,Monthly Salary,EE Share,ER Share,Total Premium\n" +
+                                "${selectedEmpName},0112-9983-2210,${String.format("%.2f", salary)},${String.format("%.2f", phEe)},${String.format("%.2f", phEr)},${String.format("%.2f", phEe + phEr)}\n"
+                        saveCSVToDownloads(context, "PhilHealth_RF1_Remittance.csv", csv)
+                    }
+                )
+                ContributionExportItem(
+                    title = "Pag-IBIG MCRF Remittance (CSV Format)",
+                    onExport = {
+                        val csv = "Member Name,PagIbig ID,Monthly Compensation,EE Contribution,ER Contribution,Total\n" +
+                                "${selectedEmpName},1228-9918-2231,${String.format("%.2f", salary)},${String.format("%.2f", pagIbigEe)},${String.format("%.2f", pagIbigEr)},${String.format("%.2f", pagIbigEe + pagIbigEr)}\n"
+                        saveCSVToDownloads(context, "PagIBIG_MCRF_Remittance.csv", csv)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun LegendRow(color: Color, label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+        }
+        Text(value, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun ContributionExportItem(title: String, onExport: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
+            .clickable { onExport() }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(title, color = Color.White, fontSize = 10.sp)
+        }
+        Icon(Icons.Default.Download, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+    }
+}
+
+fun getMonthName(month: Int): String {
+    return when (month) {
+        1 -> "January"
+        2 -> "February"
+        3 -> "March"
+        4 -> "April"
+        5 -> "May"
+        6 -> "June"
+        7 -> "July"
+        8 -> "August"
+        9 -> "September"
+        10 -> "October"
+        11 -> "November"
+        12 -> "December"
+        else -> "December"
+    }
+}
+
+fun drawPhWrappedText(canvas: Canvas, text: String, x: Float, y: Float, width: Float, paint: Paint, lineHeight: Float): Float {
+    var currentY = y
+    val words = text.split(" ")
+    var line = StringBuilder()
+    for (word in words) {
+        val testLine = if (line.isEmpty()) word else "${line} $word"
+        val testLineWidth = paint.measureText(testLine)
+        if (testLineWidth > width) {
+            canvas.drawText(line.toString(), x, currentY, paint)
+            currentY += lineHeight
+            line = StringBuilder(word)
+        } else {
+            line.append(if (line.isEmpty()) "" else " ").append(word)
+        }
+    }
+    if (line.isNotEmpty()) {
+        canvas.drawText(line.toString(), x, currentY, paint)
+        currentY += lineHeight
+    }
+    return currentY
+}
+
+fun generateBir2316PdfFile(
+    context: Context,
+    employeeName: String,
+    monthlySalary: Double,
+    sss: Double,
+    ph: Double,
+    pagIbig: Double,
+    tax: Double,
+    bonus13th: Double
+): File? {
+    try {
+        val pdfDocument = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        // Common Paints
+        val bgPaint = Paint().apply { color = android.graphics.Color.parseColor("#FBFBFD"); style = Paint.Style.FILL }
+        val blackPaint = Paint().apply { color = android.graphics.Color.parseColor("#111111"); style = Paint.Style.FILL }
+        val electricMintPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.FILL }
+        val cardFillPaint = Paint().apply { color = android.graphics.Color.parseColor("#F4F6F8"); style = Paint.Style.FILL }
+        val heroCalloutPaint = Paint().apply { color = android.graphics.Color.parseColor("#E8F8F0"); style = Paint.Style.FILL }
+        
+        val strokePaint = Paint().apply { color = android.graphics.Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        val textPaint = Paint().apply { color = android.graphics.Color.parseColor("#1A202C"); isAntiAlias = true }
+
+        val whiteTitlePaint = Paint().apply { color = android.graphics.Color.WHITE; textSize = 14f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+        val graySubtitlePaint = Paint().apply { color = android.graphics.Color.parseColor("#A0AEC0"); textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL); isAntiAlias = true }
+        val mintMetadataPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+
+        // Background
+        canvas.drawRect(0f, 0f, 595f, 842f, bgPaint)
+
+        // 1. Header block
+        canvas.drawRect(15f, 15f, 580f, 120f, blackPaint)
+        canvas.drawRect(15f, 120f, 580f, 126f, electricMintPaint)
+
+        canvas.drawText("BIR Form No. 2316", 30f, 48f, whiteTitlePaint)
+        canvas.drawText("Certificate of Compensation Payment / Tax Withheld", 30f, 68f, mintMetadataPaint)
+        canvas.drawText("For Compensation Payment With or Without Withholding Tax", 30f, 86f, graySubtitlePaint)
+        canvas.drawText("Under Tax Reform for Acceleration and Inclusion (TRAIN Law)", 30f, 100f, graySubtitlePaint)
+
+        canvas.drawText("BUREAU OF INTERNAL REVENUE", 410f, 48f, whiteTitlePaint)
+        canvas.drawText("Department of Finance", 410f, 68f, graySubtitlePaint)
+        canvas.drawText("Quezon City, Philippines", 410f, 84f, graySubtitlePaint)
+
+        var currentY = 140f
+
+        // PART I
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART I — EMPLOYEE INFORMATION", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        // Beautiful container card
+        val p1Height = 72f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p1Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p1Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        textPaint.textSize = 8.5f
+        
+        canvas.drawText("1. Taxpayer Identification No (TIN):  318-992-120-000", 30f, currentY + 18f, textPaint)
+        canvas.drawText("2. Employee's Name:  " + employeeName.uppercase(), 30f, currentY + 34f, textPaint)
+        canvas.drawText("3. Registered Address:  142-C Ayala Avenue, Makati City, Philippines", 30f, currentY + 50f, textPaint)
+        canvas.drawText("4. Date of Birth:  1994-08-12  |  Zip Code: 1226", 30f, currentY + 65f, textPaint)
+
+        currentY += p1Height + 15f
+
+        // PART II
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART II — EMPLOYER INFORMATION", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p2Height = 52f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p2Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p2Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("5. Employer's TIN:  004-551-998-000", 30f, currentY + 18f, textPaint)
+        canvas.drawText("6. Employer's Registered Name:  SHIFT CORP INC / PEOPLES HR GROUP", 30f, currentY + 34f, textPaint)
+
+        currentY += p2Height + 15f
+
+        // PART III
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART III — SUMMARY OF COMPENSATION AND TAX WITHHELD", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p3Height = 232f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p3Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p3Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+
+        val rowY = currentY + 18f
+        canvas.drawText("7. Gross Basic Salary (For the Calendar Year)", 30f, rowY, textPaint)
+        canvas.drawText(String.format("₱%,.2f", monthlySalary * 12), 430f, rowY, textPaint)
+
+        canvas.drawText("8. Non-Taxable / Exempt Compensation:", 30f, rowY + 18f, textPaint)
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+        canvas.drawText("   - SSS Premium Share Portion", 30f, rowY + 32f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", sss * 12), 430f, rowY + 32f, textPaint)
+
+        canvas.drawText("   - PhilHealth Premium Share Portion", 30f, rowY + 46f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", ph * 12), 430f, rowY + 46f, textPaint)
+
+        canvas.drawText("   - Pag-IBIG HDMF Contribution", 30f, rowY + 60f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", pagIbig * 12), 430f, rowY + 60f, textPaint)
+
+        canvas.drawText("   - 13th Month Pay & Other Benefits (₱90,000 threshold)", 30f, rowY + 74f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", bonus13th), 430f, rowY + 74f, textPaint)
+
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        val totalExempt = (sss + ph + pagIbig) * 12 + bonus13th
+        canvas.drawText("9. Total Non-Taxable Compensation Portion", 30f, rowY + 92f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", totalExempt), 430f, rowY + 92f, textPaint)
+
+        val taxableBase = maxOf(0.0, (monthlySalary * 12) - (sss + ph + pagIbig) * 12)
+        canvas.drawText("10. Taxable Compensation Income", 30f, rowY + 110f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", taxableBase), 430f, rowY + 110f, textPaint)
+
+        canvas.drawText("11. Gross Taxable Compensation", 30f, rowY + 128f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", taxableBase), 430f, rowY + 128f, textPaint)
+
+        canvas.drawText("12. Tax Due (Graduated monthly consolidated)", 30f, rowY + 150f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", tax * 12), 430f, rowY + 150f, textPaint)
+
+        // Tax Withheld in green highlight box
+        canvas.drawRoundRect(RectF(25f, rowY + 157f, 570f, rowY + 176f), 4f, 4f, heroCalloutPaint)
+        canvas.drawRoundRect(RectF(25f, rowY + 157f, 570f, rowY + 176f), 4f, 4f, strokePaint)
+        
+        textPaint.color = android.graphics.Color.parseColor("#008543")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("13. Total Amount of Taxes Withheld", 30f, rowY + 169f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", tax * 12), 430f, rowY + 169f, textPaint)
+
+        currentY += p3Height + 15f
+
+        // PART IV
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART IV — DECLARATION & SIGNATURE PANEL", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p4Height = 110f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p4Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p4Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        val declText = "We declare under the penalties of perjury that this certificate has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended."
+        drawPhWrappedText(canvas, declText, 30f, currentY + 15f, 530f, textPaint, 11f)
+
+        canvas.drawLine(50f, currentY + 75f, 250f, currentY + 75f, strokePaint)
+        canvas.drawLine(340f, currentY + 75f, 540f, currentY + 75f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Authorized Agent (Employer)", 70f, currentY + 88f, textPaint)
+        canvas.drawText(employeeName, 380f, currentY + 88f, textPaint)
+        
+        textPaint.color = android.graphics.Color.parseColor("#718096")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("Tax Withholding Agent Seal", 70f, currentY + 100f, textPaint)
+        canvas.drawText("Taxpayer Signature Panel", 380f, currentY + 100f, textPaint)
+
+        // Footer block
+        canvas.drawLine(30f, 795f, 565f, 795f, strokePaint)
+        textPaint.color = android.graphics.Color.GRAY
+        textPaint.textSize = 7.5f
+        canvas.drawText("Bureau of Internal Revenue (BIR) Official Document Remittance Model  •  Page 1 of 1", 125f, 812f, textPaint)
+
+        pdfDocument.finishPage(page)
+
+        val file = File(context.cacheDir, "BIR_Form_2316_${employeeName.replace(" ", "_")}.pdf")
+        val fileOutputStream = FileOutputStream(file)
+        pdfDocument.writeTo(fileOutputStream)
+        pdfDocument.close()
+        fileOutputStream.close()
+
+        return file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
+    }
+}
+
+fun generateBir1601CPdfFile(
+    context: Context,
+    monthlySalary: Double,
+    tax: Double
+): File? {
+    try {
+        val pdfDocument = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        // Common Paints
+        val bgPaint = Paint().apply { color = android.graphics.Color.parseColor("#FBFBFD"); style = Paint.Style.FILL }
+        val blackPaint = Paint().apply { color = android.graphics.Color.parseColor("#111111"); style = Paint.Style.FILL }
+        val electricMintPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); style = Paint.Style.FILL }
+        val cardFillPaint = Paint().apply { color = android.graphics.Color.parseColor("#F4F6F8"); style = Paint.Style.FILL }
+        val heroCalloutPaint = Paint().apply { color = android.graphics.Color.parseColor("#E8F8F0"); style = Paint.Style.FILL }
+        
+        val strokePaint = Paint().apply { color = android.graphics.Color.parseColor("#E2E8F0"); style = Paint.Style.STROKE; strokeWidth = 1f }
+        val textPaint = Paint().apply { color = android.graphics.Color.parseColor("#1A202C"); isAntiAlias = true }
+
+        val whiteTitlePaint = Paint().apply { color = android.graphics.Color.WHITE; textSize = 14f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+        val graySubtitlePaint = Paint().apply { color = android.graphics.Color.parseColor("#A0AEC0"); textSize = 9f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL); isAntiAlias = true }
+        val mintMetadataPaint = Paint().apply { color = android.graphics.Color.parseColor("#00E676"); textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); isAntiAlias = true }
+
+        // Background
+        canvas.drawRect(0f, 0f, 595f, 842f, bgPaint)
+
+        // 1. Header block
+        canvas.drawRect(15f, 15f, 580f, 120f, blackPaint)
+        canvas.drawRect(15f, 120f, 580f, 126f, electricMintPaint)
+
+        canvas.drawText("BIR Form No. 1601-C", 30f, 48f, whiteTitlePaint)
+        canvas.drawText("Monthly Remittance Return of Income Taxes Withheld", 30f, 68f, mintMetadataPaint)
+        canvas.drawText("Remitted Monthly Under Section 58 of the National Internal Revenue Code", 30f, 86f, graySubtitlePaint)
+        canvas.drawText("Authorized Remittance Standard Model — SHIFT CORP INC", 30f, 100f, graySubtitlePaint)
+
+        canvas.drawText("BUREAU OF INTERNAL REVENUE", 410f, 48f, whiteTitlePaint)
+        canvas.drawText("Return Period: " + SimpleDateFormat("MMMM yyyy", Locale.US).format(Date()), 410f, 68f, graySubtitlePaint)
+        canvas.drawText("Due Date: Next 10th Calendar Day", 410f, 84f, graySubtitlePaint)
+
+        var currentY = 140f
+
+        // PART I
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART I — BACKGROUND INFORMATION", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p1Height = 52f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p1Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p1Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        textPaint.textSize = 8.5f
+        canvas.drawText("1. Taxpayer Identification Number (TIN): 004-551-998-000", 30f, currentY + 16f, textPaint)
+        canvas.drawText("2. Withholding Agent Name: SHIFT CORP INC", 30f, currentY + 32f, textPaint)
+        canvas.drawText("3. Line of Business / RDO Code: 043-Makati East", 30f, currentY + 46f, textPaint)
+
+        currentY += p1Height + 15f
+
+        // PART II
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART II — COMPUTATION OF TAX REMITTANCE", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p2Height = 120f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p2Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p2Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+
+        val compY = currentY + 18f
+        canvas.drawText("4. Total Compensation Paid for the Month", 30f, compY, textPaint)
+        canvas.drawText(String.format("₱%,.2f", monthlySalary), 430f, compY, textPaint)
+
+        canvas.drawText("5. Less: Non-Taxable Compensation (SSS/Ph/HDMF)", 30f, compY + 18f, textPaint)
+        canvas.drawText("₱2,850.00", 430f, compY + 18f, textPaint)
+
+        canvas.drawText("6. Net Taxable Compensation Income", 30f, compY + 36f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", monthlySalary - 2850.0), 430f, compY + 36f, textPaint)
+
+        canvas.drawText("7. Total Taxes Withheld for Compensation", 30f, compY + 54f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", tax), 430f, compY + 54f, textPaint)
+
+        // Total Net Remittance Due highlighted
+        canvas.drawRoundRect(RectF(25f, compY + 62f, 570f, compY + 81f), 4f, 4f, heroCalloutPaint)
+        canvas.drawRoundRect(RectF(25f, compY + 62f, 570f, compY + 81f), 4f, 4f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#008543")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("8. Total Net Remittance Due", 30f, compY + 74f, textPaint)
+        canvas.drawText(String.format("₱%,.2f", tax), 430f, compY + 74f, textPaint)
+
+        currentY += p2Height + 15f
+
+        // PART III
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + 18f), 4f, 4f, blackPaint)
+        textPaint.color = android.graphics.Color.WHITE
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("PART III — COMPLIANCE VERIFICATION & AUDIT PANEL", 25f, currentY + 12f, textPaint)
+
+        currentY += 18f
+        val p3Height = 110f
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p3Height), 10f, 10f, cardFillPaint)
+        canvas.drawRoundRect(RectF(15f, currentY, 580f, currentY + p3Height), 10f, 10f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#4A5568")
+        textPaint.textSize = 8f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        val verifyText = "We declare under the penalties of perjury that this return has been made in good faith, verified by us, and to the best of our knowledge and belief, is true and correct, pursuant to the provisions of the National Internal Revenue Code, as amended."
+        drawPhWrappedText(canvas, verifyText, 30f, currentY + 15f, 530f, textPaint, 11f)
+
+        canvas.drawLine(50f, currentY + 75f, 250f, currentY + 75f, strokePaint)
+        canvas.drawLine(340f, currentY + 75f, 540f, currentY + 75f, strokePaint)
+
+        textPaint.color = android.graphics.Color.parseColor("#1A202C")
+        textPaint.textSize = 8.5f
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("Employer Authorized Signature", 70f, currentY + 88f, textPaint)
+        canvas.drawText("Chief Financial Officer", 380f, currentY + 88f, textPaint)
+        
+        textPaint.color = android.graphics.Color.parseColor("#718096")
+        textPaint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        canvas.drawText("Corporate Tax Agent Seal", 70f, currentY + 100f, textPaint)
+        canvas.drawText("Corporate Treasury Sign Panel", 380f, currentY + 100f, textPaint)
+
+        // Footer block
+        canvas.drawLine(30f, 795f, 565f, 795f, strokePaint)
+        textPaint.color = android.graphics.Color.GRAY
+        textPaint.textSize = 7.5f
+        canvas.drawText("BIR Form No. 1601-C — Monthly Remittance Model — SHIFT CORP INC  •  Page 1 of 1", 125f, 812f, textPaint)
+
+        pdfDocument.finishPage(page)
+
+        val file = File(context.cacheDir, "BIR_Form_1601_C_Remittance.pdf")
+        val fileOutputStream = FileOutputStream(file)
+        pdfDocument.writeTo(fileOutputStream)
+        pdfDocument.close()
+        fileOutputStream.close()
+
+        return file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
     }
 }
 
