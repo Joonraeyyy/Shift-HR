@@ -75,7 +75,7 @@ val TextLight: Color
     get() = MaterialTheme.colorScheme.onBackground
 val BorderGrey: Color
     @Composable
-    get() = if (MaterialTheme.colorScheme.onBackground == Color(0xFFFFFFFF)) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.12f)
+    get() = if (MaterialTheme.colorScheme.onBackground == Color(0xFFFFFFFF)) getAdaptiveColor(0.12f) else Color.Black.copy(alpha = 0.12f)
 
 // ---------------------- 1. CORE HR SCREEN ----------------------
 @Composable
@@ -126,7 +126,7 @@ fun SmartCaptureTerminal(
                     Text(
                         text = "Powered by Shift AI Document Engine",
                         fontSize = 10.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
+                        color = getAdaptiveTextColor(0.6f)
                     )
                 }
             }
@@ -186,7 +186,7 @@ fun RowActionButton(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f)
+                color = getAdaptiveTextColor(0.8f)
             )
         }
     }
@@ -315,7 +315,7 @@ fun CoreHrScreen(
             Text(
                 text = "Digital Vault & Verification Cabinet",
                 fontSize = 14.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                color = getAdaptiveTextColor(0.7f),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -342,7 +342,7 @@ fun CoreHrScreen(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
-                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                        .background(getAdaptiveColor(0.05f), RoundedCornerShape(6.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(10.dp))
@@ -366,7 +366,7 @@ fun CoreHrScreen(
                     val isSelected = selectedCategoryFilter == cat
                     Box(
                         modifier = Modifier
-                            .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                            .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                             .border(1.dp, if (isSelected) NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                             .clickable { selectedCategoryFilter = cat }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -401,9 +401,9 @@ fun CoreHrScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f), modifier = Modifier.size(44.dp))
+                        Icon(imageVector = Icons.Default.FolderOpen, contentDescription = null, tint = getAdaptiveTextColor(0.3f), modifier = Modifier.size(44.dp))
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("No $selectedCategoryFilter documents in your secure vault.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                        Text("No $selectedCategoryFilter documents in your secure vault.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                     }
                 }
             } else {
@@ -419,8 +419,8 @@ fun CoreHrScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
-                            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .background(getAdaptiveColor(0.04f), RoundedCornerShape(12.dp))
+                            .border(1.dp, getAdaptiveColor(0.08f), RoundedCornerShape(12.dp))
                             .clickable {
                                 Toast.makeText(context, "Opening encrypted verification file: $displayDocName...", Toast.LENGTH_SHORT).show()
                             }
@@ -461,7 +461,7 @@ fun CoreHrScreen(
                             Text(
                                 text = "Category: ${catOfFile.label} • Encrypted",
                                 fontSize = 10.sp,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                             
                             Spacer(modifier = Modifier.height(4.dp))
@@ -565,7 +565,7 @@ fun CoreHrScreen(
             Text(
                 text = "Employee Directory & Documents",
                 fontSize = 14.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f)
+                color = getAdaptiveTextColor(0.7f)
             )
             // Generate ID is only for Admin/HR or Staff
             if (userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR") {
@@ -587,12 +587,12 @@ fun CoreHrScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Type name, department, role, position...", fontSize = 12.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)) },
+            placeholder = { Text("Type name, department, role, position...", fontSize = 12.sp, color = getAdaptiveTextColor(0.4f)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(20.dp)) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = getAdaptiveTextColor(0.5f))
                     }
                 }
             },
@@ -605,7 +605,7 @@ fun CoreHrScreen(
                 .testTag("employee_search_input"),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = NeonGreen,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                unfocusedBorderColor = getAdaptiveColor(0.12f),
                 focusedContainerColor = CardGreyBg,
                 unfocusedContainerColor = CardGreyBg
             )
@@ -615,7 +615,7 @@ fun CoreHrScreen(
         Text(
             text = "Filter Directory",
             fontSize = 11.sp,
-            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+            color = getAdaptiveTextColor(0.5f),
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
         )
@@ -633,7 +633,7 @@ fun CoreHrScreen(
                 Box {
                     Row(
                         modifier = Modifier
-                            .background(if (selectedDepartment != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                            .background(if (selectedDepartment != "All") NeonGreen.copy(alpha = 0.12f) else getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                             .border(1.dp, if (selectedDepartment != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                             .clickable { deptDropdownExpanded = true }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -646,7 +646,7 @@ fun CoreHrScreen(
                             fontWeight = FontWeight.Medium
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = getAdaptiveTextColor(0.5f), modifier = Modifier.size(14.dp))
                     }
                     DropdownMenu(
                         expanded = deptDropdownExpanded,
@@ -670,7 +670,7 @@ fun CoreHrScreen(
             Box {
                 Row(
                     modifier = Modifier
-                        .background(if (selectedPosition != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .background(if (selectedPosition != "All") NeonGreen.copy(alpha = 0.12f) else getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                         .border(1.dp, if (selectedPosition != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                         .clickable { posDropdownExpanded = true }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -683,7 +683,7 @@ fun CoreHrScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = getAdaptiveTextColor(0.5f), modifier = Modifier.size(14.dp))
                 }
                 DropdownMenu(
                     expanded = posDropdownExpanded,
@@ -706,7 +706,7 @@ fun CoreHrScreen(
             Box {
                 Row(
                     modifier = Modifier
-                        .background(if (selectedRole != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .background(if (selectedRole != "All") NeonGreen.copy(alpha = 0.12f) else getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                         .border(1.dp, if (selectedRole != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                         .clickable { roleDropdownExpanded = true }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -719,7 +719,7 @@ fun CoreHrScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = getAdaptiveTextColor(0.5f), modifier = Modifier.size(14.dp))
                 }
                 DropdownMenu(
                     expanded = roleDropdownExpanded,
@@ -742,7 +742,7 @@ fun CoreHrScreen(
             Box {
                 Row(
                     modifier = Modifier
-                        .background(if (selectedShift != "All") NeonGreen.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .background(if (selectedShift != "All") NeonGreen.copy(alpha = 0.12f) else getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                         .border(1.dp, if (selectedShift != "All") NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                         .clickable { shiftDropdownExpanded = true }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -755,7 +755,7 @@ fun CoreHrScreen(
                         fontWeight = FontWeight.Medium
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = getAdaptiveTextColor(0.5f), modifier = Modifier.size(14.dp))
                 }
                 DropdownMenu(
                     expanded = shiftDropdownExpanded,
@@ -806,9 +806,9 @@ fun CoreHrScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.SearchOff, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f), modifier = Modifier.size(48.dp))
+                    Icon(Icons.Default.SearchOff, contentDescription = null, tint = getAdaptiveTextColor(0.3f), modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("No employees found matching the filters.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 12.sp)
+                    Text("No employees found matching the filters.", color = getAdaptiveTextColor(0.5f), fontSize = 12.sp)
                 }
             }
         } else {
@@ -853,7 +853,7 @@ fun CoreHrScreen(
 
                         Column(modifier = Modifier.weight(1f)) {
                             Text(text = profile.name, color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text(text = "${profile.position} | ${profile.department}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                            Text(text = "${profile.position} | ${profile.department}", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                             
                             // Visual indicator of role
                             val profileRole = getRoleForEmployee(profile)
@@ -962,7 +962,7 @@ fun CoreHrScreen(
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                                    .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                                     .padding(10.dp)
                                     .clickable {
                                         Toast.makeText(context, "Downloading encrypted $docName...", Toast.LENGTH_SHORT).show()
@@ -1039,7 +1039,7 @@ fun CoreHrScreen(
                                         )
                                     }
                                 }
-                                Icon(Icons.Default.Download, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Download, contentDescription = null, tint = getAdaptiveTextColor(0.5f), modifier = Modifier.size(16.dp))
                             }
                             Spacer(modifier = Modifier.height(6.dp))
                         }
@@ -1047,8 +1047,8 @@ fun CoreHrScreen(
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(text = "⏰ Clocking Logs & Audit Trail", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(6.dp))
-                        Text(text = "Last verified login: ${profile.lastLogin}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
-                        Text(text = "SSID / MDM Fingerprint: ${profile.registeredDevice}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                        Text(text = "Last verified login: ${profile.lastLogin}", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
+                        Text(text = "SSID / MDM Fingerprint: ${profile.registeredDevice}", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                     }
 
                     // 2. MANAGER / SUPERVISOR: Shows performance, leave, hours worked (CONFIDENTIAL SALARY HIDDEN!)
@@ -1129,7 +1129,7 @@ fun CoreHrScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             Text(text = viewModel.companyName.value.uppercase(), fontSize = 13.sp, fontWeight = FontWeight.Black, color = NeonGreen)
-                            Text(text = "SECURE EMPLOYEE ID", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                            Text(text = "SECURE EMPLOYEE ID", fontSize = 8.sp, color = getAdaptiveTextColor(0.5f))
                             
                             Spacer(modifier = Modifier.height(12.dp))
                             Box(
@@ -1148,11 +1148,11 @@ fun CoreHrScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Column(horizontalAlignment = Alignment.Start) {
-                                    Text("CARD ID", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                                    Text("CARD ID", fontSize = 7.sp, color = getAdaptiveTextColor(0.4f))
                                     Text(currentSelection.id, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("STATUS", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                                    Text("STATUS", fontSize = 7.sp, color = getAdaptiveTextColor(0.4f))
                                     Text(currentSelection.status.uppercase(), fontSize = 9.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -1188,7 +1188,7 @@ fun ProfileDetailRow(label: String, value: String) {
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 12.sp)
+        Text(text = label, color = getAdaptiveTextColor(0.5f), fontSize = 12.sp)
         Text(text = value, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -1202,15 +1202,9 @@ fun SelfServiceScreen(viewModel: TimeTrackerViewModel, context: Context = LocalC
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
+            .padding(bottom = 100.dp)
     ) {
-        Text(
-            text = "Employee Self-Service",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = NeonGreen,
-            modifier = Modifier.padding(vertical = 12.dp)
-        )
+        val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
 
         // Sub Navigation Tabs for Self-Service
         Row(
@@ -1239,7 +1233,7 @@ fun SelfServiceScreen(viewModel: TimeTrackerViewModel, context: Context = LocalC
                 ) {
                     Text(
                         text = label,
-                        color = if (activeSubTab == key) Color.Black else Color.White,
+                        color = if (activeSubTab == key) Color.Black else (if (isLightTheme) Color(0xFF475569) else Color.White),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1292,43 +1286,49 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("Vacation", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("Vacation", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     Text("${profile?.vacationLeaveBalance ?: 15} d", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("Sick", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("Sick", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     Text("${profile?.sickLeaveBalance ?: 10} d", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 if (gender == "Female") {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Maternity (F)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text("Maternity (F)", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                         Text("${profile?.maternityLeaveBalance ?: 105} d", color = Color(0xFFFF69B4), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Paternity (M)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text("Paternity (M)", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                         Text("${profile?.paternityLeaveBalance ?: 7} d", color = Color(0xFF33B5E5), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.2f)) {
-                    Text("Solo Parent", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("Solo Parent", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     Text("${profile?.soloParentLeaveBalance ?: 7} d", color = Color(0xFFFFBB33), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 
+    val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-        border = BorderStroke(1.dp, BorderGrey)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isLightTheme) Color.White else CardGreyBg
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("File New Leave Request", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(12.dp))
 
             // Leave Type Select
-            Text("Select Leave Category:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
+            Text("Select Leave Category:", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 6.dp))
             val categories = mutableListOf("Sick Leave", "Vacation Leave")
             if (gender == "Female") {
                 categories.add("Maternity Leave")
@@ -1355,7 +1355,7 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                     ) {
                         Text(
                             text = type.replace(" Leave", ""),
-                            color = if (isSelected) NeonGreen else Color.White,
+                            color = if (isSelected) NeonGreen else (if (isLightTheme) Color(0xFF475569) else Color.White),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1
@@ -1420,13 +1420,19 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
 
     val myLeaves = leaveRequests.filter { it.employeeName == viewModel.currentUserName.value }
     if (myLeaves.isEmpty()) {
-        Text("No leave history found.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No leave history found.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
+        val isCardLight = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
         myLeaves.forEach { req ->
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isCardLight) Color.White else CardGreyBg
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isCardLight) Color(0xFFE2E8F0) else BorderGrey
+                )
             ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -1450,7 +1456,7 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("${req.leaveType}: ${req.startDate} to ${req.endDate}", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text(req.reason, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text(req.reason, color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     }
                     Box(
                         modifier = Modifier
@@ -1491,10 +1497,17 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
     var disputeType by remember { mutableStateOf("GPS Drift inside Concrete Building") }
     val corrections by viewModel.correctionRequests
 
+    val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-        border = BorderStroke(1.dp, BorderGrey)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isLightTheme) Color.White else CardGreyBg
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(if (isDisputeMode) "GPS Telemetry Dispute Resolution" else "Request Time Correction", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -1512,7 +1525,7 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Standard Correction", color = if (!isDisputeMode) NeonGreen else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("Standard Correction", color = if (!isDisputeMode) NeonGreen else (if (isLightTheme) Color(0xFF475569) else Color.White), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Box(
                     modifier = Modifier
@@ -1524,7 +1537,7 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                         .padding(8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("GPS / Telemetry Dispute", color = if (isDisputeMode) Color(0xFFFF5555) else Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("GPS / Telemetry Dispute", color = if (isDisputeMode) Color(0xFFFF5555) else (if (isLightTheme) Color(0xFF475569) else Color.White), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -1542,13 +1555,13 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                             Text("FAILING TELEMETRY IDENTIFIED BY SHIFT HR", color = Color(0xFFFF5555), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("• Device Geofence Accuracy: 184m (Threshold is < 50m)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 10.sp)
-                        Text("• Location: Concrete Engineering Block B (Drift Zone)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 10.sp)
+                        Text("• Device Geofence Accuracy: 184m (Threshold is < 50m)", color = getAdaptiveTextColor(0.8f), fontSize = 10.sp)
+                        Text("• Location: Concrete Engineering Block B (Drift Zone)", color = getAdaptiveTextColor(0.8f), fontSize = 10.sp)
                     }
                 }
 
                 // Dispute Type dropdown simulation
-                Text("Select Telemetry Error Type:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Text("Select Telemetry Error Type:", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
                 val types = listOf("GPS Drift inside Concrete Building", "MDM System Mismatch", "Anti-Spoofing Mismatch")
                 Column(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     types.forEach { t ->
@@ -1568,7 +1581,7 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     .size(10.dp)
                                     .clip(CircleShape)
                                     .background(if (isSel) Color(0xFFFF5555) else Color.Transparent)
-                                    .border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                                    .border(1.dp, getAdaptiveColor(0.5f), CircleShape)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(t, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
@@ -1647,7 +1660,7 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
 
     val myCorrections = corrections.filter { it.employeeName == viewModel.currentUserName.value }
     if (myCorrections.isEmpty()) {
-        Text("No requests filed.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No requests filed.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
         myCorrections.forEach { req ->
             Card(
@@ -1670,8 +1683,8 @@ fun CorrectionFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        Text("${req.requestedTimeIn} - ${req.requestedTimeOut}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 11.sp)
-                        Text("Justification: ${req.reason}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                        Text("${req.requestedTimeIn} - ${req.requestedTimeOut}", color = getAdaptiveTextColor(0.7f), fontSize = 11.sp)
+                        Text("Justification: ${req.reason}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                         if (req.isPunchDispute) {
                             Text("Telemetry Issue: ${req.disputeType}", color = Color(0xFFFF5555).copy(alpha = 0.8f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                         }
@@ -1742,12 +1755,12 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
     when (activeSubView) {
         "labor" -> {
             Text("Labor Relations & Incident Case Log", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("Documenting due process under the Twin Notice Rule.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text("Documenting due process under the Twin Notice Rule.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
             val myCases = cases.filter { it.employeeName.equals(currentEmployeeName, ignoreCase = true) }
             if (myCases.isEmpty()) {
-                Text("No disciplinary cases recorded. Good job maintaining policy compliance!", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                Text("No disciplinary cases recorded. Good job maintaining policy compliance!", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             } else {
                 myCases.forEach { c ->
                     var explanationText by remember { mutableStateOf("") }
@@ -1770,11 +1783,11 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                                 }
                             }
                             Spacer(modifier = Modifier.height(6.dp))
-                            Text("Infraction Date: ${c.infractionDate} | Severity: ${c.severity}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                            Text("Infraction Date: ${c.infractionDate} | Severity: ${c.severity}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                             
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("1st Notice (Notice to Explain):", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text(c.noticeToExplainContent, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 4.dp))
+                            Text(c.noticeToExplainContent, color = getAdaptiveTextColor(0.8f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 4.dp))
 
                             if (c.status == "NOTICE_TO_EXPLAIN_ISSUED") {
                                 OutlinedTextField(
@@ -1802,19 +1815,19 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                                 if (c.employeeExplanation.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text("Employee's Written Justification (${c.employeeExplanationDate}):", color = Color(0xFFFFCC00), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text(c.employeeExplanation, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
+                                    Text(c.employeeExplanation, color = getAdaptiveTextColor(0.7f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
                                 }
 
                                 if (c.noticeOfDecisionContent.isNotEmpty()) {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text("2nd Notice (Notice of Decision - Issued ${c.noticeOfDecisionDate}):", color = Color(0xFF00FF88), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text(c.noticeOfDecisionContent, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
+                                    Text(c.noticeOfDecisionContent, color = getAdaptiveTextColor(0.8f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 2.dp))
                                 }
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("Policy Reference:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                                Text("Policy Reference:", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = c.policyViabilityLink.substringAfterLast("/"),
@@ -1833,7 +1846,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
         }
         "clearance" -> {
             Text("Exit Separation & Clearance Workflow", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("Track outstanding department clearance handshakes and COE availability.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text("Track outstanding department clearance handshakes and COE availability.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
             // Check if there is an active clearance for the employee, otherwise let's simulate one beautifully!
@@ -1871,7 +1884,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("Scheduled Exit: ${myClearance.separationDate}", color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            Text("Role: ${myClearance.department}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                            Text("Role: ${myClearance.department}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                         }
                         Box(
                             modifier = Modifier
@@ -1917,7 +1930,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("Certificate of Employment (COE):", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                            Text("Certificate of Employment (COE):", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                             Text(if (myClearance.coeReady) "Ready to Download" else "Pending Clearance", color = if (myClearance.coeReady) Color(0xFF00FF88) else Color(0xFFFFCC00), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                         Button(
@@ -1933,14 +1946,14 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                             modifier = Modifier.height(32.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp)
                         ) {
-                            Text("Download COE", color = if (myClearance.coeReady) Color.Black else Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                            Text("Download COE", color = if (myClearance.coeReady) Color.Black else getAdaptiveColor(0.5f), fontSize = 10.sp)
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
-                            Text("Final Pay Check Settlement:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                            Text("Final Pay Check Settlement:", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                             Text(if (myClearance.finalPayReady) "Deposited to Bank" else "Processing Liquidation", color = if (myClearance.finalPayReady) Color(0xFF00FF88) else Color(0xFFFFCC00), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -1953,7 +1966,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
             var newTargetValue by remember { mutableStateOf("") }
 
             Text("Continuous OKRs & Performance Tracker", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("Quarterly goals and direct self-appraisal submissions.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text("Quarterly goals and direct self-appraisal submissions.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             Spacer(modifier = Modifier.height(10.dp))
 
             // Filing a new OKR
@@ -2012,7 +2025,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
 
             val myOkrs = okrs.filter { it.employeeName.equals(currentEmployeeName, ignoreCase = true) }
             if (myOkrs.isEmpty()) {
-                Text("No active OKRs. Click above to register.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                Text("No active OKRs. Click above to register.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             } else {
                 myOkrs.forEach { okr ->
                     var activeSliderVal by remember { mutableStateOf(okr.progress.toFloat()) }
@@ -2034,7 +2047,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                                     Text(okr.status, color = if (okr.status == "ACHIEVED") Color(0xFF00FF88) else NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
-                            Text("Key Result: ${okr.keyResult} (Target: ${okr.targetValue})", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 4.dp))
+                            Text("Key Result: ${okr.keyResult} (Target: ${okr.targetValue})", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 4.dp))
 
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Slider(
@@ -2061,7 +2074,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                                 if (okr.managerFeedback.isNotEmpty()) {
                                     Text("Manager: ${okr.managerFeedback}", color = Color(0xFF00FF88), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                                 } else {
-                                    Text("Awaiting Manager Appraisal Audit", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp, modifier = Modifier.weight(1f))
+                                    Text("Awaiting Manager Appraisal Audit", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp, modifier = Modifier.weight(1f))
                                 }
                                 Button(
                                     onClick = {
@@ -2089,10 +2102,17 @@ fun ReimbursementFilingView(viewModel: TimeTrackerViewModel, context: Context) {
     var amount by remember { mutableStateOf("") }
     val claims by viewModel.reimbursementRequests
 
+    val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-        border = BorderStroke(1.dp, BorderGrey)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isLightTheme) Color.White else CardGreyBg
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Submit Reimbursement Request", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -2140,13 +2160,19 @@ fun ReimbursementFilingView(viewModel: TimeTrackerViewModel, context: Context) {
 
     val myClaims = claims.filter { it.employeeName == viewModel.currentUserName.value }
     if (myClaims.isEmpty()) {
-        Text("No reimbursement claims logged.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No reimbursement claims logged.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
+        val isCardLight = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
         myClaims.forEach { req ->
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                border = BorderStroke(1.dp, BorderGrey)
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isCardLight) Color.White else CardGreyBg
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isCardLight) Color(0xFFE2E8F0) else BorderGrey
+                )
             ) {
                 Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ReceiptLong, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(20.dp))
@@ -2297,7 +2323,7 @@ fun CameraScannerView(
                         )
                     }
                     IconButton(onClick = onClose) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = getAdaptiveTextColor(0.6f))
                     }
                 }
 
@@ -2342,12 +2368,12 @@ fun CameraScannerView(
                                 Column {
                                     Text(profile.name, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor, fontSize = 15.sp)
                                     Text(profile.position, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("ID: ${profile.id}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                                    Text("ID: ${profile.id}", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                                 }
                             }
                             
                             Spacer(modifier = Modifier.height(12.dp))
-                            Divider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
+                            Divider(color = getAdaptiveTextColor(0.08f))
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             Row(
@@ -2355,11 +2381,11 @@ fun CameraScannerView(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("DEPARTMENT", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                                    Text("DEPARTMENT", fontSize = 8.sp, color = getAdaptiveTextColor(0.4f))
                                     Text(profile.department, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                                 }
                                 Column {
-                                    Text("STATUS", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                                    Text("STATUS", fontSize = 8.sp, color = getAdaptiveTextColor(0.4f))
                                     Text(profile.status.uppercase(), fontSize = 10.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -2373,7 +2399,7 @@ fun CameraScannerView(
                             onClick = { scanSuccessProfile = null },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                            border = BorderStroke(1.dp, getAdaptiveColor(0.3f))
                         ) {
                             Text("Scan Another")
                         }
@@ -2395,7 +2421,7 @@ fun CameraScannerView(
                             .fillMaxWidth()
                             .height(220.dp)
                             .background(Color.Black, RoundedCornerShape(16.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp)),
+                            .border(1.dp, getAdaptiveColor(0.12f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (cameraPermissionState.status.isGranted) {
@@ -2409,13 +2435,13 @@ fun CameraScannerView(
                                 Icon(
                                     imageVector = Icons.Default.VideocamOff,
                                     contentDescription = null,
-                                    tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                                    tint = getAdaptiveTextColor(0.4f),
                                     modifier = Modifier.size(40.dp)
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "Camera Access Required for Scan",
-                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                                    color = getAdaptiveTextColor(0.6f),
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center
                                 )
@@ -2492,11 +2518,11 @@ fun CameraScannerView(
                             modifier = Modifier.padding(vertical = 4.dp),
                             textAlign = TextAlign.Center
                         )
-                        LinearProgressIndicator(color = NeonGreen, trackColor = Color.White.copy(alpha = 0.1f), modifier = Modifier.fillMaxWidth().height(2.dp))
+                        LinearProgressIndicator(color = NeonGreen, trackColor = getAdaptiveColor(0.1f), modifier = Modifier.fillMaxWidth().height(2.dp))
                     } else {
                         Text(
                             text = "SIMULATION SANDBOX",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                            color = getAdaptiveTextColor(0.4f),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.sp
@@ -2506,7 +2532,7 @@ fun CameraScannerView(
                         // Dropdown or list of profiles to mock scan
                         Text(
                             text = "Tap any mock employee card below to trigger high-fidelity scan simulation:",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                            color = getAdaptiveTextColor(0.6f),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(bottom = 8.dp)
@@ -2650,7 +2676,7 @@ fun NFCTransmitterAndGateSimulator(
                         )
                     }
                     IconButton(onClick = onClose) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = getAdaptiveTextColor(0.6f))
                     }
                 }
 
@@ -2661,7 +2687,7 @@ fun NFCTransmitterAndGateSimulator(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, if (nfcEnabled) NeonGreen.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.08f))
+                    border = BorderStroke(1.dp, if (nfcEnabled) NeonGreen.copy(alpha = 0.3f) else getAdaptiveColor(0.08f))
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
@@ -2678,7 +2704,7 @@ fun NFCTransmitterAndGateSimulator(
                                 text = if (nfcEnabled) "NFC HARDWARE ENGINE ACTIVE" else "NFC SIMULATED SANBOX MODE",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (nfcEnabled) NeonGreen else Color.White.copy(alpha = 0.7f)
+                                color = if (nfcEnabled) NeonGreen else getAdaptiveColor(0.7f)
                             )
                             Text(
                                 text = if (nfcSupported) {
@@ -2688,7 +2714,7 @@ fun NFCTransmitterAndGateSimulator(
                                     "Physical chip not detected. Software emulation active."
                                 },
                                 fontSize = 9.sp,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                         }
                     }
@@ -2700,7 +2726,7 @@ fun NFCTransmitterAndGateSimulator(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(10.dp))
+                        .background(getAdaptiveColor(0.04f), RoundedCornerShape(10.dp))
                         .padding(4.dp)
                 ) {
                     Box(
@@ -2737,7 +2763,7 @@ fun NFCTransmitterAndGateSimulator(
                     ) {
                         Text(
                             text = "Broadcasting Secure Waveform...",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                            color = getAdaptiveTextColor(0.6f),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center
                         )
@@ -2793,7 +2819,7 @@ fun NFCTransmitterAndGateSimulator(
                             fontFamily = FontFamily.Monospace,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                                .background(getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                                 .padding(10.dp)
                         )
                     }
@@ -2823,14 +2849,14 @@ fun NFCTransmitterAndGateSimulator(
                             )
                             Text(
                                 "OFFICE CYBERGATE UNLOCKED",
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                color = getAdaptiveTextColor(0.5f),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
                                 text = "${p.name} has clocked in successfully via NFC terminal.",
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f),
+                                color = getAdaptiveTextColor(0.8f),
                                 fontSize = 12.sp,
                                 textAlign = TextAlign.Center
                             )
@@ -2854,7 +2880,7 @@ fun NFCTransmitterAndGateSimulator(
                             Icon(
                                 imageVector = Icons.Default.SensorWindow,
                                 contentDescription = null,
-                                tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                                tint = getAdaptiveTextColor(0.4f),
                                 modifier = Modifier.size(48.dp)
                             )
                             Spacer(modifier = Modifier.height(10.dp))
@@ -2866,7 +2892,7 @@ fun NFCTransmitterAndGateSimulator(
                             )
                             Text(
                                 text = "Simulate tapping any employee ID card to trigger gate reception:",
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                                color = getAdaptiveTextColor(0.6f),
                                 fontSize = 11.sp,
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
@@ -2886,8 +2912,8 @@ fun NFCTransmitterAndGateSimulator(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(10.dp))
-                                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                            .background(getAdaptiveColor(0.04f), RoundedCornerShape(10.dp))
+                                            .border(1.dp, getAdaptiveColor(0.08f), RoundedCornerShape(10.dp))
                                             .clickable { gateUnlockedProfile = p }
                                             .padding(10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -2905,7 +2931,7 @@ fun NFCTransmitterAndGateSimulator(
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Column {
                                                 Text(p.name, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                                Text(p.position, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                                                Text(p.position, color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                                             }
                                         }
                                         Icon(
@@ -2968,7 +2994,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         "Point any standard scanner to decode secure work credentials.",
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                        color = getAdaptiveTextColor(0.6f),
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center
                     )
@@ -3051,7 +3077,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                 brush = Brush.linearGradient(
                     colors = listOf(
                         NeonGreen.copy(alpha = 0.5f),
-                        Color.White.copy(alpha = 0.08f),
+                        getAdaptiveColor(0.08f),
                         Color(0xFF3B82F6).copy(alpha = 0.3f)
                     )
                 )
@@ -3158,7 +3184,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                         Text(
                             text = "Dept: ${profile.department}",
                             fontSize = 11.sp,
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                            color = getAdaptiveTextColor(0.5f)
                         )
                     }
 
@@ -3167,7 +3193,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                         modifier = Modifier
                             .size(54.dp)
                             .background(Color.White, RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .border(1.dp, getAdaptiveColor(0.2f), RoundedCornerShape(8.dp))
                             .clickable { showQrDialog = true }
                             .padding(4.dp),
                         contentAlignment = Alignment.Center
@@ -3178,7 +3204,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Divider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f), thickness = 1.dp)
+                Divider(color = getAdaptiveTextColor(0.08f), thickness = 1.dp)
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -3187,15 +3213,15 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("CARD ID", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                        Text("CARD ID", fontSize = 7.sp, color = getAdaptiveTextColor(0.4f))
                         Text(profile.id, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                     }
                     Column {
-                        Text("AGE", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                        Text("AGE", fontSize = 7.sp, color = getAdaptiveTextColor(0.4f))
                         Text("${profile.age} Yrs", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                     }
                     Column {
-                        Text("STATUS", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                        Text("STATUS", fontSize = 7.sp, color = getAdaptiveTextColor(0.4f))
                         Text(profile.status.uppercase(), fontSize = 10.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -3223,7 +3249,7 @@ fun DigitalIDBadge(profile: EmployeeProfile, viewModel: TimeTrackerViewModel, co
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                        border = BorderStroke(1.dp, getAdaptiveColor(0.3f)),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         Icon(imageVector = Icons.Default.TapAndPlay, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
@@ -3310,12 +3336,12 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             modifier = Modifier
                                 .size(72.dp)
                                 .background(
-                                    if (isFinished) NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                                    if (isFinished) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.05f),
                                     CircleShape
                                 )
                                 .border(
                                     2.dp,
-                                    if (isFinished) NeonGreen else Color.White.copy(alpha = 0.2f),
+                                    if (isFinished) NeonGreen else getAdaptiveColor(0.2f),
                                     CircleShape
                                 ),
                             contentAlignment = Alignment.Center
@@ -3338,7 +3364,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
 
                         Text(
                             text = if (isFinished) "Identity authorized successfully." else "$biometricPromptText...",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                            color = getAdaptiveTextColor(0.6f),
                             fontSize = 11.sp,
                             textAlign = TextAlign.Center
                         )
@@ -3351,7 +3377,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     .height(6.dp)
                                     .clip(RoundedCornerShape(3.dp)),
                                 color = NeonGreen,
-                                trackColor = Color.White.copy(alpha = 0.1f)
+                                trackColor = getAdaptiveColor(0.1f)
                             )
                         } else {
                             Spacer(modifier = Modifier.height(6.dp))
@@ -3376,7 +3402,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = Color.Black),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
             ) {
                 Row(
                     modifier = Modifier
@@ -3387,7 +3413,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                     Box(
                         modifier = Modifier
                             .size(72.dp)
-                            .background(Color.White.copy(alpha = 0.05f), CircleShape)
+                            .background(getAdaptiveColor(0.05f), CircleShape)
                             .border(
                                 3.dp,
                                 if (isClockedIn) NeonGreen else Color.Gray,
@@ -3429,7 +3455,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         )
                         Text(
                             text = "${myProfile.position} • ${myProfile.department}",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                            color = getAdaptiveTextColor(0.6f),
                             fontSize = 12.sp
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -3439,12 +3465,12 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
+                                    .background(getAdaptiveColor(0.08f), RoundedCornerShape(6.dp))
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "#${myProfile.id}",
-                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f),
+                                    color = getAdaptiveTextColor(0.8f),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -3452,19 +3478,19 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        if (isClockedIn) NeonGreen.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.05f),
+                                        if (isClockedIn) NeonGreen.copy(alpha = 0.1f) else getAdaptiveColor(0.05f),
                                         RoundedCornerShape(6.dp)
                                     )
                                     .border(
                                         1.dp,
-                                        if (isClockedIn) NeonGreen.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f),
+                                        if (isClockedIn) NeonGreen.copy(alpha = 0.3f) else getAdaptiveColor(0.15f),
                                         RoundedCornerShape(6.dp)
                                     )
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = if (isClockedIn) "Clocked In • Regular" else "Clocked Out • Regular",
-                                    color = if (isClockedIn) NeonGreen else Color.White.copy(alpha = 0.6f),
+                                    color = if (isClockedIn) NeonGreen else getAdaptiveColor(0.6f),
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -3483,8 +3509,8 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
+                    border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
@@ -3493,7 +3519,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         Text(
                             text = "PTO BALANCE",
                             fontSize = 8.sp,
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            color = getAdaptiveTextColor(0.5f),
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
                         )
@@ -3511,8 +3537,8 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
+                    border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
@@ -3521,7 +3547,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         Text(
                             text = "WEEKLY HOURS",
                             fontSize = 8.sp,
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            color = getAdaptiveTextColor(0.5f),
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
                         )
@@ -3539,8 +3565,8 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                 Card(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                    colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
+                    border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
                 ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
@@ -3549,7 +3575,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         Text(
                             text = "NEXT SHIFT",
                             fontSize = 8.sp,
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            color = getAdaptiveTextColor(0.5f),
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.5.sp
                         )
@@ -3568,7 +3594,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
+                    .background(getAdaptiveColor(0.04f), RoundedCornerShape(12.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -3629,7 +3655,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                             onBiometricSuccessAction = { isPersonalUnlocked = true }
                                             showBiometricCheck = true
                                         },
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                                        colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveColor(0.08f)),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                                         modifier = Modifier.height(28.dp)
                                     ) {
@@ -3688,7 +3714,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 ProfileDetailRow("Personal Email", maskedPersonalEmail)
                                 ProfileDetailRow("Home Address", currentAddress)
                                 
-                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = com.example.ui.theme.AppTextColor.copy(alpha = 0.05f))
+                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = getAdaptiveTextColor(0.05f))
                                 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -3698,7 +3724,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     Column {
                                         Text("EMERGENCY CONTACT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
                                         Text("$emergencyName ($emergencyRel)", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text(emergencyPhone, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                                        Text(emergencyPhone, color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                                     }
                                     IconButton(
                                         onClick = {
@@ -3713,7 +3739,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     }
                                 }
 
-                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = com.example.ui.theme.AppTextColor.copy(alpha = 0.05f))
+                                Divider(modifier = Modifier.padding(vertical = 12.dp), color = getAdaptiveTextColor(0.05f))
 
                                 val maskedBank = if (myProfile.bankAccount.length > 4) {
                                     "•••• " + myProfile.bankAccount.takeLast(4)
@@ -3790,7 +3816,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
                                     )
                                     
-                                    Divider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.05f))
+                                    Divider(color = getAdaptiveTextColor(0.05f))
                                     Text("Emergency Contact Info", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
                                     
                                     OutlinedTextField(
@@ -3885,12 +3911,12 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     // Locked HR label
                                     Box(
                                         modifier = Modifier
-                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(6.dp))
                                             .padding(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
                                         Text(
                                             text = "🔒 Compiled by HR",
-                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                                            color = getAdaptiveTextColor(0.4f),
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             maxLines = 1,
@@ -3947,7 +3973,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 Text("Employment & Compliance", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("These settings are managed by your compliance officers.", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                            Text("These settings are managed by your compliance officers.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
                             Spacer(modifier = Modifier.height(16.dp))
 
                             ProfileDetailRow("Position Title", myProfile.position)
@@ -3964,7 +3990,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(text = "Authorized Perimeter", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 12.sp)
+                                Text(text = "Authorized Perimeter", color = getAdaptiveTextColor(0.5f), fontSize = 12.sp)
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
@@ -3978,7 +4004,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 }
                             }
 
-                            Divider(modifier = Modifier.padding(vertical = 12.dp), color = com.example.ui.theme.AppTextColor.copy(alpha = 0.05f))
+                            Divider(modifier = Modifier.padding(vertical = 12.dp), color = getAdaptiveTextColor(0.05f))
 
                             // Manager details with chat shortcut
                             Row(
@@ -3989,7 +4015,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 Column {
                                     Text("DIRECT MANAGER", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
                                     Text(myProfile.supervisor, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Operations Director", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                                    Text("Operations Director", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                                 }
                                 IconButton(
                                     onClick = {
@@ -3998,8 +4024,8 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     },
                                     modifier = Modifier
                                         .size(36.dp)
-                                        .background(Color.White.copy(alpha = 0.05f), CircleShape)
-                                        .border(1.dp, Color.White.copy(alpha = 0.1f), CircleShape)
+                                        .background(getAdaptiveColor(0.05f), CircleShape)
+                                        .border(1.dp, getAdaptiveColor(0.1f), CircleShape)
                                 ) {
                                     Icon(Icons.Default.Message, contentDescription = "Message Manager", tint = NeonGreen, modifier = Modifier.size(16.dp))
                                 }
@@ -4045,7 +4071,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                 Text("📂 Document Vault & Payslips", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                             }
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Securely download official company-approved employee forms.", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                            Text("Securely download official company-approved employee forms.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
                             Spacer(modifier = Modifier.height(16.dp))
 
                             val secureDocs = listOf(
@@ -4062,18 +4088,18 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(vertical = 4.dp)
-                                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
+                                        .border(1.dp, getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
                                         .padding(8.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Article, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.Article, contentDescription = null, tint = getAdaptiveTextColor(0.4f), modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                                            Text(filename, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                                            Text(filename, fontSize = 9.sp, color = getAdaptiveTextColor(0.4f))
                                         }
                                     }
                                     IconButton(
@@ -4110,7 +4136,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Push Reminders", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Remind me to clock out at shift completion", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                                    Text("Remind me to clock out at shift completion", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                                 }
                                 Switch(
                                     checked = pushNotificationsEnabled,
@@ -4128,7 +4154,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Dark Mode Override", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Force portal to stay in deep dark theme", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                                    Text("Force portal to stay in deep dark theme", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                                 }
                                 Switch(
                                     checked = darkModeOverride,
@@ -4146,7 +4172,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Biometric Sign-In", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Permit FaceID or Fingerprint login bypass", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                                    Text("Permit FaceID or Fingerprint login bypass", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                                 }
                                 Switch(
                                     checked = biometricLoginEnabled,
@@ -4160,7 +4186,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
             }
         }
     } else {
-        Text("Dossier profile not found. Please contact administration.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 12.sp)
+        Text("Dossier profile not found. Please contact administration.", color = getAdaptiveTextColor(0.5f), fontSize = 12.sp)
     }
 }
 
@@ -4175,13 +4201,13 @@ fun ClickableIdRow(label: String, value: String, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text(text = label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text(text = label, color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             Text(text = value, color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         Icon(
             imageVector = Icons.Default.Info,
             contentDescription = null,
-            tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
+            tint = getAdaptiveTextColor(0.2f),
             modifier = Modifier.size(14.dp)
         )
     }
@@ -4325,7 +4351,7 @@ fun SalaryCalculatorView(viewModel: TimeTrackerViewModel, context: Context) {
         }
 
         // Holiday pay detection (if log date is in holiday list)
-        val isHolidayLog = viewModel.localHolidays.any { it.date == log.date }
+        val isHolidayLog = viewModel.localHolidays.value.any { it.date == log.date }
         if (isHolidayLog) {
             holidayHours += hours
         }
@@ -4441,13 +4467,13 @@ fun PayslipsHistoryView(viewModel: TimeTrackerViewModel, context: Context) {
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(cycle, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Total Net Amount: ${viewModel.getCurrencySymbol()}${String.format("%.2f", amount)}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("Total Net Amount: ${viewModel.getCurrencySymbol()}${String.format("%.2f", amount)}", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                 }
                 Button(
                     onClick = {
                         Toast.makeText(context, "Downloading PDF Payslip for $cycle...", Toast.LENGTH_SHORT).show()
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                    colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveColor(0.08f)),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                 ) {
@@ -4547,7 +4573,7 @@ fun ReportDownloadRow(title: String, onExport: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
-            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+            .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
             .clickable { onExport() }
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -4566,7 +4592,7 @@ fun PayrollDetailRow(label: String, value: String) {
             .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text(text = label, color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
         Text(text = value, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -4765,7 +4791,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
     Spacer(modifier = Modifier.height(6.dp))
     val pendingCovers = viewModel.messagesList.value.filter { it.isSwapRequest && it.swapStatus == "ACCEPTED" }
     if (pendingCovers.isEmpty()) {
-        Text("No pending shift cover requests.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No pending shift cover requests.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
         pendingCovers.forEach { msg ->
             Card(
@@ -4777,7 +4803,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                     Text("Requester: ${msg.swapRequester}", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text("Coverer: ${msg.swapCoverer}", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Shift: ${msg.swapShiftName} on ${msg.swapDate}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 11.sp)
+                    Text("Shift: ${msg.swapShiftName} on ${msg.swapDate}", color = getAdaptiveTextColor(0.8f), fontSize = 11.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
@@ -4821,7 +4847,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
     Spacer(modifier = Modifier.height(6.dp))
     val pendingLeaves = leaves.filter { it.status == "PENDING" }
     if (pendingLeaves.isEmpty()) {
-        Text("No pending requests.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No pending requests.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
         pendingLeaves.forEach { leave ->
             Card(
@@ -4832,7 +4858,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(leave.employeeName, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text("Type: ${leave.leaveType} | ${leave.startDate} to ${leave.endDate}", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
-                    Text("Reason: ${leave.reason}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("Reason: ${leave.reason}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
@@ -4874,7 +4900,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
     Spacer(modifier = Modifier.height(6.dp))
     val pendingCorrections = corrections.filter { it.status == "PENDING" }
     if (pendingCorrections.isEmpty()) {
-        Text("No pending correction requests.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No pending correction requests.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
         pendingCorrections.forEach { req ->
             Card(
@@ -4885,7 +4911,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(req.employeeName, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text("Date: ${req.date} | ${req.requestedTimeIn} - ${req.requestedTimeOut}", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
-                    Text("Reason: ${req.reason}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("Reason: ${req.reason}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
@@ -4927,7 +4953,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
     Spacer(modifier = Modifier.height(6.dp))
     val pendingClaims = claims.filter { it.status == "PENDING" }
     if (pendingClaims.isEmpty()) {
-        Text("No pending reimbursement claims.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+        Text("No pending reimbursement claims.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
     } else {
         pendingClaims.forEach { claim ->
             Card(
@@ -5112,7 +5138,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                 val cases by viewModel.disciplinaryCases
                 val activeCases = cases.filter { it.status != "CASE_RESOLVED" }
                 if (activeCases.isEmpty()) {
-                    Text("No active labor cases pending resolution.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("No active labor cases pending resolution.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                 } else {
                     activeCases.forEach { c ->
                         var decisionText by remember { mutableStateOf("") }
@@ -5125,12 +5151,12 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                                 Text("Employee: ${c.employeeName}", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 Text("Infraction: ${c.infractionTitle} (${c.severity})", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("NTE: ${c.noticeToExplainContent}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 11.sp)
+                                Text("NTE: ${c.noticeToExplainContent}", color = getAdaptiveTextColor(0.7f), fontSize = 11.sp)
                                 
                                 if (c.status == "EXPLANATION_SUBMITTED") {
                                     Spacer(modifier = Modifier.height(8.dp))
                                     Text("Employee explanation (${c.employeeExplanationDate}):", color = Color(0xFFFFCC00), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text(c.employeeExplanation, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f), fontSize = 11.sp)
+                                    Text(c.employeeExplanation, color = getAdaptiveTextColor(0.8f), fontSize = 11.sp)
                                     Spacer(modifier = Modifier.height(8.dp))
                                     OutlinedTextField(
                                         value = decisionText,
@@ -5155,7 +5181,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                                     }
                                 } else {
                                     Spacer(modifier = Modifier.height(6.dp))
-                                    Text("Awaiting Employee's Written Explanation.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                                    Text("Awaiting Employee's Written Explanation.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                                 }
                             }
                         }
@@ -5168,7 +5194,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
 
                 val clearances by viewModel.offboardingClearances
                 if (clearances.isEmpty()) {
-                    Text("No exit clearance handshakes registered.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("No exit clearance handshakes registered.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                 } else {
                     clearances.forEach { cl ->
                         Card(
@@ -5178,7 +5204,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text("Employee: ${cl.employeeName}", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text("Separation Date: ${cl.separationDate} | Dept: ${cl.department}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                                Text("Separation Date: ${cl.separationDate} | Dept: ${cl.department}", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                                 Spacer(modifier = Modifier.height(10.dp))
 
                                 val depts = listOf(
@@ -5224,7 +5250,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
 
                 val okrs by viewModel.okrRecords
                 if (okrs.isEmpty()) {
-                    Text("No employee OKRs logged in this system.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+                    Text("No employee OKRs logged in this system.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                 } else {
                     okrs.forEach { okr ->
                         var feedbackVal by remember { mutableStateOf("") }
@@ -5239,7 +5265,7 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                                     Text("Progress: ${okr.progress}%", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Text("Objective: ${okr.objective}", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text("Key Result: ${okr.keyResult}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 11.sp)
+                                Text("Key Result: ${okr.keyResult}", color = getAdaptiveTextColor(0.7f), fontSize = 11.sp)
                                 if (okr.selfAppraisal.isNotEmpty()) {
                                     Text("Employee's Appraisal: ${okr.selfAppraisal}", color = Color(0xFFFFCC00), fontSize = 11.sp)
                                 }
@@ -5292,7 +5318,7 @@ fun AdminTaskAssignView(viewModel: TimeTrackerViewModel, context: Context) {
             Text("Assign New Task Block", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text("Select Assignee:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+            Text("Select Assignee:", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
             Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 profiles.forEach { profile ->
                     val isSelected = selectedEmployee == profile.name
@@ -5359,7 +5385,7 @@ fun AdminTaskAssignView(viewModel: TimeTrackerViewModel, context: Context) {
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(t.taskTitle, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("To: ${t.employeeName} | ${t.description}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Text("To: ${t.employeeName} | ${t.description}", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                 }
                 Box(
                     modifier = Modifier
@@ -5436,14 +5462,14 @@ fun FeelsBoardAnalyticsView(viewModel: TimeTrackerViewModel) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Feels Board of the Day: Employee Sentiment Tracker", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
-            Text("HR monitors daily submissions to ensure maximum corporate well-being.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
+            Text("HR monitors daily submissions to ensure maximum corporate well-being.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
             Spacer(modifier = Modifier.height(12.dp))
 
             // Dynamic Employee of Month Predictor
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(10.dp))
+                    .background(getAdaptiveColor(0.03f), RoundedCornerShape(10.dp))
                     .border(1.dp, NeonGreen.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
                     .padding(12.dp)
             ) {
@@ -5463,7 +5489,7 @@ fun FeelsBoardAnalyticsView(viewModel: TimeTrackerViewModel) {
                     Text(
                         text = "⭐ Predicted Employee of the Year candidate: Aditya Joshi (Director)\nReason: Highest ledger compliance and continuous geofencing verification logs.",
                         fontSize = 11.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f)
+                        color = getAdaptiveTextColor(0.8f)
                     )
                 }
             }
@@ -5477,7 +5503,7 @@ fun FeelsBoardAnalyticsView(viewModel: TimeTrackerViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp)
-                        .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.02f), RoundedCornerShape(8.dp))
                         .padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -5501,7 +5527,7 @@ fun FeelsBoardAnalyticsView(viewModel: TimeTrackerViewModel) {
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(report.employeeName, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("\"${report.note}\"", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                        Text("\"${report.note}\"", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                     }
                 }
             }
@@ -5515,7 +5541,7 @@ fun AiAssistantScreen(viewModel: TimeTrackerViewModel) {
     var chatbotQuery by remember { mutableStateOf("") }
     val chatHistory = remember {
         mutableStateListOf(
-            Pair("System", "Hello! I am the ClauseOS Compliance AI assistant. How can I help you today? I have access to your shift ledger, Philippines/India holiday compliance rules, and employee feedback datasets.")
+            Pair("System", "Hello! I am the ClauseOS Compliance AI assistant. How can I help you today? I have access to your shift ledger, Philippines holiday compliance rules, and employee feedback datasets.")
         )
     }
     val coroutineScope = rememberCoroutineScope()
@@ -5561,7 +5587,7 @@ fun AiAssistantScreen(viewModel: TimeTrackerViewModel) {
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(if (isUser) NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f))
+                                        .background(if (isUser) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.05f))
                                         .border(1.dp, if (isUser) NeonGreen else BorderGrey, RoundedCornerShape(12.dp))
                                         .padding(10.dp)
                                         .widthIn(max = 240.dp)
@@ -5598,9 +5624,9 @@ fun AiAssistantScreen(viewModel: TimeTrackerViewModel) {
                                 
                                 val reply = when {
                                     query.lowercase().contains("leave") -> "Under Section 4 of ClauseOS HR Guidelines, employees can file leaves via the Self-Service portal. Once submitted, requests are forwarded instantly to managers for review."
-                                    query.lowercase().contains("holiday") -> "Under Philippines and India hub local standards, national holidays trigger 200% (Double Pay) rates. Regular local holidays trigger 100% standard allowances."
-                                    query.lowercase().contains("night") -> "Night differential pay consists of 10% additional compensation on the basic hourly rate for shifts conducted between 10:00 PM and 06:00 AM."
-                                    else -> "We have processed your request. Under current Indore and Philippine regulations, all clock logs conform to secure geofenced standards."
+                                    query.lowercase().contains("holiday") -> "Under Philippine labor standards, regular holidays trigger 200% (Double Pay) rates. Special non-working days trigger 130% premium compensation rates."
+                                    query.lowercase().contains("night") -> "Night differential pay consists of 10% additional compensation on the basic hourly rate for shifts conducted between 10:00 PM and 06:00 AM under Philippine Labor Law."
+                                    else -> "We have processed your request. Under current Philippine labor regulations, all clock logs conform to secure geofenced standards."
                                 }
                                 chatHistory.add(Pair("System", reply))
                             }
@@ -5699,7 +5725,7 @@ fun SaaSHeader(title: String, onBack: () -> Unit) {
             onClick = onBack,
             modifier = Modifier
                 .size(36.dp)
-                .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(10.dp))
+                .background(getAdaptiveColor(0.05f), RoundedCornerShape(10.dp))
         ) {
             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = NeonGreen, modifier = Modifier.size(16.dp))
         }
@@ -5781,7 +5807,7 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                 Text(
                     text = "Check in with HR! How is your well-being today?",
                     fontSize = 10.sp,
-                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                    color = getAdaptiveTextColor(0.5f)
                 )
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -5803,7 +5829,7 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (feelsScore == score) NeonGreen else Color.White.copy(alpha = 0.04f))
+                                .background(if (feelsScore == score) NeonGreen else getAdaptiveColor(0.04f))
                                 .clickable { feelsScore = score }
                                 .padding(4.dp),
                             contentAlignment = Alignment.Center
@@ -5887,7 +5913,7 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                     Text(
                         text = "Take a quick animated walkthrough & try out live simulations of shift-clocks, NFC, AI, and check the official architecture diagram.",
                         fontSize = 10.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.65f)
+                        color = getAdaptiveTextColor(0.65f)
                     )
                 }
                 Icon(
@@ -6021,7 +6047,7 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
         if (announcements.isEmpty()) {
             Text(
                 "No announcements published yet.",
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                color = getAdaptiveTextColor(0.5f),
                 fontSize = 11.sp,
                 modifier = Modifier.padding(vertical = 4.dp)
             )
@@ -6041,7 +6067,7 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(bulletin.title, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(bulletin.date, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontSize = 9.sp)
+                            Text(bulletin.date, color = getAdaptiveTextColor(0.4f), fontSize = 9.sp)
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(bulletin.content, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
@@ -6083,7 +6109,7 @@ fun SaaSTileLauncher(
             }
             Column {
                 Text(title, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                Text(subtitle, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp, maxLines = 2, lineHeight = 10.sp)
+                Text(subtitle, color = getAdaptiveTextColor(0.5f), fontSize = 8.sp, maxLines = 2, lineHeight = 10.sp)
             }
         }
     }
@@ -6103,9 +6129,9 @@ fun HeatmapPill(count: Int, isWeekend: Boolean) {
         count == 0 -> {
             if (isWeekend) {
                 Quadruple(
-                    Color.White.copy(alpha = 0.02f),
-                    Color.White.copy(alpha = 0.05f),
-                    Color.White.copy(alpha = 0.3f),
+                    getAdaptiveColor(0.02f),
+                    getAdaptiveColor(0.05f),
+                    getAdaptiveColor(0.3f),
                     "REST"
                 )
             } else {
@@ -6194,6 +6220,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
     // Active paint mode shift template
     var activeShiftTemplate by remember { mutableStateOf("Manila Dev Shift") }
     var viewMode by remember { mutableStateOf("gantt") }
+    var activeSubTab by remember { mutableStateOf("schedule") } // "schedule" or "holidays"
     
     // Real Drag and Drop Gesture State
     var isDraggingShift by remember { mutableStateOf(false) }
@@ -6276,7 +6303,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp)
             .testTag("supervisor_schedule_container")
     ) {
         // INFO / ROLE AUTHORIZATION HEADER CARD
@@ -6295,7 +6322,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                     modifier = Modifier
                         .size(44.dp)
                         .background(
-                            if (currentUserRole != "EMPLOYEE") NeonGreen.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                            if (currentUserRole != "EMPLOYEE") NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.05f),
                             RoundedCornerShape(12.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -6303,7 +6330,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                     Icon(
                         imageVector = if (currentUserRole != "EMPLOYEE") Icons.Default.AdminPanelSettings else Icons.Default.Lock,
                         contentDescription = null,
-                        tint = if (currentUserRole != "EMPLOYEE") NeonGreen else Color.White.copy(alpha = 0.5f),
+                        tint = if (currentUserRole != "EMPLOYEE") NeonGreen else getAdaptiveColor(0.5f),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -6330,18 +6357,82 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                             else -> "Read-Only Access: View assigned calendar shifts only."
                         },
                         fontSize = 11.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
+                        color = getAdaptiveTextColor(0.6f)
                     )
                 }
             }
         }
 
-        // --- DEPARTMENT FILTER TABS ---
+        // --- SUB-TABS SELECTOR FOR COMPLIANCE MATRIX vs HOLIDAY CALENDAR ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { activeSubTab = "schedule" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (activeSubTab == "schedule") NeonGreen else getAdaptiveColor(0.05f)
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = if (activeSubTab == "schedule") Color.Black else com.example.ui.theme.AppTextColor,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Shift Schedule\nMatrix",
+                    color = if (activeSubTab == "schedule") Color.Black else com.example.ui.theme.AppTextColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            Button(
+                onClick = { activeSubTab = "holidays" },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (activeSubTab == "holidays") NeonGreen else getAdaptiveColor(0.05f)
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Event,
+                    contentDescription = null,
+                    tint = if (activeSubTab == "holidays") Color.Black else com.example.ui.theme.AppTextColor,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "Holiday\nCalendar",
+                    color = if (activeSubTab == "holidays") Color.Black else com.example.ui.theme.AppTextColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+
+        if (activeSubTab == "schedule") {
+            // --- DEPARTMENT FILTER TABS ---
         Text(
             text = "Filter by Department",
             fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
-            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+            color = getAdaptiveTextColor(0.5f),
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Row(
@@ -6361,15 +6452,15 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                         .background(
                             when {
                                 isSelected -> NeonGreen.copy(alpha = 0.15f)
-                                else -> Color.White.copy(alpha = 0.04f)
+                                else -> getAdaptiveColor(0.04f)
                             }
                         )
                         .border(
                             1.dp,
                             when {
                                 isSelected -> NeonGreen
-                                !isDeptAuthorized -> Color.White.copy(alpha = 0.02f)
-                                else -> Color.White.copy(alpha = 0.1f)
+                                !isDeptAuthorized -> getAdaptiveColor(0.02f)
+                                else -> getAdaptiveColor(0.1f)
                             },
                             RoundedCornerShape(10.dp)
                         )
@@ -6382,14 +6473,14 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = "Locked",
-                                tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f),
+                                tint = getAdaptiveTextColor(0.3f),
                                 modifier = Modifier.size(10.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                         }
                         Text(
                             text = dept,
-                            color = if (isSelected) NeonGreen else if (!isDeptAuthorized) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.7f),
+                            color = if (isSelected) NeonGreen else if (!isDeptAuthorized) getAdaptiveColor(0.3f) else getAdaptiveColor(0.7f),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -6456,7 +6547,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
@@ -6480,11 +6571,11 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                     imageVector = if (mode == "grid") Icons.Default.DateRange else Icons.Default.Analytics,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
-                                    tint = if (isSelected) NeonGreen else Color.White.copy(alpha = 0.6f)
+                                    tint = if (isSelected) NeonGreen else getAdaptiveColor(0.6f)
                                 )
                                 Text(
                                     text = label,
-                                    color = if (isSelected) NeonGreen else Color.White.copy(alpha = 0.6f),
+                                    color = if (isSelected) NeonGreen else getAdaptiveColor(0.6f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -6506,7 +6597,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.White.copy(alpha = 0.04f))
+                                .background(getAdaptiveColor(0.04f))
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -6516,7 +6607,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 modifier = Modifier.width(150.dp).padding(start = 8.dp),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = com.example.ui.theme.AppTextColor
                             )
                             
                             // Days Column Headers (Width dynamically adjusts to match cells below)
@@ -6528,7 +6619,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                     textAlign = TextAlign.Center,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                             }
                         }
@@ -6543,7 +6634,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                             ) {
                                 Text(
                                     text = "No team members found in this department.",
-                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                                    color = getAdaptiveTextColor(0.4f),
                                     fontSize = 11.sp
                                 )
                             }
@@ -6554,7 +6645,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .border(0.5.dp, Color.White.copy(alpha = 0.03f))
+                                        .border(0.5.dp, getAdaptiveColor(0.03f))
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -6571,7 +6662,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                         Text(
                                             text = emp.department,
                                             fontSize = 9.sp,
-                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
+                                            color = getAdaptiveTextColor(0.4f),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -6662,7 +6753,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                                 else -> "REST"
                                                             },
                                                             fontSize = 7.sp,
-                                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                                            color = getAdaptiveTextColor(0.5f)
                                                         )
                                                     }
 
@@ -6671,7 +6762,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .height(5.dp)
-                                                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(2.5.dp))
+                                                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(2.5.dp))
                                                             .padding(horizontal = 1.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
@@ -6692,7 +6783,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                                 Box(modifier = Modifier.weight(3f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
                                                             }
                                                             else -> {
-                                                                Box(modifier = Modifier.weight(24f).height(1.dp).background(Color.White.copy(alpha = 0.15f)))
+                                                                Box(modifier = Modifier.weight(24f).height(1.dp).background(getAdaptiveColor(0.15f)))
                                                             }
                                                         }
                                                     }
@@ -6747,14 +6838,14 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                     }
                     Box(
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
                             text = "Selected Dept: $selectedDeptFilter",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f)
+                            color = getAdaptiveTextColor(0.7f)
                         )
                     }
                 }
@@ -6772,7 +6863,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color.White.copy(alpha = 0.04f))
+                                .background(getAdaptiveColor(0.04f))
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -6781,7 +6872,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 modifier = Modifier.width(90.dp).padding(start = 8.dp),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                             Text(
                                 text = "Morning (08a-12p)",
@@ -6789,7 +6880,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 textAlign = TextAlign.Center,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                             Text(
                                 text = "Afternoon (12p-06p)",
@@ -6797,7 +6888,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 textAlign = TextAlign.Center,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                             Text(
                                 text = "Night (06p-12a)",
@@ -6805,7 +6896,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 textAlign = TextAlign.Center,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                color = getAdaptiveTextColor(0.5f)
                             )
                         }
 
@@ -6819,8 +6910,8 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .border(0.5.dp, Color.White.copy(alpha = 0.03f))
-                                    .background(if (isWeekend) Color.White.copy(alpha = 0.01f) else Color.Transparent)
+                                    .border(0.5.dp, getAdaptiveColor(0.03f))
+                                    .background(if (isWeekend) getAdaptiveColor(0.01f) else Color.Transparent)
                                     .padding(vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -6830,13 +6921,13 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                         text = label,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isWeekend) Color.White.copy(alpha = 0.4f) else Color.White
+                                        color = if (isWeekend) getAdaptiveColor(0.4f) else Color.White
                                     )
                                     if (isWeekend) {
                                         Text(
                                             text = "Weekend",
                                             fontSize = 8.sp,
-                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f)
+                                            color = getAdaptiveTextColor(0.3f)
                                         )
                                     }
                                 }
@@ -6883,7 +6974,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                             staffingAlerts.take(3).forEach { alert ->
                                 Text(
                                     text = "• $alert",
-                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.85f),
+                                    color = getAdaptiveTextColor(0.85f),
                                     fontSize = 10.5.sp,
                                     lineHeight = 14.sp,
                                     modifier = Modifier.padding(vertical = 1.dp)
@@ -6998,7 +7089,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
             Text(
                 text = "1. Tap a shift template to select your paint-brush. 2. Tap any authorized employee cell to instantly paint/assign that shift!",
                 fontSize = 10.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                color = getAdaptiveTextColor(0.5f),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -7028,10 +7119,10 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSelected) color.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.03f))
+                                    .background(if (isSelected) color.copy(alpha = 0.2f) else getAdaptiveColor(0.03f))
                                     .border(
                                         if (isSelected) 2.dp else 1.dp,
-                                        if (isSelected) color else Color.White.copy(alpha = 0.1f),
+                                        if (isSelected) color else getAdaptiveColor(0.1f),
                                         RoundedCornerShape(12.dp)
                                     )
                                     .clickable { activeShiftTemplate = shift }
@@ -7097,7 +7188,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                             else -> "REST"
                                         },
                                         fontSize = 8.sp,
-                                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                                        color = getAdaptiveTextColor(0.5f)
                                     )
                                 }
                             }
@@ -7134,23 +7225,961 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(12.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                    .background(getAdaptiveColor(0.04f), RoundedCornerShape(12.dp))
+                    .border(1.dp, getAdaptiveColor(0.1f), RoundedCornerShape(12.dp))
                     .padding(14.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Read-Only",
-                        tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                        tint = getAdaptiveTextColor(0.5f),
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Note: You are logged in with employee read-only privileges. Scheduling modification is reserved for Supervisors, Managers, and Admin/HR departments.",
                         fontSize = 11.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                        color = getAdaptiveTextColor(0.5f)
                     )
+                }
+            }
+        }
+    } else {
+        PhilippineHolidayCalendarComponent(viewModel = viewModel)
+    }
+}
+}
+
+@Composable
+fun PhilippineHolidayCalendarComponent(viewModel: TimeTrackerViewModel) {
+    val context = LocalContext.current
+    val userCountryCode = remember { viewModel.getUserCountryCode() }
+    val holidays by remember {
+        derivedStateOf {
+            viewModel.localHolidays.value.filter {
+                it.country == "ALL" || it.country == userCountryCode
+            }
+        }
+    }
+    val teamSchedules by viewModel.teamSchedules
+    val profiles by viewModel.employeeProfiles
+    
+    // Default to June (index 5) since the scheduling app is in June 2026!
+    var selectedMonthIndex by remember { mutableStateOf(5) } 
+    val monthNames = listOf(
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    )
+    
+    // Calculate the days of the selected month
+    val calendarInstance = remember(selectedMonthIndex) {
+        Calendar.getInstance().apply {
+            set(Calendar.YEAR, 2026)
+            set(Calendar.MONTH, selectedMonthIndex)
+            set(Calendar.DAY_OF_MONTH, 1)
+        }
+    }
+    
+    val daysInMonth = calendarInstance.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val firstDayOfWeekVal = calendarInstance.get(Calendar.DAY_OF_WEEK)
+    val firstDayOffset = firstDayOfWeekVal - 1 // 0 = Sunday, 1 = Monday, etc.
+    
+    var selectedDayNum by remember(selectedMonthIndex) { mutableStateOf(1) }
+    val selectedDateKey = "2026-%02d-%02d".format(selectedMonthIndex + 1, selectedDayNum)
+    
+    // Find holiday on the selected day
+    val holidayForSelectedDay = holidays.find { it.date == selectedDateKey }
+    
+    // Filter holidays for the selected month to list them at the bottom
+    val monthHolidays = holidays.filter {
+        val parts = it.date.split("-")
+        parts.size == 3 && parts[1].toInt() == (selectedMonthIndex + 1)
+    }
+    
+    // State for creating a custom holiday
+    var showCustomHolidayDialog by remember { mutableStateOf(false) }
+    var customHolidayName by remember { mutableStateOf("") }
+    var customHolidayDesc by remember { mutableStateOf("") }
+    var customHolidayType by remember { mutableStateOf("Regular") } // Regular, Special (Non-Working), Special (Working)
+    
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        // --- MONTHS SELECTOR TAB ROW ---
+        Text(
+            text = "SELECT MONTH (2026)",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = NeonGreen,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            monthNames.forEachIndexed { index, name ->
+                val isSelected = selectedMonthIndex == index
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.03f))
+                        .border(
+                            width = 1.dp,
+                            color = if (isSelected) NeonGreen else getAdaptiveColor(0.1f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .clickable { selectedDayNum = 1; selectedMonthIndex = index }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = name,
+                        color = if (isSelected) NeonGreen else getAdaptiveColor(0.6f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+        
+        // --- MAIN CALENDAR CARD ---
+        val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isLightTheme) Color.White else CardGreyBg
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "${monthNames[selectedMonthIndex].uppercase()} 2026",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 14.sp,
+                            color = com.example.ui.theme.AppTextColor
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                .border(1.dp, NeonGreen.copy(alpha = 0.3f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (userCountryCode == "PH") "📍 PHILIPPINES (PH) • AUTO" else "📍 INDIA (IN) • AUTO",
+                                color = NeonGreen,
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    
+                    if (viewModel.currentUserRole.value != "EMPLOYEE") {
+                        IconButton(
+                            onClick = { showCustomHolidayDialog = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Add Custom Holiday",
+                                tint = NeonGreen,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(10.dp))
+                
+                // Day headings (Sun to Sat)
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    val daysHeader = listOf("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+                    daysHeader.forEach { day ->
+                        Text(
+                            text = day,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = getAdaptiveTextColor(0.4f)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(6.dp))
+                
+                // Calendar Grid
+                val totalCells = firstDayOffset + daysInMonth
+                val weeksCount = (totalCells + 6) / 7
+                
+                var currentDay = 1
+                for (w in 0 until weeksCount) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        for (d in 0 until 7) {
+                            val cellIndex = w * 7 + d
+                            if (cellIndex >= firstDayOffset && currentDay <= daysInMonth) {
+                                val dayNum = currentDay
+                                val dateKey = "2026-%02d-%02d".format(selectedMonthIndex + 1, dayNum)
+                                val holiday = holidays.find { it.date == dateKey }
+                                val isSelected = selectedDayNum == dayNum
+                                
+                                val holidayColor = when {
+                                    holiday == null -> Color.Transparent
+                                    holiday.name.contains("EDSA", ignoreCase = true) -> Color(0xFF10B981) // Green (Special Working)
+                                    holiday.name.contains("Chinese", ignoreCase = true) ||
+                                    holiday.name.contains("Black Saturday", ignoreCase = true) ||
+                                    holiday.name.contains("Ninoy Aquino", ignoreCase = true) ||
+                                    holiday.name.contains("All Saints", ignoreCase = true) ||
+                                    holiday.name.contains("All Souls", ignoreCase = true) ||
+                                    holiday.name.contains("Immaculate", ignoreCase = true) ||
+                                    holiday.name.contains("Christmas Eve", ignoreCase = true) ||
+                                    holiday.name.contains("Last Day of the Year", ignoreCase = true) -> Color(0xFF3B82F6) // Blue (Special Non-Working)
+                                    else -> Color(0xFFEF4444) // Red (Regular)
+                                }
+                                
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .padding(2.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(
+                                            when {
+                                                isSelected -> NeonGreen.copy(alpha = 0.25f)
+                                                holiday != null -> holidayColor.copy(alpha = 0.15f)
+                                                else -> getAdaptiveColor(0.01f)
+                                            }
+                                        )
+                                        .border(
+                                            width = 1.dp,
+                                            color = when {
+                                                isSelected -> NeonGreen
+                                                holiday != null -> holidayColor
+                                                else -> getAdaptiveColor(0.05f)
+                                            },
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .clickable { selectedDayNum = dayNum }
+                                        .padding(2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Text(
+                                            text = dayNum.toString(),
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected || holiday != null) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (isSelected) NeonGreen else if (holiday != null) holidayColor else com.example.ui.theme.AppTextColor
+                                        )
+                                        val hasNotes = viewModel.calendarNotes.value.any { it.date == dateKey }
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(top = 1.dp)
+                                        ) {
+                                            if (holiday != null) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(CircleShape)
+                                                        .background(holidayColor)
+                                                )
+                                            }
+                                            if (hasNotes) {
+                                                if (holiday != null) Spacer(modifier = Modifier.width(2.dp))
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(CircleShape)
+                                                        .background(Color(0xFFE879F9)) // Purple Note Dot
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                                currentDay++
+                            } else {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // --- LEGENDS DISPLAY ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFEF4444)))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Regular Holiday", fontSize = 9.sp, color = getAdaptiveTextColor(0.7f))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3B82F6)))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Special Non-Working", fontSize = 9.sp, color = getAdaptiveTextColor(0.7f))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF10B981)))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Special Working", fontSize = 9.sp, color = getAdaptiveTextColor(0.7f))
+            }
+        }
+        
+        // --- DETAIL DISPLAY AREA ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isLightTheme) Color.White else CardGreyBg
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Text(
+                    text = "DETAILS FOR %02d %s 2026".format(selectedDayNum, monthNames[selectedMonthIndex].uppercase()),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    color = NeonGreen,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+                
+                if (holidayForSelectedDay != null) {
+                    val category = when {
+                        holidayForSelectedDay.name.contains("EDSA", ignoreCase = true) -> "Special (Working) Day"
+                        holidayForSelectedDay.name.contains("Chinese", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("Black Saturday", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("Ninoy Aquino", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("All Saints", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("All Souls", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("Immaculate", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("Christmas Eve", ignoreCase = true) ||
+                        holidayForSelectedDay.name.contains("Last Day of the Year", ignoreCase = true) -> "Special (Non-Working) Day"
+                        else -> "Regular Holiday"
+                    }
+                    
+                    val color = when (category) {
+                        "Special (Working) Day" -> Color(0xFF10B981)
+                        "Special (Non-Working) Day" -> Color(0xFF3B82F6)
+                        else -> Color(0xFFEF4444)
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = null,
+                            tint = color,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = holidayForSelectedDay.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = color
+                        )
+                    }
+                    
+                    Text(
+                        text = "Category: $category",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = getAdaptiveTextColor(0.8f),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    
+                    Text(
+                        text = holidayForSelectedDay.description,
+                        fontSize = 11.sp,
+                        color = getAdaptiveTextColor(0.6f),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 6.dp))
+                    
+                    // Compliance details
+                    val isPH = userCountryCode == "PH"
+                    Text(
+                        text = if (isPH) "PH LABOR CODE COMPLIANCE AUDIT" else "INDIAN LABOUR COMPLIANCE AUDIT",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = NeonGreen,
+                        letterSpacing = 0.5.sp,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    
+                    val complianceText = if (isPH) {
+                        when (category) {
+                            "Regular Holiday" -> "Philippine Article 93: Double Pay (200%) rate applies for actual hours worked. Unworked employees are fully paid 100% of their base pay."
+                            "Special (Non-Working) Day" -> "130% premium compensation rate applies for worked hours. Unworked hours fall under 'no work, no pay' rule."
+                            else -> "100% standard rate. Normal work operations apply with standard pay structures."
+                        }
+                    } else {
+                        when (category) {
+                            "Regular Holiday" -> "Indian Factories Act: Double Wages (200%) rate applies for worked hours. Unworked employees are fully paid 100% of their base pay."
+                            "Special (Non-Working) Day" -> "150% premium compensation rate applies for worked hours on local festival/state holidays."
+                            else -> "100% standard rate. Standard working day under Indian labour laws."
+                        }
+                    }
+                    
+                    Text(
+                        text = complianceText,
+                        fontSize = 11.sp,
+                        color = getAdaptiveTextColor(0.8f),
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    // Check active schedules for this holiday date
+                    val scheduledEmployeesOnThisDay = teamSchedules.filter {
+                        it.date == selectedDateKey && it.shiftName != "Off"
+                    }
+                    
+                    if (scheduledEmployeesOnThisDay.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFEF4444).copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Warning,
+                                        contentDescription = "Alert",
+                                        tint = Color(0xFFEF4444),
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "ATTENTION: PREVENTATIVE LABOR LIABILITY ALERT",
+                                        color = Color(0xFFEF4444),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                scheduledEmployeesOnThisDay.forEach { sched ->
+                                    val empProfile = profiles.find { it.name == sched.employeeName }
+                                    val dept = empProfile?.department ?: "Team"
+                                    Text(
+                                        text = "• ${sched.employeeName} ($dept) is scheduled for '${sched.shiftName}'.",
+                                        color = getAdaptiveTextColor(0.85f),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Ensure that payroll accounts for premium holiday calculations!",
+                                    color = getAdaptiveTextColor(0.6f),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(NeonGreen.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                .border(1.dp, NeonGreen.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .padding(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Compliant",
+                                    tint = NeonGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "COMPLIANT: No active employee shifts scheduled on this holiday. 0% premium payroll risk.",
+                                    color = NeonGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Event,
+                            contentDescription = null,
+                            tint = getAdaptiveTextColor(0.3f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Standard Working Day",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                color = getAdaptiveTextColor(0.8f)
+                            )
+                            Text(
+                                text = "Standard 100% payroll hourly rate applies with normal shift rules.",
+                                fontSize = 11.sp,
+                                color = getAdaptiveTextColor(0.5f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        
+        // --- HOLIDAYS INDEX list FOR CURRENT MONTH ---
+        Text(
+            text = "MONTHLY PUBLIC HOLIDAYS INDEX",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = NeonGreen,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        if (monthHolidays.isEmpty()) {
+            Text(
+                text = "No official holidays listed for this month.",
+                color = getAdaptiveTextColor(0.4f),
+                fontSize = 11.sp,
+                modifier = Modifier.padding(vertical = 4.dp)
+            )
+        } else {
+            monthHolidays.forEach { hol ->
+                val dayPart = hol.date.split("-").getOrNull(2)?.toInt() ?: 1
+                val category = when {
+                    hol.name.contains("EDSA", ignoreCase = true) -> "Special (Working)"
+                    hol.name.contains("Chinese", ignoreCase = true) ||
+                    hol.name.contains("Black Saturday", ignoreCase = true) ||
+                    hol.name.contains("Ninoy Aquino", ignoreCase = true) ||
+                    hol.name.contains("All Saints", ignoreCase = true) ||
+                    hol.name.contains("All Souls", ignoreCase = true) ||
+                    hol.name.contains("Immaculate", ignoreCase = true) ||
+                    hol.name.contains("Christmas Eve", ignoreCase = true) ||
+                    hol.name.contains("Last Day of the Year", ignoreCase = true) -> "Special (Non-Working)"
+                    else -> "Regular"
+                }
+                val color = when (category) {
+                    "Special (Working)" -> Color(0xFF10B981)
+                    "Special (Non-Working)" -> Color(0xFF3B82F6)
+                    else -> Color(0xFFEF4444)
+                }
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .background(getAdaptiveColor(0.02f), RoundedCornerShape(8.dp))
+                        .border(0.5.dp, BorderGrey, RoundedCornerShape(8.dp))
+                        .clickable { selectedDayNum = dayPart }
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(color.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "%02d".format(dayPart),
+                            fontWeight = FontWeight.Bold,
+                            color = color,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = hol.name,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = com.example.ui.theme.AppTextColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = category,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = color
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "Details",
+                        tint = getAdaptiveTextColor(0.3f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+        }
+        
+        // --- CUSTOM HOLIDAY REGISTER DIALOG ---
+        if (showCustomHolidayDialog) {
+            AlertDialog(
+                onDismissRequest = { showCustomHolidayDialog = false },
+                title = { Text("Register Custom Holiday", fontWeight = FontWeight.Bold, fontSize = 16.sp) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Add a custom company-wide holiday for %02d %s 2026.".format(selectedDayNum, monthNames[selectedMonthIndex]), fontSize = 11.sp, color = getAdaptiveTextColor(0.7f))
+                        
+                        OutlinedTextField(
+                            value = customHolidayName,
+                            onValueChange = { customHolidayName = it },
+                            placeholder = { Text("e.g., ClauseOS Foundation Day", fontSize = 11.sp) },
+                            label = { Text("Holiday Name", fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        OutlinedTextField(
+                            value = customHolidayDesc,
+                            onValueChange = { customHolidayDesc = it },
+                            placeholder = { Text("e.g., Annual celebration of founding", fontSize = 11.sp) },
+                            label = { Text("Description", fontSize = 11.sp) },
+                            singleLine = true,
+                            textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        // Type Selection
+                        Text("Holiday Category Type:", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            listOf("Regular", "Special (Non-Working)", "Special (Working)").forEach { type ->
+                                val isTypeSelected = customHolidayType == type
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1.5f)
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(if (isTypeSelected) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.02f))
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isTypeSelected) NeonGreen else getAdaptiveColor(0.1f),
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable { customHolidayType = type }
+                                        .padding(vertical = 6.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(type.replace(" (", "\n("), fontSize = 9.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, color = if (isTypeSelected) NeonGreen else getAdaptiveColor(0.7f))
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (customHolidayName.isNotBlank()) {
+                                val isNational = customHolidayType == "Regular"
+                                val formattedDate = "2026-%02d-%02d".format(selectedMonthIndex + 1, selectedDayNum)
+                                
+                                viewModel.addCustomHoliday(
+                                    name = if (customHolidayType == "Regular") customHolidayName else "$customHolidayName (${if (customHolidayType.contains("Non-Working")) userCountryCode else "Special Working " + userCountryCode})",
+                                    date = formattedDate,
+                                    description = customHolidayDesc.ifBlank { "Custom registered holiday" },
+                                    isNational = isNational,
+                                    country = userCountryCode
+                                )
+                                
+                                customHolidayName = ""
+                                customHolidayDesc = ""
+                                showCustomHolidayDialog = false
+                                Toast.makeText(context, "Registered custom holiday!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Please enter a holiday name", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                    ) {
+                        Text("Register", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { showCustomHolidayDialog = false }) {
+                        Text("Cancel", fontSize = 11.sp)
+                    }
+                }
+            )
+        }
+
+        // --- CALENDAR NOTES & REMINDERS SECTION ---
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "CALENDAR REMINDERS & NOTES FOR %02d %s".format(selectedDayNum, monthNames[selectedMonthIndex].uppercase()),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = NeonGreen,
+            letterSpacing = 1.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        
+        val notesForSelectedDay = viewModel.calendarNotes.value.filter { it.date == selectedDateKey }
+        
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isLightTheme) Color.White else CardGreyBg
+            ),
+            border = BorderStroke(
+                1.dp,
+                if (isLightTheme) Color(0xFFE2E8F0) else BorderGrey
+            )
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                if (notesForSelectedDay.isEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EventNote,
+                            contentDescription = null,
+                            tint = getAdaptiveTextColor(0.3f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "No notes or reminders for this date.",
+                            fontSize = 11.sp,
+                            color = getAdaptiveTextColor(0.5f)
+                        )
+                    }
+                } else {
+                    notesForSelectedDay.forEach { note ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .background(getAdaptiveColor(0.02f), RoundedCornerShape(8.dp))
+                                .border(1.dp, getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = note.title,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = com.example.ui.theme.AppTextColor
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = note.time,
+                                        fontSize = 9.sp,
+                                        color = NeonGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                if (note.description.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = note.description,
+                                        fontSize = 11.sp,
+                                        color = getAdaptiveTextColor(0.6f)
+                                    )
+                                }
+                                if (note.syncWithGoogleCalendar) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.NotificationsActive,
+                                            contentDescription = null,
+                                            tint = Color(0xFF4285F4),
+                                            modifier = Modifier.size(10.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Notification Active",
+                                            fontSize = 9.sp,
+                                            color = Color(0xFF4285F4),
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                            IconButton(
+                                onClick = { viewModel.deleteCalendarNote(note.id) },
+                                modifier = Modifier.size(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = "Delete note",
+                                    tint = getAdaptiveTextColor(0.4f),
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Divider(color = getAdaptiveColor(0.1f), modifier = Modifier.padding(vertical = 12.dp))
+                
+                // Form to add a note
+                var newNoteTitle by remember { mutableStateOf("") }
+                var newNoteDesc by remember { mutableStateOf("") }
+                var newNoteTime by remember { mutableStateOf("09:00 AM") }
+                var newNoteNotify by remember { mutableStateOf(true) }
+                
+                Text(
+                    text = "ADD NOTE ON THIS DATE",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    color = NeonGreen,
+                    letterSpacing = 0.5.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                OutlinedTextField(
+                    value = newNoteTitle,
+                    onValueChange = { newNoteTitle = it },
+                    placeholder = { Text("Title (e.g., Project Deadline, Shift Swap Handover)", fontSize = 11.sp) },
+                    textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp)
+                )
+                
+                OutlinedTextField(
+                    value = newNoteDesc,
+                    onValueChange = { newNoteDesc = it },
+                    placeholder = { Text("Description / Details (Optional)", fontSize = 11.sp) },
+                    textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+                
+                // Time selector chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val times = listOf("09:00 AM", "12:00 PM", "03:00 PM", "06:00 PM")
+                    times.forEach { t ->
+                        val isSelected = newNoteTime == t
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else getAdaptiveColor(0.02f))
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) NeonGreen else getAdaptiveColor(0.08f),
+                                    shape = RoundedCornerShape(6.dp)
+                                )
+                                .clickable { newNoteTime = t }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = t,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) NeonGreen else getAdaptiveTextColor(0.6f)
+                            )
+                        }
+                    }
+                }
+                
+                // Toggle notification checkbox
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                ) {
+                    Checkbox(
+                        checked = newNoteNotify,
+                        onCheckedChange = { newNoteNotify = it },
+                        colors = CheckboxDefaults.colors(checkedColor = NeonGreen)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Enable system & alert notification",
+                        fontSize = 11.sp,
+                        color = getAdaptiveTextColor(0.7f)
+                    )
+                }
+                
+                Button(
+                    onClick = {
+                        if (newNoteTitle.isNotBlank()) {
+                            viewModel.addCalendarNote(
+                                date = selectedDateKey,
+                                title = newNoteTitle,
+                                description = newNoteDesc,
+                                time = newNoteTime,
+                                sync = newNoteNotify
+                            )
+                            newNoteTitle = ""
+                            newNoteDesc = ""
+                            Toast.makeText(context, "Added note & reminder successfully!", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Please enter a title", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                ) {
+                    Text("Save Calendar Note & Reminder", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -7256,7 +8285,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                             )
                             Text(
                                 "Locked with DOLE standard tax tables (TRAIN Law & PhilHealth 2026)",
-                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                color = getAdaptiveTextColor(0.5f),
                                 fontSize = 10.sp
                             )
                         }
@@ -7284,7 +8313,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
                             .border(1.dp, BorderGrey, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                             .clickable {
@@ -7306,7 +8335,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
                             .border(1.dp, BorderGrey, RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
@@ -7317,7 +8346,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                             modifier = Modifier.fillMaxWidth(),
                             decorationBox = { innerTextField ->
                                 if (monthlySalaryInput.isEmpty()) {
-                                    Text("Enter Basic Salary (₱)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontSize = 12.sp)
+                                    Text("Enter Basic Salary (₱)", color = getAdaptiveTextColor(0.4f), fontSize = 12.sp)
                                 }
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("₱ ", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -7411,7 +8440,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             val percentNet = if (salary > 0) (netMonthlyPay / salary) * 100 else 100.0
                             Text(String.format("%.0f%%", percentNet), color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                            Text("Take-Home", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                            Text("Take-Home", color = getAdaptiveTextColor(0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                     
@@ -7434,7 +8463,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Total Employer Counterpart Contribution:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 10.sp)
+                    Text("Total Employer Counterpart Contribution:", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp)
                     Text(
                         String.format("₱%,.2f", sssEr + phEr + pagIbigEr),
                         color = NeonGreen,
@@ -7460,14 +8489,14 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                 )
                 Text(
                     "Prorated calculations tailored for multiple workforce scenarios.",
-                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                    color = getAdaptiveTextColor(0.5f),
                     fontSize = 10.sp,
                     modifier = Modifier.padding(bottom = 10.dp)
                 )
                 
                 // Scenarios tab selector row
                 Row(
-                    modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp)).padding(2.dp),
+                    modifier = Modifier.fillMaxWidth().background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp)).padding(2.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     val cases = listOf(
@@ -7549,7 +8578,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                     "regular" -> {
                         Text(
                             "Standard active full-year tenure (12 calendar months of computation). No adjustments needed.",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            color = getAdaptiveTextColor(0.5f),
                             fontSize = 10.sp,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
@@ -7561,11 +8590,11 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                 
                 // Result Summary
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total Calculated Months:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text("Total Calculated Months:", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                     Text(String.format("%.2f Months", totalWorkedMonths), color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Gross Basic Yearly Compensation:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text("Gross Basic Yearly Compensation:", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                     Text(String.format("₱%,.2f", grossYearlyEarnings), color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -7607,7 +8636,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                         Text(
                             if (isFullyExempt) "The full amount is exempt from income tax since it falls below the ₱90,000 threshold under the TRAIN Law."
                             else "The portion exceeding the ₱90,000 exemption limit (₱${String.format("%,.2f", taxable13th)}) will be aggregated to taxable compensations.",
-                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                            color = getAdaptiveTextColor(0.6f),
                             fontSize = 9.sp,
                             lineHeight = 12.sp
                         )
@@ -7630,7 +8659,7 @@ fun PhComplianceView(viewModel: TimeTrackerViewModel, context: Context) {
                 }
                 Text(
                     "Generate and print government-compliant BIR certificates or contribution files in one click.",
-                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                    color = getAdaptiveTextColor(0.5f),
                     fontSize = 10.sp,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
@@ -7723,7 +8752,7 @@ fun LegendRow(color: Color, label: String, value: String) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(color))
             Spacer(modifier = Modifier.width(6.dp))
-            Text(label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 10.sp)
+            Text(label, color = getAdaptiveTextColor(0.7f), fontSize = 10.sp)
         }
         Text(value, color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
@@ -7735,7 +8764,7 @@ fun ContributionExportItem(title: String, onExport: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
-            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(6.dp))
+            .background(getAdaptiveColor(0.03f), RoundedCornerShape(6.dp))
             .clickable { onExport() }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -7746,7 +8775,7 @@ fun ContributionExportItem(title: String, onExport: () -> Unit) {
             Spacer(modifier = Modifier.width(8.dp))
             Text(title, color = com.example.ui.theme.AppTextColor, fontSize = 10.sp)
         }
-        Icon(Icons.Default.Download, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+        Icon(Icons.Default.Download, contentDescription = null, tint = getAdaptiveTextColor(0.4f), modifier = Modifier.size(14.dp))
     }
 }
 
@@ -8144,3 +9173,51 @@ fun generateBir1601CPdfFile(
     }
 }
 
+
+
+@androidx.compose.runtime.Composable
+fun getAdaptiveColor(whiteAlpha: Float): Color {
+    val isLightTheme = androidx.compose.material3.MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+    return if (isLightTheme) {
+        val blackAlpha = when {
+            whiteAlpha <= 0.02f -> 0.12f
+            whiteAlpha <= 0.04f -> 0.20f
+            whiteAlpha <= 0.05f -> 0.26f
+            whiteAlpha <= 0.08f -> 0.35f
+            whiteAlpha <= 0.1f  -> 0.42f
+            whiteAlpha <= 0.12f -> 0.48f
+            whiteAlpha <= 0.15f -> 0.55f
+            whiteAlpha <= 0.2f  -> 0.65f
+            whiteAlpha <= 0.3f  -> 0.72f
+            whiteAlpha <= 0.4f  -> 0.80f
+            whiteAlpha <= 0.5f  -> 0.85f
+            whiteAlpha <= 0.6f  -> 0.90f
+            whiteAlpha <= 0.7f  -> 0.94f
+            else -> whiteAlpha
+        }
+        Color.Black.copy(alpha = blackAlpha)
+    } else {
+        Color.White.copy(alpha = whiteAlpha)
+    }
+}
+
+@androidx.compose.runtime.Composable
+fun getAdaptiveTextColor(alpha: Float): Color {
+    val isLightTheme = androidx.compose.material3.MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+    return if (isLightTheme) {
+        val lightAlpha = when {
+            alpha <= 0.05f -> 0.55f
+            alpha <= 0.1f  -> 0.65f
+            alpha <= 0.15f -> 0.72f
+            alpha <= 0.2f  -> 0.78f
+            alpha <= 0.3f  -> 0.84f
+            alpha <= 0.4f  -> 0.88f
+            alpha <= 0.5f  -> 0.92f
+            alpha <= 0.6f  -> 0.95f
+            else -> alpha
+        }
+        com.example.ui.theme.AppTextColor.copy(alpha = lightAlpha)
+    } else {
+        com.example.ui.theme.AppTextColor.copy(alpha = alpha)
+    }
+}

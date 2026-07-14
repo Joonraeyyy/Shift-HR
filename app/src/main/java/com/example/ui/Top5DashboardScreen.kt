@@ -210,7 +210,7 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .background(Color.Transparent) // Let underlying LiquidGlassBackground shine through!
-            .padding(16.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 100.dp)
     ) {
         // --- PRIMARY SCREEN SELECTOR TABS ---
         Row(
@@ -1042,7 +1042,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1058,7 +1058,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1109,7 +1109,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                             .fillMaxWidth()
                             .height(6.dp)
                             .clip(RoundedCornerShape(3.dp))
-                            .background(Color.White.copy(alpha = 0.08f))
+                            .background(getAdaptiveColor(0.08f))
                     ) {
                         Box(
                             modifier = Modifier
@@ -1171,7 +1171,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (hiringPace == pace) themeColors.primaryAccent else Color.White.copy(alpha = 0.04f))
+                            .background(if (hiringPace == pace) themeColors.primaryAccent else getAdaptiveColor(0.04f))
                             .clickable { hiringPace = pace }
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
@@ -1194,7 +1194,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(6.dp))
-                            .background(if (resignationLevel == level) themeColors.primaryAccent else Color.White.copy(alpha = 0.04f))
+                            .background(if (resignationLevel == level) themeColors.primaryAccent else getAdaptiveColor(0.04f))
                             .clickable { resignationLevel = level }
                             .padding(vertical = 6.dp),
                         contentAlignment = Alignment.Center
@@ -1228,7 +1228,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
             ) {
                 Column {
                     Text("Projected Future Headcount:", color = themeColors.textSecondary, fontSize = 10.sp)
-                    Text("Based on net monthly change of ${String.format("%+.1f", netMonthlyGrowth)}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Based on net monthly change of ${String.format("%+.1f", netMonthlyGrowth)}", color = getAdaptiveTextColor(0.5f), fontSize = 8.sp)
                 }
                 Text(
                     text = "${projectedHeadcount.toInt()} Staff",
@@ -1257,7 +1257,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1273,7 +1273,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1325,7 +1325,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                             .weight(1f)
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color.White.copy(alpha = 0.05f))
+                            .background(getAdaptiveColor(0.05f))
                     ) {
                         Box(
                             modifier = Modifier
@@ -1381,7 +1381,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                         drawArc(Color(0xFF8B5CF6), startAngle, matAngle, false, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx()))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Top", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 7.sp)
+                        Text("Top", color = getAdaptiveTextColor(0.5f), fontSize = 7.sp)
                         Text("SICK", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text("45%", color = Color(0xFFEF4444), fontSize = 9.sp, fontWeight = FontWeight.Black)
                     }
@@ -1416,7 +1416,7 @@ fun WorkforceLegendRow(color: Color, label: String, value: String) {
                     .background(color)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 10.sp)
+            Text(label, color = getAdaptiveTextColor(0.7f), fontSize = 10.sp)
         }
         Text(value, color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
@@ -1440,7 +1440,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1449,14 +1449,14 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("1.8% (Very Low)", color = Color(0xFF00FF88), fontSize = 13.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("Stability: 98.2%", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Stability: 98.2%", color = getAdaptiveTextColor(0.5f), fontSize = 8.sp)
                 }
                 
                 // Top Attrition Factor Card
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp))
                         .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                         .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -1465,7 +1465,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Overtime Strain", color = Color(0xFFFFCC00), fontSize = 13.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("Impact: High", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Impact: High", color = getAdaptiveTextColor(0.5f), fontSize = 8.sp)
                 }
             }
         }
@@ -1539,7 +1539,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .background(getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
                     .border(1.dp, themeColors.cardBorder, RoundedCornerShape(8.dp))
                     .clickable { empExpanded = true }
                     .padding(horizontal = 12.dp, vertical = 8.dp)
@@ -1610,7 +1610,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(String.format("%.0f%%", currentRiskScore), color = com.example.ui.theme.AppTextColor, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                        Text("Risk Level", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        Text("Risk Level", color = getAdaptiveTextColor(0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 
@@ -1621,7 +1621,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     Column(modifier = Modifier.weight(1f)) {
                         Text(emp.position.uppercase(), color = themeColors.secondaryAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                         Text(emp.name, color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("Department: ${emp.department}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 10.sp)
+                        Text("Department: ${emp.department}", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp)
                         Spacer(modifier = Modifier.height(4.dp))
                         
                         val statusText = when {
@@ -1728,7 +1728,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                         Text(actionTitle, color = actionColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(actionDesc, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 9.sp, lineHeight = 12.sp)
+                    Text(actionDesc, color = getAdaptiveTextColor(0.7f), fontSize = 9.sp, lineHeight = 12.sp)
                 }
             }
         }
@@ -2327,7 +2327,7 @@ fun PodiumColumn(
             modifier = Modifier
                 .size(44.dp)
                 .background(color, CircleShape)
-                .border(2.dp, Color.White.copy(alpha = 0.4f), CircleShape),
+                .border(2.dp, getAdaptiveColor(0.4f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
             val initials = employee.name.split(" ").mapNotNull { it.firstOrNull() }.take(2).joinToString("").uppercase()

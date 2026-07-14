@@ -161,7 +161,7 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(bottom = 24.dp)
+            .padding(bottom = 100.dp)
     ) {
         if (userRole == "EMPLOYEE") {
             // For Employee role, just show the individual section directly, no tabs or extra title (matches screenshot exactly)
@@ -179,13 +179,6 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
             )
         } else {
             // Admin/HR view has tabs and full functionality
-            Text(
-                text = "Performance Appraisal & Reporting",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = themeColors.primaryAccent,
-                modifier = Modifier.padding(vertical = 12.dp)
-            )
 
             // Tabs Row
             Row(
@@ -218,7 +211,7 @@ fun PerformanceReportingScreen(viewModel: TimeTrackerViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.Lock,
                                     contentDescription = "RBAC Locked",
-                                    tint = if (activeTab == key) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.4f),
+                                    tint = if (activeTab == key) Color.Black.copy(alpha = 0.5f) else getAdaptiveColor(0.4f),
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -307,7 +300,7 @@ fun IndividualAppraisalSection(
             Text(
                 text = "Target Review Subject",
                 fontSize = 11.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                color = getAdaptiveTextColor(0.5f),
                 fontWeight = FontWeight.Bold
             )
             
@@ -367,7 +360,7 @@ fun IndividualAppraisalSection(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+                        .background(getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
                         .padding(12.dp)
                 ) {
                     Icon(
@@ -436,7 +429,7 @@ fun IndividualAppraisalSection(
                 Text(
                     text = selectedProfile.position,
                     fontSize = 12.sp,
-                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.85f),
+                    color = getAdaptiveTextColor(0.85f),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -490,7 +483,7 @@ fun IndividualAppraisalSection(
                     Text(
                         text = "out of 5.0",
                         fontSize = 9.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                        color = getAdaptiveTextColor(0.5f)
                     )
                 }
             }
@@ -585,7 +578,7 @@ fun IndividualAppraisalSection(
                     Text(
                         text = "Comparison of employee self-evaluations against supervisor audits.",
                         fontSize = 10.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                        color = getAdaptiveTextColor(0.5f)
                     )
                 }
                 Icon(
@@ -603,7 +596,7 @@ fun IndividualAppraisalSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.05f))
+                        .background(getAdaptiveColor(0.05f))
                         .padding(vertical = 6.dp, horizontal = 8.dp)
                 ) {
                     Text(text = "Competency / KPI", modifier = Modifier.weight(1.8f), fontSize = 10.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
@@ -621,13 +614,13 @@ fun IndividualAppraisalSection(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(if (index % 2 == 0) Color.Transparent else Color.White.copy(alpha = 0.02f))
+                            .background(if (index % 2 == 0) Color.Transparent else getAdaptiveColor(0.02f))
                             .padding(vertical = 10.dp, horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1.8f)) {
                             Text(text = kpi.competency, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
-                            Text(text = kpi.description, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                            Text(text = kpi.description, fontSize = 9.sp, color = getAdaptiveTextColor(0.5f))
                         }
                         Text(
                             text = String.format("%.1f", kpi.selfScore),
@@ -686,7 +679,7 @@ fun IndividualAppraisalSection(
                     Text(
                         text = "Performance reviews overall rating over the past five quarters.",
                         fontSize = 10.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                        color = getAdaptiveTextColor(0.5f)
                     )
                 }
                 Icon(
@@ -875,7 +868,7 @@ fun IndividualAppraisalSection(
                             .weight(1f)
                             .height(44.dp)
                             .testTag("share_individual_pdf_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.08f)),
+                        colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveColor(0.08f)),
                         shape = RoundedCornerShape(10.dp),
                         border = BorderStroke(1.dp, themeColors.cardBorder)
                     ) {
@@ -936,7 +929,7 @@ fun OrganizationAuditSection(
                 ) {
                     Icon(imageVector = icon, contentDescription = null, tint = themeColors.primaryAccent, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = title, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), textAlign = TextAlign.Center)
+                    Text(text = title, fontSize = 9.sp, color = getAdaptiveTextColor(0.5f), textAlign = TextAlign.Center)
                     Text(text = valStr, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor, textAlign = TextAlign.Center)
                 }
             }
@@ -995,7 +988,7 @@ fun OrganizationAuditSection(
                     Text(
                         text = "Compare hires, attrition, promotions, and appraisal scores across periods.",
                         fontSize = 9.sp,
-                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
+                        color = getAdaptiveTextColor(0.6f)
                     )
                 }
             }
@@ -1006,7 +999,7 @@ fun OrganizationAuditSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                    .background(getAdaptiveColor(0.05f), RoundedCornerShape(8.dp))
                     .padding(2.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -1043,8 +1036,8 @@ fun OrganizationAuditSection(
                         modifier = Modifier
                             .weight(1f)
                             .height(160.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.03f)),
+                        border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
                     ) {
                         Column(
                             modifier = Modifier
@@ -1062,7 +1055,7 @@ fun OrganizationAuditSection(
                             
                             // Turnover gauge summary
                             Column {
-                                Text(text = "Turnover Rate", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                                Text(text = "Turnover Rate", fontSize = 8.sp, color = getAdaptiveTextColor(0.6f))
                                 Text(
                                     text = String.format("%.2f%%", row.turnoverRate),
                                     fontSize = 12.sp,
@@ -1077,21 +1070,21 @@ fun OrganizationAuditSection(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(text = "👥 Hires/Attrition", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                                    Text(text = "👥 Hires/Attrition", fontSize = 7.sp, color = getAdaptiveTextColor(0.6f))
                                     Text(text = "${row.newHires}/${row.separations}", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(text = "⚡ Promo/Transf", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                                    Text(text = "⚡ Promo/Transf", fontSize = 7.sp, color = getAdaptiveTextColor(0.6f))
                                     Text(text = "${row.promotions}/${row.jobTransfers}", fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                                 }
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(text = "⭐ Avg Appraisal", fontSize = 7.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
+                                    Text(text = "⭐ Avg Appraisal", fontSize = 7.sp, color = getAdaptiveTextColor(0.6f))
                                     Text(text = String.format("%.2f", row.avgScore), fontSize = 7.5.sp, fontWeight = FontWeight.Bold, color = themeColors.primaryAccent)
                                 }
                             }
@@ -1135,7 +1128,7 @@ fun OrganizationAuditSection(
             Text(
                 text = "Compile multi-period statistics and synthesize smart recommendations on retention & career stability.",
                 fontSize = 10.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                color = getAdaptiveTextColor(0.6f),
                 modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
             )
 
@@ -1156,8 +1149,8 @@ fun OrganizationAuditSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.04f)),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
+                        border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Row(
@@ -1260,7 +1253,7 @@ fun OrganizationAuditSection(
             Text(
                 text = "Comparison of current targets against database-aggregated results.",
                 fontSize = 10.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                color = getAdaptiveTextColor(0.5f),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -1268,7 +1261,7 @@ fun OrganizationAuditSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color.White.copy(alpha = 0.05f))
+                    .background(getAdaptiveColor(0.05f))
                     .padding(vertical = 6.dp, horizontal = 8.dp)
             ) {
                 Text(text = "Department", modifier = Modifier.weight(1.5f), fontSize = 10.sp, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
@@ -1282,7 +1275,7 @@ fun OrganizationAuditSection(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (index % 2 == 0) Color.Transparent else Color.White.copy(alpha = 0.02f))
+                        .background(if (index % 2 == 0) Color.Transparent else getAdaptiveColor(0.02f))
                         .padding(vertical = 10.dp, horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1334,7 +1327,7 @@ fun OrganizationAuditSection(
             Text(
                 text = "Visualization of staff count mapped across overall score frequencies.",
                 fontSize = 10.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                color = getAdaptiveTextColor(0.5f),
                 modifier = Modifier.padding(bottom = 12.dp)
             )
 
@@ -1573,7 +1566,7 @@ fun RbacLockedView(themeColors: LiquidThemeColors) {
             Box(
                 modifier = Modifier
                     .size(64.dp)
-                    .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(32.dp)),
+                    .background(getAdaptiveColor(0.05f), RoundedCornerShape(32.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -1595,7 +1588,7 @@ fun RbacLockedView(themeColors: LiquidThemeColors) {
             Text(
                 text = "Strict Role-Based Access Control is enforced on company-wide executive dossiers. Employee-level accounts are restricted from viewing macro performance curves, organizational benchmarks, and peer ratings to preserve corporate privacy.",
                 fontSize = 11.sp,
-                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                color = getAdaptiveTextColor(0.6f),
                 textAlign = TextAlign.Center,
                 lineHeight = 16.sp
             )
@@ -1603,7 +1596,7 @@ fun RbacLockedView(themeColors: LiquidThemeColors) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(6.dp))
+                    .background(getAdaptiveColor(0.04f), RoundedCornerShape(6.dp))
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Icon(Icons.Default.Security, contentDescription = null, tint = themeColors.primaryAccent, modifier = Modifier.size(12.dp))

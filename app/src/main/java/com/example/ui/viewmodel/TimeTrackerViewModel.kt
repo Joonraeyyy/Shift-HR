@@ -25,7 +25,8 @@ data class Holiday(
     val name: String,
     val date: String, // yyyy-MM-dd
     val description: String,
-    val isNational: Boolean
+    val isNational: Boolean,
+    val country: String = "ALL" // "PH", "IN", or "ALL"
 )
 
 data class CalendarEventNote(
@@ -292,37 +293,38 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var liveFieldLat = mutableStateOf(14.5995)
     var liveFieldLng = mutableStateOf(120.9842)
 
-    // Combined Holiday list for Indore / India and Manila / Philippines regions
-    val localHolidays = listOf(
-        Holiday("New Year's Day", "2026-01-01", "Global New Year and Philippine Regular Holiday", true),
-        Holiday("Republic Day India", "2026-01-26", "National holiday honoring the Constitution of India", true),
-        Holiday("Maha Shivratri", "2026-02-15", "Venerated Lord Shiva festival celebrated in Indore temples", false),
-        Holiday("Chinese New Year (PH)", "2026-02-17", "Special Non-Working Day celebrating Chinese New Year in the Philippines", false),
-        Holiday("EDSA People Power Revolution Anniversary (PH)", "2026-02-25", "Special Working Day celebrating EDSA anniversary in the Philippines", false),
-        Holiday("Maundy Thursday (PH)", "2026-04-02", "Philippine Maundy Thursday local holiday reflection", true),
-        Holiday("Good Friday (PH/Indore)", "2026-04-03", "Good Friday solemn holiday recognized globally", true),
-        Holiday("Black Saturday (PH)", "2026-04-04", "Special Non-Working Day in the Philippines", false),
-        Holiday("Araw ng Kagitingan (PH)", "2026-04-09", "Philippine Day of Valor honoring local heroes", true),
-        Holiday("Dr. Ambedkar Jayanti", "2026-04-14", "Birth anniversary tribute to Dr. B.R. Ambedkar", true),
-        Holiday("Eid-ul-Fitr", "2026-04-20", "Festive break marking the end of holy Ramadan fasting", false),
-        Holiday("Labor Day (PH)", "2026-05-01", "Philippine Labor Day celebrating local workers", true),
-        Holiday("Independence Day (PH)", "2026-06-12", "Philippine Independence Day grand celebration", true),
-        Holiday("Independence Day India", "2026-08-15", "National Freedom Day with patriotic flag hoisting", true),
-        Holiday("Ninoy Aquino Day (PH)", "2026-08-21", "Special Non-Working Day honoring Ninoy Aquino in the Philippines", false),
-        Holiday("National Heroes Day (PH)", "2026-08-31", "Philippine National Heroes Day holiday", true),
-        Holiday("Ganesh Chaturthi", "2026-09-15", "Devout greeting of Lord Ganesha in Indore", false),
-        Holiday("Gandhi Jayanti", "2026-10-02", "Tribute to Father of the Nation, Mahatma Gandhi", true),
-        Holiday("All Saints' Day (PH)", "2026-11-01", "Special Non-Working Day in the Philippines", false),
-        Holiday("All Souls' Day (PH)", "2026-11-02", "Additional Special Non-Working Day in the Philippines", false),
-        Holiday("Diwali (Festival of Lights)", "2026-11-09", "Indore's grandest festival with brilliant lighting and fireworks", true),
-        Holiday("Guru Nanak Jayanti", "2026-11-24", "Sacred Sikh anniversary celebration", false),
-        Holiday("Bonifacio Day (PH)", "2026-11-30", "Philippine Andres Bonifacio celebration of courage", true),
-        Holiday("Feast of the Immaculate Conception (PH)", "2026-12-08", "Special Non-Working Day honoring the Feast of the Immaculate Conception in the Philippines", false),
-        Holiday("Christmas Eve (PH)", "2026-12-24", "Additional Special Non-Working Day in the Philippines", false),
-        Holiday("Christmas Day", "2026-12-25", "Global winter celebration and gifting", true),
-        Holiday("Rizal Day (PH)", "2026-12-30", "Philippine Jose Rizal national hero tribute day", true),
-        Holiday("Last Day of the Year (PH)", "2026-12-31", "Additional Special Non-Working Day in the Philippines", false)
-    )
+    // Combined Holiday list for Manila / Philippines region
+    var localHolidays = mutableStateOf<List<Holiday>>(listOf(
+        Holiday("New Year's Day", "2026-01-01", "Global New Year and Philippine Regular Holiday", true, "PH"),
+        Holiday("Chinese New Year (PH)", "2026-02-17", "Special Non-Working Day celebrating Chinese New Year in the Philippines", false, "PH"),
+        Holiday("EDSA People Power Revolution Anniversary (PH)", "2026-02-25", "Special Working Day celebrating EDSA anniversary in the Philippines", false, "PH"),
+        Holiday("Maundy Thursday (PH)", "2026-04-02", "Philippine Maundy Thursday local holiday reflection", true, "PH"),
+        Holiday("Good Friday (PH)", "2026-04-03", "Good Friday solemn holiday recognized in the Philippines", true, "PH"),
+        Holiday("Black Saturday (PH)", "2026-04-04", "Special Non-Working Day in the Philippines", false, "PH"),
+        Holiday("Araw ng Kagitingan (PH)", "2026-04-09", "Philippine Day of Valor honoring local heroes", true, "PH"),
+        Holiday("Labor Day (PH)", "2026-05-01", "Philippine Labor Day celebrating local workers", true, "PH"),
+        Holiday("Independence Day (PH)", "2026-06-12", "Philippine Independence Day grand celebration", true, "PH"),
+        Holiday("Ninoy Aquino Day (PH)", "2026-08-21", "Special Non-Working Day honoring Ninoy Aquino in the Philippines", false, "PH"),
+        Holiday("National Heroes Day (PH)", "2026-08-31", "Philippine National Heroes Day holiday", true, "PH"),
+        Holiday("All Saints' Day (PH)", "2026-11-01", "Special Non-Working Day in the Philippines", false, "PH"),
+        Holiday("All Souls' Day (PH)", "2026-11-02", "Additional Special Non-Working Day in the Philippines", false, "PH"),
+        Holiday("Bonifacio Day (PH)", "2026-11-30", "Philippine Andres Bonifacio celebration of courage", true, "PH"),
+        Holiday("Feast of the Immaculate Conception (PH)", "2026-12-08", "Special Non-Working Day honoring the Feast of the Immaculate Conception in the Philippines", false, "PH"),
+        Holiday("Christmas Eve (PH)", "2026-12-24", "Additional Special Non-Working Day in the Philippines", false, "PH"),
+        Holiday("Christmas Day (PH)", "2026-12-25", "Global winter celebration and gifting in the Philippines", true, "PH"),
+        Holiday("Rizal Day (PH)", "2026-12-30", "Philippine Jose Rizal national hero tribute day", true, "PH"),
+        Holiday("Last Day of the Year (PH)", "2026-12-31", "Additional Special Non-Working Day in the Philippines", false, "PH")
+    ))
+
+    fun getUserCountryCode(): String {
+        return "PH"
+    }
+
+    fun addCustomHoliday(name: String, date: String, description: String, isNational: Boolean, country: String = "ALL") {
+        val currentHolidays = localHolidays.value.toMutableList()
+        currentHolidays.add(Holiday(name, date, description, isNational, country))
+        localHolidays.value = currentHolidays
+    }
 
     var todayHoliday = mutableStateOf<Holiday?>(null)
 
@@ -815,9 +817,14 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     private fun checkTodayHoliday() {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val todayStr = sdf.format(Date())
-        todayHoliday.value = localHolidays.find { it.date == todayStr }
-        todayHoliday.value?.let { holiday ->
-            addNotification("Indore Holiday Today", "Today is ${holiday.name}! Holiday rates may apply. 🎉", isAlert = false)
+        val userCountry = getUserCountryCode()
+        val holiday = localHolidays.value.find { 
+            it.date == todayStr && (it.country == "ALL" || it.country == userCountry) 
+        }
+        todayHoliday.value = holiday
+        holiday?.let { h ->
+            val regionName = if (userCountry == "PH") "Philippines" else "India/Indore"
+            addNotification("$regionName Holiday Today", "Today is ${h.name}! Holiday rates may apply. 🎉", isAlert = false)
         }
     }
 
