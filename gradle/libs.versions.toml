@@ -39,6 +39,8 @@ roborazzi = "1.59.0"
 firebaseBom = "34.15.0"
 secretsGradlePlugin = "2.0.1"
 googleServices = "4.5.0"
+playServicesMlkitDocumentScanner = "16.0.0-beta1"
+workRuntime = "2.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -89,6 +91,8 @@ roborazzi-junit-rule = { group = "io.github.takahirom.roborazzi", name = "robora
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-ai = { group = "com.google.firebase", name = "firebase-ai" }
 firebase-appcheck-recaptcha = { group = "com.google.firebase", name = "firebase-appcheck-recaptcha" }
+play-services-mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "playServicesMlkitDocumentScanner" }
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workRuntime" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

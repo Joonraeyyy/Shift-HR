@@ -935,7 +935,7 @@ fun RealtimeInsightsDashboard(
         Column {
             Text(
                 text = "Realtime Insights",
-                color = Color.White,
+                color = com.example.ui.theme.AppTextColor,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -1049,7 +1049,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                 ) {
                     Text("Total Staff", color = themeColors.textSecondary, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("$totalCount Active", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text("$totalCount Active", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text("+14% YoY Growth", color = Color(0xFF00FF88), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1065,7 +1065,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                 ) {
                     Text("Avg Hires Rate", color = themeColors.textSecondary, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("3.5 / Month", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text("3.5 / Month", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text("98% Probation Pass", color = themeColors.secondaryAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1099,7 +1099,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(deptName, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(deptName, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Text("$count Employees (${String.format("%.0f%%", ratio * 100)})", color = themeColors.textSecondary, fontSize = 10.sp)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -1161,7 +1161,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
             Text("Simulate organizational growth metrics in real-time without spreadsheets.", color = themeColors.textSecondary, fontSize = 9.sp, modifier = Modifier.padding(bottom = 10.dp))
             
             // Hiring Pace Selectors
-            Text("Simulated Hiring Pace", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("Simulated Hiring Pace", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1184,7 +1184,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
             Spacer(modifier = Modifier.height(6.dp))
             
             // Resignations Selector
-            Text("Expected Resignations (Attrition Risk Factor)", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("Expected Resignations (Attrition Risk Factor)", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1209,7 +1209,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
             // Slider
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Projection Timeline:", color = themeColors.textSecondary, fontSize = 10.sp)
-                Text("${projectionMonths.toInt()} Months", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text("${projectionMonths.toInt()} Months", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Slider(
                 value = projectionMonths,
@@ -1228,7 +1228,7 @@ fun HeadcountDashboardContent(themeColors: LiquidThemeColors, employees: List<To
             ) {
                 Column {
                     Text("Projected Future Headcount:", color = themeColors.textSecondary, fontSize = 10.sp)
-                    Text("Based on net monthly change of ${String.format("%+.1f", netMonthlyGrowth)}", color = Color.White.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Based on net monthly change of ${String.format("%+.1f", netMonthlyGrowth)}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
                 }
                 Text(
                     text = "${projectedHeadcount.toInt()} Staff",
@@ -1264,7 +1264,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                 ) {
                     Text("Monthly Absence Rate", color = themeColors.textSecondary, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("2.4%", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text("2.4%", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text("Industry standard: 3.5%", color = Color(0xFF00FF88), fontSize = 8.sp)
                 }
@@ -1280,7 +1280,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                 ) {
                     Text("Clocked-In Today", color = themeColors.textSecondary, fontSize = 9.sp)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("26 / 28 Present", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text("26 / 28 Present", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
                     Text("Live Present: 92.8%", color = themeColors.secondaryAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1319,7 +1319,7 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(day, color = Color.White, fontSize = 10.sp, modifier = Modifier.width(70.dp), fontWeight = FontWeight.Bold)
+                    Text(day, color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, modifier = Modifier.width(70.dp), fontWeight = FontWeight.Bold)
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -1381,8 +1381,8 @@ fun AbsenteeismDashboardContent(themeColors: LiquidThemeColors, employees: List<
                         drawArc(Color(0xFF8B5CF6), startAngle, matAngle, false, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx()))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Top", color = Color.White.copy(alpha = 0.5f), fontSize = 7.sp)
-                        Text("SICK", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("Top", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 7.sp)
+                        Text("SICK", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         Text("45%", color = Color(0xFFEF4444), fontSize = 9.sp, fontWeight = FontWeight.Black)
                     }
                 }
@@ -1416,9 +1416,9 @@ fun WorkforceLegendRow(color: Color, label: String, value: String) {
                     .background(color)
             )
             Spacer(modifier = Modifier.width(6.dp))
-            Text(label, color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+            Text(label, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 10.sp)
         }
-        Text(value, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(value, color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -1449,7 +1449,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("1.8% (Very Low)", color = Color(0xFF00FF88), fontSize = 13.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("Stability: 98.2%", color = Color.White.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Stability: 98.2%", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
                 }
                 
                 // Top Attrition Factor Card
@@ -1465,7 +1465,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Overtime Strain", color = Color(0xFFFFCC00), fontSize = 13.sp, fontWeight = FontWeight.Black)
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text("Impact: High", color = Color.White.copy(alpha = 0.5f), fontSize = 8.sp)
+                    Text("Impact: High", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 8.sp)
                 }
             }
         }
@@ -1533,7 +1533,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
             Text("Simulate live retention adjustments to predict individual turnover probabilities.", color = themeColors.textSecondary, fontSize = 9.sp, modifier = Modifier.padding(bottom = 10.dp))
             
             // Dropdown selector
-            Text("Select Target Employee Profile", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text("Select Target Employee Profile", color = com.example.ui.theme.AppTextColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(4.dp))
             
             Box(
@@ -1549,7 +1549,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(selectedEmpName, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(selectedEmpName, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = themeColors.primaryAccent)
                 }
                 
@@ -1560,7 +1560,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                 ) {
                     employees.forEach { emp ->
                         DropdownMenuItem(
-                            text = { Text(emp.name, color = Color.White, fontSize = 12.sp) },
+                            text = { Text(emp.name, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp) },
                             onClick = {
                                 selectedEmpName = emp.name
                                 empExpanded = false
@@ -1577,6 +1577,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                val appTextColor = com.example.ui.theme.AppTextColor
                 Box(modifier = Modifier.size(100.dp), contentAlignment = Alignment.Center) {
                     Canvas(modifier = Modifier.size(85.dp)) {
                         val strokeWidth = 8.dp.toPx()
@@ -1584,7 +1585,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                         
                         // Track
                         drawArc(
-                            color = Color.White.copy(alpha = 0.05f),
+                            color = appTextColor.copy(alpha = 0.05f),
                             startAngle = -90f,
                             sweepAngle = 360f,
                             useCenter = false,
@@ -1608,8 +1609,8 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                         )
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(String.format("%.0f%%", currentRiskScore), color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black)
-                        Text("Risk Level", color = Color.White.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        Text(String.format("%.0f%%", currentRiskScore), color = com.example.ui.theme.AppTextColor, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                        Text("Risk Level", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 
@@ -1619,8 +1620,8 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                 selectedEmployee?.let { emp ->
                     Column(modifier = Modifier.weight(1f)) {
                         Text(emp.position.uppercase(), color = themeColors.secondaryAccent, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                        Text(emp.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        Text("Department: ${emp.department}", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                        Text(emp.name, color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("Department: ${emp.department}", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 10.sp)
                         Spacer(modifier = Modifier.height(4.dp))
                         
                         val statusText = when {
@@ -1649,7 +1650,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
             Divider(color = themeColors.cardBorder.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 12.dp))
             
             // Sensitivity Adjustment Sliders
-            Text("PROACTIVE RETENTION ACTIONS SIMULATOR", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text("PROACTIVE RETENTION ACTIONS SIMULATOR", color = com.example.ui.theme.AppTextColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
             Spacer(modifier = Modifier.height(8.dp))
             
             // 1. Monthly Salary Adjustment
@@ -1727,7 +1728,7 @@ fun TurnoverPredictiveContent(themeColors: LiquidThemeColors, employees: List<To
                         Text(actionTitle, color = actionColor, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(actionDesc, color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp, lineHeight = 12.sp)
+                    Text(actionDesc, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 9.sp, lineHeight = 12.sp)
                 }
             }
         }

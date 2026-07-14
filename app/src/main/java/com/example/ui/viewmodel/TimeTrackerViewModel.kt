@@ -1,6 +1,7 @@
 package com.example.ui.viewmodel
 
 import android.app.Application
+import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import com.example.data.WeatherResponse
 import com.example.data.ForecastResponse
@@ -10,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.database.AppDatabase
 import com.example.data.database.ShiftConfigEntity
 import com.example.data.database.TimeLogEntity
+import com.example.data.database.DossierDocumentEntity
 import com.example.data.repository.TimeTrackerRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -87,6 +89,7 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     val allTimeLogs: StateFlow<List<TimeLogEntity>>
     val pendingTimeLogs: StateFlow<List<TimeLogEntity>>
     val shiftConfig: StateFlow<ShiftConfigEntity>
+    val dossierDocuments: StateFlow<List<DossierDocumentEntity>>
 
     // Screen states
     var currentScreen = mutableStateOf("performance_reports") // clock, spreadsheet, hr_approval, settings, holidays
@@ -220,6 +223,14 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var isSyncing = mutableStateOf(false)
     var syncMessage = mutableStateOf("")
 
+    // Document scanner / multi-image export states
+    var showExportSheet = mutableStateOf(false)
+    var pendingScanUris = mutableStateOf<List<Uri>>(emptyList())
+    var exportFileName = mutableStateOf("")
+    var exportCategory = mutableStateOf(DossierCategory.IDENTITY)
+    var exportOptimization = mutableStateOf("Standard (Recommended for HR)")
+    var targetProfileId = mutableStateOf("")
+
     // Active log state
     private val _activeTimeLog = MutableStateFlow<TimeLogEntity?>(null)
     val activeTimeLog: StateFlow<TimeLogEntity?> = _activeTimeLog.asStateFlow()
@@ -283,25 +294,34 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     // Combined Holiday list for Indore / India and Manila / Philippines regions
     val localHolidays = listOf(
-        Holiday("New Year's Day", "2026-01-01", "Global New Year celebration", false),
+        Holiday("New Year's Day", "2026-01-01", "Global New Year and Philippine Regular Holiday", true),
         Holiday("Republic Day India", "2026-01-26", "National holiday honoring the Constitution of India", true),
         Holiday("Maha Shivratri", "2026-02-15", "Venerated Lord Shiva festival celebrated in Indore temples", false),
+        Holiday("Chinese New Year (PH)", "2026-02-17", "Special Non-Working Day celebrating Chinese New Year in the Philippines", false),
+        Holiday("EDSA People Power Revolution Anniversary (PH)", "2026-02-25", "Special Working Day celebrating EDSA anniversary in the Philippines", false),
         Holiday("Maundy Thursday (PH)", "2026-04-02", "Philippine Maundy Thursday local holiday reflection", true),
         Holiday("Good Friday (PH/Indore)", "2026-04-03", "Good Friday solemn holiday recognized globally", true),
+        Holiday("Black Saturday (PH)", "2026-04-04", "Special Non-Working Day in the Philippines", false),
         Holiday("Araw ng Kagitingan (PH)", "2026-04-09", "Philippine Day of Valor honoring local heroes", true),
         Holiday("Dr. Ambedkar Jayanti", "2026-04-14", "Birth anniversary tribute to Dr. B.R. Ambedkar", true),
         Holiday("Eid-ul-Fitr", "2026-04-20", "Festive break marking the end of holy Ramadan fasting", false),
         Holiday("Labor Day (PH)", "2026-05-01", "Philippine Labor Day celebrating local workers", true),
         Holiday("Independence Day (PH)", "2026-06-12", "Philippine Independence Day grand celebration", true),
         Holiday("Independence Day India", "2026-08-15", "National Freedom Day with patriotic flag hoisting", true),
+        Holiday("Ninoy Aquino Day (PH)", "2026-08-21", "Special Non-Working Day honoring Ninoy Aquino in the Philippines", false),
         Holiday("National Heroes Day (PH)", "2026-08-31", "Philippine National Heroes Day holiday", true),
         Holiday("Ganesh Chaturthi", "2026-09-15", "Devout greeting of Lord Ganesha in Indore", false),
         Holiday("Gandhi Jayanti", "2026-10-02", "Tribute to Father of the Nation, Mahatma Gandhi", true),
+        Holiday("All Saints' Day (PH)", "2026-11-01", "Special Non-Working Day in the Philippines", false),
+        Holiday("All Souls' Day (PH)", "2026-11-02", "Additional Special Non-Working Day in the Philippines", false),
         Holiday("Diwali (Festival of Lights)", "2026-11-09", "Indore's grandest festival with brilliant lighting and fireworks", true),
         Holiday("Guru Nanak Jayanti", "2026-11-24", "Sacred Sikh anniversary celebration", false),
         Holiday("Bonifacio Day (PH)", "2026-11-30", "Philippine Andres Bonifacio celebration of courage", true),
-        Holiday("Christmas Day", "2026-12-25", "Global winter celebration and gifting", false),
-        Holiday("Rizal Day (PH)", "2026-12-30", "Philippine Jose Rizal national hero tribute day", true)
+        Holiday("Feast of the Immaculate Conception (PH)", "2026-12-08", "Special Non-Working Day honoring the Feast of the Immaculate Conception in the Philippines", false),
+        Holiday("Christmas Eve (PH)", "2026-12-24", "Additional Special Non-Working Day in the Philippines", false),
+        Holiday("Christmas Day", "2026-12-25", "Global winter celebration and gifting", true),
+        Holiday("Rizal Day (PH)", "2026-12-30", "Philippine Jose Rizal national hero tribute day", true),
+        Holiday("Last Day of the Year (PH)", "2026-12-31", "Additional Special Non-Working Day in the Philippines", false)
     )
 
     var todayHoliday = mutableStateOf<Holiday?>(null)
@@ -412,7 +432,13 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             emergencyContactPhone = "+91 98765 43210",
             age = 29,
             phoneNumber = "+91 94451 22340",
-            picture = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80"
+            picture = "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80",
+            gender = "Female",
+            vacationLeaveBalance = 15,
+            sickLeaveBalance = 10,
+            maternityLeaveBalance = 105,
+            paternityLeaveBalance = 0,
+            soloParentLeaveBalance = 7
         ),
         EmployeeProfile(
             id = "COS-2026-0013",
@@ -425,7 +451,13 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             emergencyContactPhone = "+63 912 345 6789",
             age = 23,
             phoneNumber = "+63 915 567 8910",
-            picture = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80"
+            picture = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80",
+            gender = "Male",
+            vacationLeaveBalance = 12,
+            sickLeaveBalance = 8,
+            maternityLeaveBalance = 0,
+            paternityLeaveBalance = 7,
+            soloParentLeaveBalance = 0
         ),
         EmployeeProfile(
             id = "COS-2026-0014",
@@ -438,7 +470,13 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             emergencyContactPhone = "+91 88888 77777",
             age = 35,
             phoneNumber = "+91 88877 66554",
-            picture = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80"
+            picture = "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80",
+            gender = "Male",
+            vacationLeaveBalance = 18,
+            sickLeaveBalance = 12,
+            maternityLeaveBalance = 0,
+            paternityLeaveBalance = 7,
+            soloParentLeaveBalance = 0
         ),
         EmployeeProfile(
             id = "COS-2026-0015",
@@ -451,7 +489,13 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             emergencyContactPhone = "+91 99999 88888",
             age = 42,
             phoneNumber = "+91 99911 22334",
-            picture = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80"
+            picture = "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=150&q=80",
+            gender = "Female",
+            vacationLeaveBalance = 20,
+            sickLeaveBalance = 15,
+            maternityLeaveBalance = 105,
+            paternityLeaveBalance = 0,
+            soloParentLeaveBalance = 7
         ),
         EmployeeProfile(
             id = "COS-2026-0016",
@@ -464,7 +508,78 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             emergencyContactPhone = "+91 11111 22222",
             age = 48,
             phoneNumber = "+91 11122 33445",
-            picture = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80"
+            picture = "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&q=80",
+            gender = "Male",
+            vacationLeaveBalance = 25,
+            sickLeaveBalance = 15,
+            maternityLeaveBalance = 0,
+            paternityLeaveBalance = 7,
+            soloParentLeaveBalance = 7
+        )
+    ))
+
+    // --- COMPLIANCE STATES ---
+    var disciplinaryCases = mutableStateOf<List<DisciplinaryCase>>(listOf(
+        DisciplinaryCase(
+            employeeName = "Sarah Jenkins",
+            infractionTitle = "Attendance Misalignment Alert",
+            infractionDate = "2026-06-25",
+            noticeToExplainDate = "2026-06-26",
+            noticeToExplainContent = "Your geofence logging telemetry flagged a 200m mismatch on June 25. Please explain this discrepancy under the attendance policy Clause 4.1.",
+            employeeExplanation = "I was working inside the concrete Engineering building which caused temporary GPS signal attenuation and drift.",
+            employeeExplanationDate = "2026-06-27",
+            status = "EXPLANATION_SUBMITTED",
+            severity = "Low"
+        ),
+        DisciplinaryCase(
+            employeeName = "Robert Chen",
+            infractionTitle = "Confidentiality Policy Sync",
+            infractionDate = "2026-06-10",
+            noticeToExplainDate = "2026-06-11",
+            noticeToExplainContent = "A public product roadmap leak was reported. Verify standard hands-off logging security.",
+            employeeExplanation = "I performed a complete audit and confirmed no internal login credentials or plans were leaked from my devices.",
+            employeeExplanationDate = "2026-06-12",
+            noticeOfDecisionDate = "2026-06-14",
+            noticeOfDecisionContent = "Case resolved. No policy violation found. Recommended routine security log hygiene.",
+            status = "CASE_RESOLVED",
+            severity = "High"
+        )
+    ))
+
+    var offboardingClearances = mutableStateOf<List<OffboardingClearance>>(listOf(
+        OffboardingClearance(
+            employeeName = "Robert Chen",
+            separationDate = "2026-08-31",
+            department = "Product Management",
+            itClearanceStatus = "CLEARED",
+            financeClearanceStatus = "PENDING",
+            adminClearanceStatus = "CLEARED",
+            status = "IN_PROGRESS",
+            comments = "Awaiting final travel expense liquidation."
+        )
+    ))
+
+    var okrRecords = mutableStateOf<List<OkrRecord>>(listOf(
+        OkrRecord(
+            employeeName = "Sarah Jenkins",
+            objective = "Architect Advanced Compliance Guardrails",
+            keyResult = "Deliver five modular M3 self-service interfaces with validation",
+            targetValue = "5 interfaces",
+            currentValue = "3 interfaces",
+            progress = 60,
+            selfAppraisal = "I have integrated the Room database and styled the forms beautifully, with edge-to-edge Compose templates.",
+            managerFeedback = "Excellent structural design. Ensure linter guidelines are fully met."
+        ),
+        OkrRecord(
+            employeeName = "Marcus Aurelius (HR Intern)",
+            objective = "Streamline HR Onboarding Audits",
+            keyResult = "Audit 100% of employee profiles for mandatory tax/SSN entries",
+            targetValue = "100%",
+            currentValue = "100%",
+            progress = 100,
+            selfAppraisal = "Completed the audit for all current personnel.",
+            managerFeedback = "Fantastic work, very detailed documentation!",
+            status = "ACHIEVED"
         )
     ))
 
@@ -529,6 +644,9 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     init {
         val db = AppDatabase.getDatabase(application)
         repository = TimeTrackerRepository(db.timeLogDao(), db.shiftConfigDao())
+
+        dossierDocuments = db.dossierDao().getAllDocuments()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         allTimeLogs = repository.allTimeLogs
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -798,7 +916,52 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     // Leaves Management
-    fun fileLeaveRequest(leaveType: String, startDate: String, endDate: String, reason: String) {
+    fun calculateDaysBetween(start: String, end: String): Int {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val startDate = sdf.parse(start)
+            val endDate = sdf.parse(end)
+            if (startDate != null && endDate != null) {
+                val diff = endDate.time - startDate.time
+                val days = (diff / (1000 * 60 * 60 * 24)).toInt() + 1
+                if (days > 0) days else 1
+            } else 1
+        } catch (e: Exception) {
+            1
+        }
+    }
+
+    fun fileLeaveRequest(leaveType: String, startDate: String, endDate: String, reason: String): String? {
+        val profile = employeeProfiles.value.find { it.name == currentUserName.value }
+        if (profile == null) {
+            return "Employee profile not found."
+        }
+        val duration = calculateDaysBetween(startDate, endDate)
+        if (duration <= 0) {
+            return "Invalid leave duration."
+        }
+
+        // Gender validations for statutory categories
+        if (leaveType == "Maternity Leave" && profile.gender != "Female") {
+            return "Maternity Leave is legally protected for Female employees only under statutory regulations."
+        }
+        if (leaveType == "Paternity Leave" && profile.gender != "Male") {
+            return "Paternity Leave is legally protected for Male employees only under statutory regulations."
+        }
+
+        // Accrual checks
+        val balance = when (leaveType) {
+            "Vacation Leave" -> profile.vacationLeaveBalance
+            "Sick Leave" -> profile.sickLeaveBalance
+            "Maternity Leave" -> profile.maternityLeaveBalance
+            "Paternity Leave" -> profile.paternityLeaveBalance
+            "Solo Parent Leave" -> profile.soloParentLeaveBalance
+            else -> 9999
+        }
+        if (duration > balance) {
+            return "Insufficient $leaveType balance. Requested $duration days but only $balance days left."
+        }
+
         val newReq = LeaveRequest(
             employeeName = currentUserName.value,
             leaveType = leaveType,
@@ -808,17 +971,31 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             status = "PENDING"
         )
         leaveRequests.value = leaveRequests.value + newReq
-        addAuditLog(currentUserName.value, "Filed $leaveType from $startDate to $endDate")
+        addAuditLog(currentUserName.value, "Filed $leaveType from $startDate to $endDate ($duration days)")
         addNotification("Self-Service", "$leaveType request filed successfully.", isAlert = false)
+        return null
     }
 
     fun approveLeave(id: String) {
-        leaveRequests.value = leaveRequests.value.map {
-            if (it.id == id) {
-                addAuditLog(currentUserName.value, "Approved leave for ${it.employeeName}")
-                addNotification("Leave Approved", "${it.employeeName}'s ${it.leaveType} has been approved.", isAlert = false)
-                it.copy(status = "APPROVED")
-            } else it
+        leaveRequests.value = leaveRequests.value.map { req ->
+            if (req.id == id) {
+                val duration = calculateDaysBetween(req.startDate, req.endDate)
+                employeeProfiles.value = employeeProfiles.value.map { profile ->
+                    if (profile.name == req.employeeName) {
+                        when (req.leaveType) {
+                            "Vacation Leave" -> profile.copy(vacationLeaveBalance = (profile.vacationLeaveBalance - duration).coerceAtLeast(0))
+                            "Sick Leave" -> profile.copy(sickLeaveBalance = (profile.sickLeaveBalance - duration).coerceAtLeast(0))
+                            "Maternity Leave" -> profile.copy(maternityLeaveBalance = (profile.maternityLeaveBalance - duration).coerceAtLeast(0))
+                            "Paternity Leave" -> profile.copy(paternityLeaveBalance = (profile.paternityLeaveBalance - duration).coerceAtLeast(0))
+                            "Solo Parent Leave" -> profile.copy(soloParentLeaveBalance = (profile.soloParentLeaveBalance - duration).coerceAtLeast(0))
+                            else -> profile
+                        }
+                    } else profile
+                }
+                addAuditLog(currentUserName.value, "Approved ${req.leaveType} for ${req.employeeName} ($duration Days)")
+                addNotification("Leave Approved", "${req.employeeName}'s ${req.leaveType} has been approved.", isAlert = false)
+                req.copy(status = "APPROVED")
+            } else req
         }
     }
 
@@ -832,28 +1009,70 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // Attendance Correction Requests
-    fun fileCorrectionRequest(date: String, requestedTimeIn: String, requestedTimeOut: String, reason: String) {
+    // Attendance Correction & Punch Dispute Requests
+    fun fileCorrectionRequest(
+        date: String,
+        requestedTimeIn: String,
+        requestedTimeOut: String,
+        reason: String,
+        disputeType: String = "GPS Drift",
+        isDispute: Boolean = false,
+        telemetry: String = ""
+    ) {
         val newReq = CorrectionRequest(
             employeeName = currentUserName.value,
             date = date,
             requestedTimeIn = requestedTimeIn,
             requestedTimeOut = requestedTimeOut,
             reason = reason,
-            status = "PENDING"
+            status = "PENDING",
+            disputeType = disputeType,
+            originalTelemetry = if (isDispute) telemetry else "Manual correction entry",
+            isPunchDispute = isDispute
         )
         correctionRequests.value = correctionRequests.value + newReq
-        addAuditLog(currentUserName.value, "Requested attendance correction for date $date")
-        addNotification("Self-Service", "Correction request submitted to manager.", isAlert = false)
+        addAuditLog(currentUserName.value, "Requested ${if (isDispute) "GPS dispute resolution" else "time correction"} for date $date")
+        addNotification("Self-Service", "${if (isDispute) "Dispute ticket" else "Correction request"} submitted successfully.", isAlert = false)
+    }
+
+    fun parseDateTimeToMillis(dateStr: String, timeStr: String): Long {
+        return try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.US)
+            sdf.parse("$dateStr $timeStr")?.time ?: System.currentTimeMillis()
+        } catch (e: Exception) {
+            System.currentTimeMillis()
+        }
     }
 
     fun approveCorrection(id: String) {
-        correctionRequests.value = correctionRequests.value.map {
-            if (it.id == id) {
-                addAuditLog(currentUserName.value, "Approved time correction for ${it.employeeName}")
-                addNotification("Correction Approved", "Attendance correction approved for ${it.employeeName}.", isAlert = false)
-                it.copy(status = "APPROVED")
-            } else it
+        correctionRequests.value = correctionRequests.value.map { req ->
+            if (req.id == id) {
+                addAuditLog(currentUserName.value, "Approved time correction dispute for ${req.employeeName} on ${req.date}")
+                addNotification("Dispute Resolved", "Attendance dispute resolved for ${req.employeeName}.", isAlert = false)
+                
+                // Real DB update!
+                viewModelScope.launch {
+                    val timeInMs = parseDateTimeToMillis(req.date, req.requestedTimeIn)
+                    val timeOutMs = parseDateTimeToMillis(req.date, req.requestedTimeOut)
+                    
+                    val existing = allTimeLogs.value.find { it.employeeName == req.employeeName && it.date == req.date }
+                    val logToSave = existing?.copy(
+                        timeIn = timeInMs,
+                        timeOut = timeOutMs,
+                        isApproved = "APPROVED"
+                    ) ?: TimeLogEntity(
+                        date = req.date,
+                        employeeName = req.employeeName,
+                        timeIn = timeInMs,
+                        timeOut = timeOutMs,
+                        isApproved = "APPROVED"
+                    )
+                    repository.insertOrUpdateTimeLog(logToSave)
+                    refreshActiveLog()
+                }
+                
+                req.copy(status = "APPROVED")
+            } else req
         }
     }
 
@@ -861,9 +1080,140 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         correctionRequests.value = correctionRequests.value.map {
             if (it.id == id) {
                 addAuditLog(currentUserName.value, "Rejected time correction for ${it.employeeName}")
-                addNotification("Correction Rejected", "Attendance correction rejected for ${it.employeeName}.", isAlert = true)
+                addNotification("Correction Rejected", "Attendance correction/dispute rejected for ${it.employeeName}.", isAlert = true)
                 it.copy(status = "REJECTED")
             } else it
+        }
+    }
+
+    // --- DISCIPLINARY & DUE PROCESS HELPERS ---
+    fun issueNoticeToExplain(employeeName: String, infractionTitle: String, date: String, content: String, severity: String, link: String) {
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val newCase = DisciplinaryCase(
+            employeeName = employeeName,
+            infractionTitle = infractionTitle,
+            infractionDate = date,
+            noticeToExplainDate = todayStr,
+            noticeToExplainContent = content,
+            severity = severity,
+            policyViabilityLink = link,
+            status = "NOTICE_TO_EXPLAIN_ISSUED"
+        )
+        disciplinaryCases.value = disciplinaryCases.value + newCase
+        addAuditLog(currentUserName.value, "Issued Notice to Explain to $employeeName for $infractionTitle")
+        addNotification("Compliance Alert", "Disciplinary case logged for $employeeName.", isAlert = true)
+    }
+
+    fun submitEmployeeExplanation(caseId: String, explanation: String) {
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        disciplinaryCases.value = disciplinaryCases.value.map {
+            if (it.id == caseId) {
+                addAuditLog(currentUserName.value, "Submitted disciplinary explanation for ${it.employeeName}")
+                it.copy(
+                    employeeExplanation = explanation,
+                    employeeExplanationDate = todayStr,
+                    status = "EXPLANATION_SUBMITTED"
+                )
+            } else it
+        }
+    }
+
+    fun issueNoticeOfDecision(caseId: String, decisionContent: String) {
+        val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        disciplinaryCases.value = disciplinaryCases.value.map {
+            if (it.id == caseId) {
+                addAuditLog(currentUserName.value, "Issued Notice of Decision for ${it.employeeName}")
+                addNotification("Case Resolved", "Disciplinary case for ${it.employeeName} has been updated.", isAlert = false)
+                it.copy(
+                    noticeOfDecisionContent = decisionContent,
+                    noticeOfDecisionDate = todayStr,
+                    status = "CASE_RESOLVED"
+                )
+            } else it
+        }
+    }
+
+    // --- OFFBOARDING & CLEARANCES HELPERS ---
+    fun startOffboarding(employeeName: String, separationDate: String, department: String) {
+        val newClearance = OffboardingClearance(
+            employeeName = employeeName,
+            separationDate = separationDate,
+            department = department,
+            status = "IN_PROGRESS"
+        )
+        offboardingClearances.value = offboardingClearances.value + newClearance
+        addAuditLog(currentUserName.value, "Initialized offboarding clearance tracker for $employeeName")
+        addNotification("Offboarding", "Clearance workflow started for $employeeName.", isAlert = false)
+    }
+
+    fun updateDepartmentClearance(clearanceId: String, dept: String, isCleared: Boolean) {
+        offboardingClearances.value = offboardingClearances.value.map {
+            if (it.id == clearanceId) {
+                val updated = when (dept) {
+                    "IT" -> it.copy(itClearanceStatus = if (isCleared) "CLEARED" else "PENDING")
+                    "Finance" -> it.copy(financeClearanceStatus = if (isCleared) "CLEARED" else "PENDING")
+                    "Admin" -> it.copy(adminClearanceStatus = if (isCleared) "CLEARED" else "PENDING")
+                    else -> it
+                }
+                
+                // Auto check if fully cleared
+                val fullyCleared = updated.itClearanceStatus == "CLEARED" &&
+                                   updated.financeClearanceStatus == "CLEARED" &&
+                                   updated.adminClearanceStatus == "CLEARED"
+                
+                updated.copy(
+                    coeReady = fullyCleared,
+                    finalPayReady = fullyCleared,
+                    status = if (fullyCleared) "FULLY_CLEARED" else "IN_PROGRESS"
+                )
+            } else it
+        }
+    }
+
+    // --- OKRS & CONTINUOUS APPRAISAL HELPERS ---
+    fun logOkr(objective: String, keyResult: String, target: String, current: String, progress: Int) {
+        val newOkr = OkrRecord(
+            employeeName = currentUserName.value,
+            objective = objective,
+            keyResult = keyResult,
+            targetValue = target,
+            currentValue = current,
+            progress = progress,
+            status = "ACTIVE"
+        )
+        okrRecords.value = okrRecords.value + newOkr
+        addAuditLog(currentUserName.value, "Logged OKR Objective: $objective")
+    }
+
+    fun updateOkrProgress(okrId: String, currentVal: String, progress: Int, selfAppraisal: String) {
+        okrRecords.value = okrRecords.value.map {
+            if (it.id == okrId) {
+                it.copy(
+                    currentValue = currentVal,
+                    progress = progress,
+                    selfAppraisal = selfAppraisal,
+                    status = if (progress >= 100) "ACHIEVED" else "ACTIVE"
+                )
+            } else it
+        }
+    }
+
+    fun submitManagerOkrFeedback(okrId: String, feedback: String) {
+        okrRecords.value = okrRecords.value.map {
+            if (it.id == okrId) {
+                it.copy(managerFeedback = feedback)
+            } else it
+        }
+    }
+
+    fun getApprovedLeaveOnDate(employeeName: String, dateStr: String): LeaveRequest? {
+        return leaveRequests.value.find { req ->
+            if (req.employeeName == employeeName && req.status == "APPROVED") {
+                val target = dateStr
+                val start = req.startDate
+                val end = req.endDate
+                target >= start && target <= end
+            } else false
         }
     }
 
@@ -991,6 +1341,24 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
         addAuditLog(currentUserName.value, "Updated emergency contact and personal profile details.")
         addNotification("Self-Service", "Successfully updated personal profile and contact details.", isAlert = false)
+    }
+
+    fun addDocumentToProfile(profileId: String, documentName: String) {
+        employeeProfiles.value = employeeProfiles.value.map {
+            if (it.id == profileId) {
+                if (!it.documents.contains(documentName)) {
+                    it.copy(documents = it.documents + documentName)
+                } else {
+                    it
+                }
+            } else {
+                it
+            }
+        }
+        val targetProfile = employeeProfiles.value.find { it.id == profileId }
+        val name = targetProfile?.name ?: ""
+        addAuditLog(currentUserName.value, "Uploaded document '$documentName' to $name's Dossier.")
+        addNotification("Core HR", "Uploaded $documentName to $name's secure vault.", isAlert = false)
     }
 
     fun toggleOfflineMode(offline: Boolean) {

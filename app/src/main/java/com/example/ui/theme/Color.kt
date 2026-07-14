@@ -1,6 +1,16 @@
 package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
+
+val AppTextColor: Color
+    @Composable
+    get() = MaterialTheme.colorScheme.onBackground
+
+val AppTextSecondaryColor: Color
+    @Composable
+    get() = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
 
 // ClauseOS Compliance SaaS Premium Palette
 val CyberBg = Color(0xFF090D16)      // Sleek Dark Charcoal/Navy Slate
@@ -32,7 +42,8 @@ data class LiquidThemeColors(
     val cardSurface: Color,
     val cardBorder: Color,
     val textPrimary: Color = Color(0xFFFFFFFF),
-    val textSecondary: Color = Color(0xFFCBD5E1)
+    val textSecondary: Color = Color(0xFFCBD5E1),
+    val isLightTheme: Boolean = false
 )
 
 object LiquidThemeRegistry {
@@ -96,7 +107,86 @@ object LiquidThemeRegistry {
         cardBorder = Color(0x33FFFFFF)
     )
 
-    val allThemes = listOf(SapphireGlass, EmeraldGlass, MidnightGlass, AmethystGlass, SunsetGlass)
+    // LIGHT GLASS Presets matching their dark counterparts elegantly
+    val SapphireLightGlass = LiquidThemeColors(
+        name = "Sapphire Light",
+        bgGradientStart = Color(0xFFF0F4FF),
+        bgGradientEnd = Color(0xFFE0E7FF),
+        bgBubble1 = Color(0xFF93C5FD), // Soft sky blue bubble
+        bgBubble2 = Color(0xFFC7D2FE), // Soft indigo bubble
+        primaryAccent = Color(0xFF2563EB), // Clear royal blue
+        secondaryAccent = Color(0xFF4F46E5), // Clear indigo
+        cardSurface = Color(0x80FFFFFF), // Semi-transparent white glass card (50% opacity)
+        cardBorder = Color(0x24000000), // Soft dark border
+        textPrimary = Color(0xFF0F172A), // Slate 900
+        textSecondary = Color(0xFF475569), // Slate 600
+        isLightTheme = true
+    )
+
+    val EmeraldLightGlass = LiquidThemeColors(
+        name = "Emerald Light",
+        bgGradientStart = Color(0xFFF0FDF4),
+        bgGradientEnd = Color(0xFFDCFCE7),
+        bgBubble1 = Color(0xFF86EFAC), // Soft mint bubble
+        bgBubble2 = Color(0xFFA7F3D0), // Soft emerald bubble
+        primaryAccent = Color(0xFF059669), // Clear emerald
+        secondaryAccent = Color(0xFF0D9488), // Clear teal
+        cardSurface = Color(0x80FFFFFF),
+        cardBorder = Color(0x24000000),
+        textPrimary = Color(0xFF062F21),
+        textSecondary = Color(0xFF1F2937),
+        isLightTheme = true
+    )
+
+    val AlabasterLightGlass = LiquidThemeColors(
+        name = "Alabaster Light",
+        bgGradientStart = Color(0xFFFAFAFA),
+        bgGradientEnd = Color(0xFFF4F4F5),
+        bgBubble1 = Color(0xFFE4E4E7), // Soft gray bubble
+        bgBubble2 = Color(0xFFD4D4D8), // Soft steel bubble
+        primaryAccent = Color(0xFF18181B), // Ink/Dark charcoal
+        secondaryAccent = Color(0xFF52525B), // Medium charcoal
+        cardSurface = Color(0x80FFFFFF),
+        cardBorder = Color(0x24000000),
+        textPrimary = Color(0xFF09090B),
+        textSecondary = Color(0xFF3F3F46),
+        isLightTheme = true
+    )
+
+    val AmethystLightGlass = LiquidThemeColors(
+        name = "Amethyst Light",
+        bgGradientStart = Color(0xFFFAF5FF),
+        bgGradientEnd = Color(0xFFF3E8FF),
+        bgBubble1 = Color(0xFFD8B4FE), // Soft amethyst bubble
+        bgBubble2 = Color(0xFFF3C0F9), // Soft fuchsia bubble
+        primaryAccent = Color(0xFF7C3AED), // Clear purple
+        secondaryAccent = Color(0xFFD946EF), // Clear fuchsia
+        cardSurface = Color(0x80FFFFFF),
+        cardBorder = Color(0x24000000),
+        textPrimary = Color(0xFF1E1B4B),
+        textSecondary = Color(0xFF4338CA),
+        isLightTheme = true
+    )
+
+    val SunsetLightGlass = LiquidThemeColors(
+        name = "Sunset Light",
+        bgGradientStart = Color(0xFFFFF7ED),
+        bgGradientEnd = Color(0xFFFFEDD5),
+        bgBubble1 = Color(0xFFFDBA74), // Soft amber bubble
+        bgBubble2 = Color(0xFFFECDD3), // Soft rose bubble
+        primaryAccent = Color(0xFFD97706), // Clear warm amber
+        secondaryAccent = Color(0xFFEA580C), // Clear warm orange
+        cardSurface = Color(0x80FFFFFF),
+        cardBorder = Color(0x24000000),
+        textPrimary = Color(0xFF451A03),
+        textSecondary = Color(0xFF7C2D12),
+        isLightTheme = true
+    )
+
+    val allThemes = listOf(
+        SapphireGlass, EmeraldGlass, MidnightGlass, AmethystGlass, SunsetGlass,
+        SapphireLightGlass, EmeraldLightGlass, AlabasterLightGlass, AmethystLightGlass, SunsetLightGlass
+    )
 
     fun getThemeByName(name: String): LiquidThemeColors {
         return allThemes.find { it.name.lowercase() == name.lowercase() } ?: SapphireGlass

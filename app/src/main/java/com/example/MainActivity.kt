@@ -1,5 +1,24 @@
 package com.example
 
+import android.app.Activity
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.pdf.PdfDocument
+import android.graphics.ImageDecoder
+import android.provider.MediaStore
+import android.net.Uri
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import java.io.File
+
 import android.app.Application
 import android.os.Bundle
 import android.widget.Toast
@@ -37,6 +56,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import android.content.res.Configuration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -74,11 +95,192 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : ComponentActivity() {
+    private var viewModelRef: TimeTrackerViewModel? = null
+
+    private val scannerLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val scanningResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+            scanningResult?.pdf?.let { pdf ->
+                viewModelRef?.let { vm ->
+                    vm.pendingScanUris.value = listOf(pdf.uri)
+                    vm.exportFileName.value = "DOC_${SimpleDateFormat("ddMMyyyy_HHmm", Locale.US).format(Date())}"
+                    vm.showExportSheet.value = true
+                }
+            }
+        }
+    }
+
+    private val galleryLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            viewModelRef?.let { vm ->
+                vm.pendingScanUris.value = uris
+                vm.exportFileName.value = "DOC_${SimpleDateFormat("ddMMyyyy_HHmm", Locale.US).format(Date())}"
+                vm.showExportSheet.value = true
+            }
+        }
+    }
+
+    private fun startDocumentScanner() {
+        val options = GmsDocumentScannerOptions.Builder()
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF, GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build()
+        val scanner = GmsDocumentScanning.getClient(options)
+        scanner.getStartScanIntent(this)
+            .addOnSuccessListener { intentSender ->
+                scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+            }
+            .addOnFailureListener { exception ->
+                Log.e("ShiftHR_Scanner", "Scanner Initialization Failed: ${exception.message}")
+                Toast.makeText(this, "Failed to start document scanner: ${exception.message}", Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun optimizeBitmap(bitmap: Bitmap, quality: String): Bitmap {
+        val scale = when (quality) {
+            "Compact (Low Data)" -> 0.5f
+            else -> 1.0f
+        }
+        
+        val width = (bitmap.width * scale).toInt()
+        val height = (bitmap.height * scale).toInt()
+        
+        val resized = if (scale != 1.0f) {
+            Bitmap.createScaledBitmap(bitmap, width, height, true)
+        } else {
+            bitmap
+        }
+        
+        val compressionQuality = when (quality) {
+            "High Fidelity (Large File)" -> 100
+            "Compact (Low Data)" -> 40
+            else -> 70 // Standard (Recommended for HR)
+        }
+        
+        if (compressionQuality == 100 && scale == 1.0f) {
+            return resized
+        }
+        
+        val outputStream = java.io.ByteArrayOutputStream()
+        resized.compress(Bitmap.CompressFormat.JPEG, compressionQuality, outputStream)
+        val bytes = outputStream.toByteArray()
+        return android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: resized
+    }
+
+    private fun convertBitmapsToPdf(bitmapList: List<Bitmap>, outputFile: File) {
+        val pdfDocument = PdfDocument()
+
+        bitmapList.forEachIndexed { index, bitmap ->
+            // Standard A4 Paper Size Dimensions in Points (72 points/inch)
+            val pageWidth = 595
+            val pageHeight = 842
+            
+            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, index + 1).create()
+            val page = pdfDocument.startPage(pageInfo)
+            val canvas = page.canvas
+
+            // Compute scaling factor to seamlessly fit image within the A4 bounding canvas
+            val scaleX = pageWidth.toFloat() / bitmap.width
+            val scaleY = pageHeight.toFloat() / bitmap.height
+            val scale = minOf(scaleX, scaleY)
+
+            val matrix = Matrix().apply {
+                postScale(scale, scale)
+                // Center the image gracefully on the page canvas canvas space
+                val dx = (pageWidth - (bitmap.width * scale)) / 2f
+                val dy = (pageHeight - (bitmap.height * scale)) / 2f
+                postTranslate(dx, dy)
+            }
+
+            canvas.drawBitmap(bitmap, matrix, null)
+            pdfDocument.finishPage(page)
+        }
+
+        // Write the stream safely out to disk space storage
+        outputFile.outputStream().use { outputStream ->
+            pdfDocument.writeTo(outputStream)
+        }
+        pdfDocument.close()
+    }
+
+    private fun compilePdfAndUpload(
+        context: Context,
+        uris: List<Uri>,
+        fileName: String,
+        category: DossierCategory,
+        optimization: String,
+        profileId: String,
+        viewModel: TimeTrackerViewModel
+    ) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val finalFileName = "${category.name}_${fileName.trim()}"
+                val actualName = if (finalFileName.endsWith(".pdf", ignoreCase = true)) finalFileName else "$finalFileName.pdf"
+                
+                val outputFile = File(context.filesDir, actualName)
+                
+                if (uris.size == 1 && context.contentResolver.getType(uris[0]) == "application/pdf") {
+                    // It is a PDF Uri from ML Kit scanner, copy directly
+                    context.contentResolver.openInputStream(uris[0])?.use { input ->
+                        outputFile.outputStream().use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } else {
+                    // It is image Uris, convert and compile
+                    val bitmaps = uris.mapNotNull { uri ->
+                        val originalBitmap = try {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                                val source = ImageDecoder.createSource(context.contentResolver, uri)
+                                ImageDecoder.decodeBitmap(source)
+                            } else {
+                                MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                            null
+                        }
+                        
+                        originalBitmap?.let { optimizeBitmap(it, optimization) }
+                    }
+                    
+                    if (bitmaps.isEmpty()) {
+                        throw Exception("No valid images selected")
+                    }
+                    
+                    convertBitmapsToPdf(bitmaps, outputFile)
+                }
+                
+                withContext(Dispatchers.Main) {
+                    // Trigger Room + WorkManager Background synchronization pipeline
+                    val db = com.example.data.database.AppDatabase.getDatabase(context)
+                    com.example.data.database.handleCapturedDocumentPipeline(
+                        context = context,
+                        scannedPdfUri = android.net.Uri.fromFile(outputFile),
+                        chosenCategory = category.name,
+                        profileId = profileId,
+                        dossierDao = db.dossierDao()
+                    )
+
+                    viewModel.addDocumentToProfile(profileId, actualName)
+                    viewModel.showExportSheet.value = false
+                    Toast.makeText(context, "Successfully compiled $actualName and added to secure HR dossier!", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(context, "Failed to compile PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             val viewModel: TimeTrackerViewModel = viewModel()
+            viewModelRef = viewModel
             val themeName by viewModel.selectedTheme
             MyApplicationTheme(themeName = themeName) {
                 Scaffold(
@@ -87,7 +289,18 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     TimeTrackerApp(
                         modifier = Modifier.padding(innerPadding),
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onScanDocument = { profileId ->
+                            viewModel.targetProfileId.value = profileId
+                            startDocumentScanner()
+                        },
+                        onUploadPhotos = { profileId ->
+                            viewModel.targetProfileId.value = profileId
+                            galleryLauncher.launch("image/*")
+                        },
+                        onCompilePdf = { context, uris, fileName, category, optimization, profileId ->
+                            compilePdfAndUpload(context, uris, fileName, category, optimization, profileId, viewModel)
+                        }
                     )
                 }
             }
@@ -135,7 +348,10 @@ fun LiquidGlassBackground(
 @Composable
 fun TimeTrackerApp(
     modifier: Modifier = Modifier,
-    viewModel: TimeTrackerViewModel = viewModel()
+    viewModel: TimeTrackerViewModel = viewModel(),
+    onScanDocument: (profileId: String) -> Unit = {},
+    onUploadPhotos: (profileId: String) -> Unit = {},
+    onCompilePdf: (Context, List<Uri>, String, DossierCategory, String, String) -> Unit = { _, _, _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val allLogs by viewModel.allTimeLogs.collectAsStateWithLifecycle()
@@ -148,6 +364,40 @@ fun TimeTrackerApp(
     val currentUserRole by viewModel.currentUserRole
     val currentUserName by viewModel.currentUserName
     val notifications by viewModel.notifications
+
+    // Dynamic Department & Supervisor/Manager filtered logs
+    val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(currentUserName, ignoreCase = true) }
+    val userDepartment = currentUserProfile?.department ?: ""
+
+    val filteredPendingLogs = pendingLogs.filter { log ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        
+        if (currentUserRole == "ADMIN_HR") {
+            true
+        } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+            empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            log.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
+
+    val filteredAllLogs = allLogs.filter { log ->
+        val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empRole = empUser?.role ?: "EMPLOYEE"
+        val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
+        val empDept = empProfile?.department ?: ""
+        
+        if (currentUserRole == "ADMIN_HR") {
+            true
+        } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
+            empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
+        } else {
+            log.employeeName.equals(currentUserName, ignoreCase = true)
+        }
+    }
 
     // Log selected for detail viewing
     var viewDetailsLog by remember { mutableStateOf<TimeLogEntity?>(null) }
@@ -187,7 +437,7 @@ fun TimeTrackerApp(
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.testTag("confirm_reject_button")
                 ) {
-                    Text("Reject Punch", color = Color.White)
+                    Text("Reject Punch", color = com.example.ui.theme.AppTextColor)
                 }
             },
             dismissButton = {
@@ -222,6 +472,175 @@ fun TimeTrackerApp(
             currencySymbol = viewModel.getCurrencySymbol(),
             userRole = currentUserRole
         )
+    }
+
+    // Document PDF Compiler / Export Bottom Sheet Dialog
+    val showExportSheetState = viewModel.showExportSheet.value
+    if (showExportSheetState) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { viewModel.showExportSheet.value = false }
+        ) {
+            var fileNameText by remember { mutableStateOf(viewModel.exportFileName.value) }
+            var selectedCategory by remember { mutableStateOf(viewModel.exportCategory.value) }
+            var selectedOptimization by remember { mutableStateOf(viewModel.exportOptimization.value) }
+            
+            val mintGreen = Color(0xFF00E676)
+            
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .border(1.dp, Color.Black.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp)
+                ) {
+                    Text(
+                        text = "Smart Capture Compiler",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = "Powered by Shift HR Document Engine",
+                        fontSize = 11.sp,
+                        color = Color.Gray
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // File Name field
+                    Text("File Name", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = fileNameText,
+                        onValueChange = { fileNameText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("e.g. DOC_13072026_1853", fontSize = 12.sp) },
+                        textStyle = TextStyle(fontSize = 13.sp),
+                        trailingIcon = { Text(".pdf", fontSize = 13.sp, modifier = Modifier.padding(end = 12.dp)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = mintGreen,
+                            unfocusedBorderColor = Color.LightGray,
+                            focusedTextColor = Color.Black,
+                            unfocusedTextColor = Color.Black
+                        )
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Category Selector
+                    Text("Category Tag", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DossierCategory.values().forEach { category ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (selectedCategory == category) mintGreen.copy(alpha = 0.15f) else Color.Transparent)
+                                    .clickable { selectedCategory = category }
+                                    .border(1.dp, if (selectedCategory == category) mintGreen else Color.LightGray.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = selectedCategory == category,
+                                    onClick = { selectedCategory = category },
+                                    colors = RadioButtonDefaults.colors(selectedColor = mintGreen)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column {
+                                    Text(category.name, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                                    Text(category.label, fontSize = 10.sp, color = Color.Gray)
+                                }
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Optimization Slider or Choices
+                    Text("Optimization Engine", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black.copy(alpha = 0.7f))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    
+                    val optimizations = listOf(
+                        "High Fidelity (Large File)",
+                        "Standard (Recommended for HR)",
+                        "Compact (Low Data)"
+                    )
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        optimizations.forEach { opt ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { selectedOptimization = opt }
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (selectedOptimization == opt) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = if (selectedOptimization == opt) mintGreen else Color.Gray,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(opt, fontSize = 11.sp, color = Color.Black)
+                            }
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Actions
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { viewModel.showExportSheet.value = false }
+                        ) {
+                            Text("Cancel", color = Color.Gray)
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                if (fileNameText.trim().isNotEmpty()) {
+                                    onCompilePdf(
+                                        context,
+                                        viewModel.pendingScanUris.value,
+                                        fileNameText.trim(),
+                                        selectedCategory,
+                                        selectedOptimization,
+                                        viewModel.targetProfileId.value
+                                    )
+                                } else {
+                                    Toast.makeText(context, "Please enter a file name", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = mintGreen, contentColor = Color.Black),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Compile & Export", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Biometric Face Recognition Simulation Dialog
@@ -298,7 +717,7 @@ fun TimeTrackerApp(
                         text = "Authenticating identity for: ${viewModel.currentUserName.value}",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = com.example.ui.theme.AppTextColor
                     )
 
                     // Styled viewfinder
@@ -366,7 +785,7 @@ fun TimeTrackerApp(
                                 } else "BIOMETRIC VECTOR SCANNING...",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = com.example.ui.theme.AppTextColor
                             )
                             Text(
                                 text = "${(scanProgress * 100).toInt()}% MATCH RATE",
@@ -389,7 +808,7 @@ fun TimeTrackerApp(
                             text = "SIMULATOR BIOMETRIC RESPONSE TARGET",
                             fontSize = 8.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color.White.copy(alpha = 0.4f),
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                             letterSpacing = 0.5.sp
                         )
                         Row(
@@ -405,7 +824,7 @@ fun TimeTrackerApp(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f).height(38.dp)
                             ) {
-                                Text("Correct Face", fontSize = 10.sp, color = Color.White)
+                                Text("Correct Face", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor)
                             }
                             Button(
                                 onClick = { viewModel.isFaceScanMismatched.value = true },
@@ -416,7 +835,7 @@ fun TimeTrackerApp(
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier.weight(1f).height(38.dp)
                             ) {
-                                Text("Unknown Person", fontSize = 10.sp, color = Color.White)
+                                Text("Unknown Person", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor)
                             }
                         }
                     }
@@ -429,7 +848,7 @@ fun TimeTrackerApp(
                             onClick = { viewModel.showFaceScannerForAction.value = null },
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                            Text("Cancel", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
                         }
 
                         Button(
@@ -471,7 +890,10 @@ fun TimeTrackerApp(
                 themeName = viewModel.selectedTheme.value,
                 modifier = modifier
             ) {
-                Column(
+                val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val isKeyboardVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 50.dp
+
+                Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(
@@ -482,6 +904,20 @@ fun TimeTrackerApp(
                             }
                         )
                 ) {
+                    if (isLandscape && !isKeyboardVisible) {
+                        MainNavigationRail(
+                            currentScreen = currentScreen,
+                            userRole = currentUserRole,
+                            pendingCount = filteredPendingLogs.size,
+                            onTabSelected = { viewModel.currentScreen.value = it }
+                        )
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
             // App top-bar (Aesthetic Cyber Header)
             HeaderBar(
                 roleName = currentUserRole,
@@ -502,39 +938,7 @@ fun TimeTrackerApp(
                 onDismiss = { viewModel.dismissNotification(it) }
             )
 
-            // Dynamic Department & Supervisor/Manager filtered logs
-            val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(currentUserName, ignoreCase = true) }
-            val userDepartment = currentUserProfile?.department ?: ""
-
-            val filteredPendingLogs = pendingLogs.filter { log ->
-                val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
-                val empRole = empUser?.role ?: "EMPLOYEE"
-                val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
-                val empDept = empProfile?.department ?: ""
-                
-                if (currentUserRole == "ADMIN_HR") {
-                    true
-                } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
-                    empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
-                } else {
-                    log.employeeName.equals(currentUserName, ignoreCase = true)
-                }
-            }
-
-            val filteredAllLogs = allLogs.filter { log ->
-                val empUser = viewModel.registeredUsers.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
-                val empRole = empUser?.role ?: "EMPLOYEE"
-                val empProfile = viewModel.employeeProfiles.value.find { it.name.equals(log.employeeName, ignoreCase = true) }
-                val empDept = empProfile?.department ?: ""
-                
-                if (currentUserRole == "ADMIN_HR") {
-                    true
-                } else if (currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR") {
-                    empDept.equals(userDepartment, ignoreCase = true) && empRole != "SUPERVISOR" && empRole != "MANAGER"
-                } else {
-                    log.employeeName.equals(currentUserName, ignoreCase = true)
-                }
-            }
+            // Alerts section
 
             // Content Screens switching
             Box(
@@ -613,7 +1017,11 @@ fun TimeTrackerApp(
                     "core_hr" -> {
                         Column {
                             SaaSHeader(title = "Core HR Dossier & Directory", onBack = { viewModel.currentScreen.value = "saas_hub" })
-                            CoreHrScreen(viewModel = viewModel)
+                            CoreHrScreen(
+                                viewModel = viewModel,
+                                onScanDocument = onScanDocument,
+                                onUploadPhotos = onUploadPhotos
+                            )
                         }
                     }
                     "self_service" -> {
@@ -666,16 +1074,15 @@ fun TimeTrackerApp(
                 }
             }
 
-            val isKeyboardVisible = WindowInsets.ime.asPaddingValues().calculateBottomPadding() > 50.dp
-
-            if (!isKeyboardVisible) {
-                // Custom Styled Bottom Navigation Bar (Cyber Indore Cycling Theme)
-                MainNavigationBar(
-                    currentScreen = currentScreen,
-                    userRole = currentUserRole,
-                    pendingCount = filteredPendingLogs.size,
-                    onTabSelected = { viewModel.currentScreen.value = it }
-                )
+                if (!isLandscape && !isKeyboardVisible) {
+                    // Custom Styled Bottom Navigation Bar (Cyber Indore Cycling Theme)
+                    MainNavigationBar(
+                        currentScreen = currentScreen,
+                        userRole = currentUserRole,
+                        pendingCount = filteredPendingLogs.size,
+                        onTabSelected = { viewModel.currentScreen.value = it }
+                    )
+                }
             }
         }
 
@@ -709,7 +1116,7 @@ fun TimeTrackerApp(
                                 Icon(
                                     imageVector = Icons.Default.CalendarMonth,
                                     contentDescription = null,
-                                    tint = Color.White,
+                                    tint = com.example.ui.theme.AppTextColor,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -726,14 +1133,14 @@ fun TimeTrackerApp(
                                     text = activeNotif.title,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                             }
                             IconButton(onClick = { viewModel.dismissActiveSimulatedNotification() }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Close",
-                                    tint = Color.White.copy(alpha = 0.5f)
+                                    tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
                                 )
                             }
                         }
@@ -744,14 +1151,14 @@ fun TimeTrackerApp(
                             Icon(
                                 imageVector = Icons.Default.Schedule,
                                 contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.4f),
+                                tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "${activeNotif.date} at ${activeNotif.time}",
                                 fontSize = 12.sp,
-                                color = Color.White.copy(alpha = 0.7f)
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f)
                             )
                         }
                         
@@ -760,7 +1167,7 @@ fun TimeTrackerApp(
                             Text(
                                 text = activeNotif.description,
                                 fontSize = 11.sp,
-                                color = Color.White.copy(alpha = 0.5f)
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
                             )
                         }
                         
@@ -780,7 +1187,7 @@ fun TimeTrackerApp(
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4))
                             ) {
-                                Text("Open Calendar", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("Open Calendar", color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -845,7 +1252,7 @@ fun LoginScreen(
             text = "SHIFT HR",
             fontSize = 28.sp,
             fontWeight = FontWeight.Black,
-            color = Color.White,
+            color = com.example.ui.theme.AppTextColor,
             letterSpacing = 2.sp,
             textAlign = TextAlign.Center
         )
@@ -917,7 +1324,7 @@ fun LoginScreen(
                     text = if (isRegisterMode) "CREATE NEW COMPLIANCE TENANT" else "UNLEASH SECURE SESSION",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = com.example.ui.theme.AppTextColor,
                     letterSpacing = 1.sp
                 )
 
@@ -956,7 +1363,7 @@ fun LoginScreen(
                     )
 
                     // Role selector dropdown simulation
-                    Text("Select Corporate Tier / Role:", color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp)
+                    Text("Select Corporate Tier / Role:", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f), fontSize = 11.sp)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -1040,7 +1447,7 @@ fun LoginScreen(
                             Icon(
                                 imageVector = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                 contentDescription = null,
-                                tint = Color.White.copy(alpha = 0.6f)
+                                tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                             )
                         }
                     },
@@ -1116,7 +1523,7 @@ fun LoginScreen(
             text = "DEMO ACCOUNTS (TAP TO FILL)",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = Color.White.copy(alpha = 0.5f),
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
             letterSpacing = 1.5.sp,
             modifier = Modifier.padding(bottom = 12.dp)
         )
@@ -1154,7 +1561,7 @@ fun LoginScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column {
-                            Text(text = label, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                            Text(text = label, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                             Text(text = "User: $u | Pass: $p", fontSize = 10.sp, color = Color(0xFF00E5FF))
                         }
                         Icon(
@@ -1226,7 +1633,7 @@ fun HeaderBar(
                     text = displayName,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,
-                    color = Color.White,
+                    color = com.example.ui.theme.AppTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1263,7 +1670,7 @@ fun HeaderBar(
                     Text(
                         text = if (isOffline) "Offline" else "Online",
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -1337,12 +1744,25 @@ fun NotificationsSection(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 16.dp)
     ) {
-        val latest = notifications.first()
-        val isSecurityCheck = latest.title.equals("SECURITY CHECK", ignoreCase = true)
+        val originalLatest = notifications.first()
+        val latest = if (originalLatest.message == "Ready for secure login. Select a role to get started.") {
+            originalLatest.copy(
+                title = "SECURITY SHIELD",
+                message = "All chat channels end-to-end encrypted",
+                isAlert = false
+            )
+        } else {
+            originalLatest
+        }
+        val isSecurityCheck = latest.title.equals("SECURITY CHECK", ignoreCase = true) || latest.title.equals("SECURITY SHIELD", ignoreCase = true)
         
-        val containerColor = if (isSecurityCheck) {
+        val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+        
+        val containerColor = if (isLightTheme) {
+            Color(0xE6FFFFFF) // Soft white translucent background
+        } else if (isSecurityCheck) {
             Color(0xFF041E15) // Deep rich green forest background
         } else if (latest.isAlert) {
             Color(0xFF3B1D22)
@@ -1350,7 +1770,9 @@ fun NotificationsSection(
             Color(0xFF1D352F)
         }
         
-        val borderColor = if (isSecurityCheck) {
+        val borderColor = if (isLightTheme) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+        } else if (isSecurityCheck) {
             Color(0xFF00FF88).copy(alpha = 0.5f) // Bright lime neon border
         } else if (latest.isAlert) {
             Color(0xFFF43F5E).copy(alpha = 0.4f)
@@ -1358,7 +1780,9 @@ fun NotificationsSection(
             Color(0xFF10B981).copy(alpha = 0.4f)
         }
         
-        val titleColor = if (isSecurityCheck) {
+        val titleColor = if (isLightTheme) {
+            if (latest.isAlert) Color(0xFFC53030) else Color(0xFF1A202C) // Bold charcoal text (#1A202C) for alert contents
+        } else if (isSecurityCheck) {
             Color(0xFFCCFF00) // Lime yellow/green
         } else if (latest.isAlert) {
             Color(0xFFFFA5B5)
@@ -1366,13 +1790,17 @@ fun NotificationsSection(
             Color(0xFFCCFF00)
         }
         
-        val messageColor = if (isSecurityCheck) {
+        val messageColor = if (isLightTheme) {
+            Color(0xFF2D3748) // Crisp dark slate gray (#2D3748)
+        } else if (isSecurityCheck) {
             Color(0xFFCCFF00).copy(alpha = 0.85f)
         } else {
             Color.White.copy(alpha = 0.9f)
         }
         
-        val iconTint = if (isSecurityCheck) {
+        val iconTint = if (isLightTheme) {
+            if (latest.isAlert) Color(0xFFE53E3E) else MaterialTheme.colorScheme.primary
+        } else if (isSecurityCheck) {
             Color(0xFFCCFF00) // Lime yellow/green bell
         } else if (latest.isAlert) {
             Color(0xFFF43F5E)
@@ -1448,7 +1876,7 @@ fun NotificationsSection(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Dismiss",
-                            tint = Color.White,
+                            tint = com.example.ui.theme.AppTextColor,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -1467,123 +1895,204 @@ fun MainNavigationBar(
 ) {
     val isStaff = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
     val primaryColor = MaterialTheme.colorScheme.primary
+    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
 
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        contentColor = primaryColor,
-        modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
-        NavigationBarItem(
-            selected = currentScreen == "clock",
-            onClick = { onTabSelected("clock") },
-            icon = { Icon(Icons.Outlined.Timer, contentDescription = "Clock", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_clock")
-        )
+        androidx.compose.material3.Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp),
+            shape = RoundedCornerShape(20.dp),
+            color = if (isLightTheme) Color(0xE6FFFFFF) else Color(0xCC0F172A), // Sleek Frosted glass look
+            border = BorderStroke(1.dp, if (isLightTheme) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.1f)),
+            shadowElevation = 8.dp
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val navItems = mutableListOf(
+                    Triple("clock", Icons.Outlined.Timer, "Clock"),
+                    Triple("spreadsheet", Icons.Outlined.Leaderboard, "Stats"),
+                    Triple("chat", Icons.Outlined.ChatBubbleOutline, "Chat")
+                )
+                if (isStaff) {
+                    navItems.add(Triple("hr_approval", Icons.Outlined.FactCheck, "Approvals"))
+                }
+                navItems.add(Triple("saas_hub", Icons.Outlined.Hub, "SaaS Hub"))
+                navItems.add(Triple("holidays", Icons.Outlined.CalendarMonth, "Holidays"))
+                navItems.add(Triple("settings", Icons.Outlined.Settings, "Settings"))
 
-        NavigationBarItem(
-            selected = currentScreen == "spreadsheet",
-            onClick = { onTabSelected("spreadsheet") },
-            icon = { Icon(Icons.Outlined.Leaderboard, contentDescription = "Stats", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_spreadsheet")
-        )
-
-        NavigationBarItem(
-            selected = currentScreen == "chat",
-            onClick = { onTabSelected("chat") },
-            icon = { Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Chat", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_chat")
-        )
-
-        if (isStaff) {
-            NavigationBarItem(
-                selected = currentScreen == "hr_approval",
-                onClick = { onTabSelected("hr_approval") },
-                icon = {
-                    BadgedBox(
-                        badge = {
-                            if (pendingCount > 0) {
-                                Badge(containerColor = Color(0xFFF43F5E)) {
-                                    Text(pendingCount.toString(), color = Color.White)
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(Icons.Outlined.FactCheck, contentDescription = "Approvals", modifier = Modifier.size(24.dp))
+                navItems.forEach { (route, icon, label) ->
+                    val isSelected = when (route) {
+                        "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
+                        else -> currentScreen == route
                     }
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.Black,
-                    selectedTextColor = primaryColor,
-                    indicatorColor = primaryColor,
-                    unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                    unselectedTextColor = Color.White.copy(alpha = 0.7f)
-                ),
-                modifier = Modifier.testTag("tab_hr_approval")
-            )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clickable(
+                                onClick = { onTabSelected(route) },
+                                indication = androidx.compose.foundation.LocalIndication.current,
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            )
+                            .testTag("tab_$route"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            if (route == "hr_approval") {
+                                BadgedBox(
+                                    badge = {
+                                        if (pendingCount > 0) {
+                                            Badge(containerColor = Color(0xFFF43F5E)) {
+                                                Text(pendingCount.toString(), color = Color.White, fontSize = 9.sp)
+                                            }
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = label,
+                                        tint = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
+                            } else {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            Text(
+                                text = label,
+                                fontSize = 9.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
 
-        NavigationBarItem(
-            selected = currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant",
-            onClick = { onTabSelected("saas_hub") },
-            icon = { Icon(Icons.Outlined.Hub, contentDescription = "SaaS Hub", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_saas_hub")
-        )
+@Composable
+fun MainNavigationRail(
+    currentScreen: String,
+    userRole: String,
+    pendingCount: Int,
+    onTabSelected: (String) -> Unit
+) {
+    val isStaff = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
 
-        NavigationBarItem(
-            selected = currentScreen == "holidays",
-            onClick = { onTabSelected("holidays") },
-            icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = "Holidays", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_holidays")
-        )
+    androidx.compose.material3.Surface(
+        modifier = Modifier
+            .fillMaxHeight()
+            .width(80.dp),
+        color = if (isLightTheme) Color(0xE6FFFFFF) else Color(0xCC0F172A), // Sleek Frosted glass look
+        border = BorderStroke(1.dp, if (isLightTheme) Color.Black.copy(alpha = 0.08f) else Color.White.copy(alpha = 0.1f)),
+        shadowElevation = 8.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            val navItems = mutableListOf(
+                Triple("clock", Icons.Outlined.Timer, "Clock"),
+                Triple("spreadsheet", Icons.Outlined.Leaderboard, "Stats"),
+                Triple("chat", Icons.Outlined.ChatBubbleOutline, "Chat")
+            )
+            if (isStaff) {
+                navItems.add(Triple("hr_approval", Icons.Outlined.FactCheck, "Approvals"))
+            }
+            navItems.add(Triple("saas_hub", Icons.Outlined.Hub, "SaaS Hub"))
+            navItems.add(Triple("holidays", Icons.Outlined.CalendarMonth, "Holidays"))
+            navItems.add(Triple("settings", Icons.Outlined.Settings, "Settings"))
 
-        NavigationBarItem(
-            selected = currentScreen == "settings",
-            onClick = { onTabSelected("settings") },
-            icon = { Icon(Icons.Outlined.Settings, contentDescription = "Settings", modifier = Modifier.size(24.dp)) },
-            colors = NavigationBarItemDefaults.colors(
-                selectedIconColor = Color.Black,
-                selectedTextColor = primaryColor,
-                indicatorColor = primaryColor,
-                unselectedIconColor = Color.White.copy(alpha = 0.7f),
-                unselectedTextColor = Color.White.copy(alpha = 0.7f)
-            ),
-            modifier = Modifier.testTag("tab_settings")
-        )
+            navItems.forEach { (route, icon, label) ->
+                val isSelected = when (route) {
+                    "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
+                    else -> currentScreen == route
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .clickable(
+                            onClick = { onTabSelected(route) },
+                            indication = androidx.compose.foundation.LocalIndication.current,
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                        )
+                        .testTag("tab_$route"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        if (route == "hr_approval") {
+                            BadgedBox(
+                                badge = {
+                                    if (pendingCount > 0) {
+                                        Badge(containerColor = Color(0xFFF43F5E)) {
+                                            Text(pendingCount.toString(), color = Color.White, fontSize = 9.sp)
+                                        }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = label,
+                                    tint = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = label,
+                            fontSize = 9.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) primaryColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -1640,7 +2149,7 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                         text = currentWeather?.name ?: "Loading...",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = com.example.ui.theme.AppTextColor
                     )
                 }
 
@@ -1649,21 +2158,26 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+                    val containerBg = if (isLightMode) Color(0xFFF1F5F9) else Color.White.copy(alpha = 0.05f)
+                    val placeholderColor = if (isLightMode) Color(0xFF4A5568) else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
+                    val unfocusedBorder = if (isLightMode) Color.Black.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.1f)
+
                     OutlinedTextField(
                         value = cityInput,
                         onValueChange = { cityInput = it },
-                        placeholder = { Text("Search city", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f)) },
+                        placeholder = { Text("Search city", fontSize = 11.sp, color = placeholderColor) },
                         modifier = Modifier
                             .width(110.dp)
                             .height(44.dp),
                         singleLine = true,
-                        textStyle = TextStyle(fontSize = 11.sp, color = Color.White),
+                        textStyle = TextStyle(fontSize = 11.sp, color = com.example.ui.theme.AppTextColor),
                         shape = RoundedCornerShape(12.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.1f),
-                            focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                            unfocusedContainerColor = Color.Black.copy(alpha = 0.2f)
+                            unfocusedBorderColor = unfocusedBorder,
+                            focusedContainerColor = containerBg,
+                            unfocusedContainerColor = containerBg
                         ),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
@@ -1716,7 +2230,7 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                                     text = "${weather.main.temp.toInt()}",
                                     fontSize = 48.sp,
                                     fontWeight = FontWeight.Light,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                                 Text(
                                     text = "°C",
@@ -1730,13 +2244,13 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                                 text = weather.weather.firstOrNull()?.description?.uppercase() ?: "CLEAR SKY",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.6f),
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
                                 letterSpacing = 1.sp
                             )
                             Text(
                                 text = "Feels like ${weather.main.feelsLike.toInt()}°C  •  H: ${weather.main.tempMax.toInt()}° L: ${weather.main.tempMin.toInt()}°",
                                 fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.4f),
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                         }
@@ -1770,20 +2284,20 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Air, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Text("WIND", fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.wind.speed} m/s", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("WIND", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
+                            Text("${weather.wind.speed} m/s", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                         }
                         Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.08f)).align(Alignment.CenterVertically))
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.WaterDrop, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp))
-                            Text("HUMIDITY", fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.main.humidity}%", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("HUMIDITY", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
+                            Text("${weather.main.humidity}%", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                         }
                         Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.08f)).align(Alignment.CenterVertically))
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             Icon(Icons.Default.Compress, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(14.dp))
-                            Text("PRESSURE", fontSize = 8.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.main.pressure} hPa", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("PRESSURE", fontSize = 8.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.padding(top = 2.dp))
+                            Text("${weather.main.pressure} hPa", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                         }
                     }
 
@@ -1820,7 +2334,7 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                                 text = recText,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.85f),
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.85f),
                                 lineHeight = 12.sp
                             )
                         }
@@ -1834,7 +2348,7 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                         text = "3-HOUR SHIFT TEMPERATURES",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color.White.copy(alpha = 0.4f),
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                         letterSpacing = 1.sp,
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
@@ -1860,11 +2374,11 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                                 contentAlignment = Alignment.Center
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = timeStr, fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f))
+                                    Text(text = timeStr, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Icon(fIcon, contentDescription = null, tint = fColor, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = "$temp°", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(text = "$temp°", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                                 }
                             }
                         }
@@ -2005,14 +2519,14 @@ fun EmployeeClockScreen(
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Black,
                             fontSize = 38.sp,
-                            color = Color.White,
+                            color = com.example.ui.theme.AppTextColor,
                             modifier = Modifier.testTag("live_clock_timer")
                         )
                         Text(
                             text = "ELAPSED SHIFT HOURS",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White.copy(alpha = 0.3f),
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f),
                             letterSpacing = 1.sp,
                             modifier = Modifier.padding(top = 2.dp)
                         )
@@ -2047,12 +2561,12 @@ fun EmployeeClockScreen(
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "SHIFT TARGET", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text(text = "${shiftConfig.shiftDurationHours} HOURS", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color.White)
+                        Text(text = "SHIFT TARGET", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text(text = "${shiftConfig.shiftDurationHours} HOURS", fontWeight = FontWeight.Black, fontSize = 13.sp, color = com.example.ui.theme.AppTextColor)
                     }
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.08f)))
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "HOURLY PAY", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text(text = "HOURLY PAY", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                         Text(text = "${viewModel.getCurrencySymbol()}${shiftConfig.hourlyRate} / HR", fontWeight = FontWeight.Black, fontSize = 13.sp, color = Color(0xFF38BDF8))
                     }
                 }
@@ -2092,12 +2606,12 @@ fun EmployeeClockScreen(
                             text = todayHoliday.name,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
-                            color = Color.White
+                            color = com.example.ui.theme.AppTextColor
                         )
                         Text(
                             text = todayHoliday.description,
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.7f)
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -2152,12 +2666,12 @@ fun EmployeeClockScreen(
                                         text = "Today is ${bday.name}'s Birthday! 🎂",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = Color.White
+                                        color = com.example.ui.theme.AppTextColor
                                     )
                                     Text(
                                         text = "Role: ${bday.role} | Tap to send warm Indore wishes!",
                                         fontSize = 11.sp,
-                                        color = Color.White.copy(alpha = 0.6f)
+                                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                                     )
                                 }
                                 Button(
@@ -2170,9 +2684,9 @@ fun EmployeeClockScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier.height(32.dp).testTag("wish_birthday_${bday.name.lowercase().replace(" ", "_")}")
                                 ) {
-                                    Icon(Icons.Default.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                    Icon(Icons.Default.Send, contentDescription = null, tint = com.example.ui.theme.AppTextColor, modifier = Modifier.size(12.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("WISH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("WISH", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                                 }
                             }
                         }
@@ -2184,7 +2698,7 @@ fun EmployeeClockScreen(
                             text = "UPCOMING REMINDERS",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color.White.copy(alpha = 0.4f),
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                             letterSpacing = 0.5.sp,
                             modifier = Modifier.padding(bottom = 6.dp)
                         )
@@ -2204,7 +2718,7 @@ fun EmployeeClockScreen(
                                         .padding(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = bday.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Text(text = bday.name, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                                         Text(text = "${bday.dateStr} (${bday.daysUntil}d)", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
@@ -2220,7 +2734,7 @@ fun EmployeeClockScreen(
             text = "CHRONO INTERCEPT PUNCHES",
             fontWeight = FontWeight.Black,
             fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.4f),
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
             letterSpacing = 1.5.sp,
             modifier = Modifier.align(Alignment.Start).padding(start = 4.dp, bottom = 12.dp)
         )
@@ -2373,7 +2887,7 @@ fun PunchButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.2f),
+                        tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -2381,7 +2895,7 @@ fun PunchButton(
                         text = text.uppercase(),
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.2f)
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f)
                     )
                 }
             }
@@ -2514,13 +3028,13 @@ fun PunchButton(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = icon, contentDescription = null, tint = com.example.ui.theme.AppTextColor, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = text.uppercase(),
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.sp,
-                        color = Color.White
+                        color = com.example.ui.theme.AppTextColor
                     )
                 }
             }
@@ -2585,7 +3099,7 @@ fun WorkflowTimelineCard(log: TimeLogEntity?, config: ShiftConfigEntity) {
                         Text(
                             text = step.desc,
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.3f)
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f)
                         )
                     }
 
@@ -2601,7 +3115,7 @@ fun WorkflowTimelineCard(log: TimeLogEntity?, config: ShiftConfigEntity) {
                         Text(
                             text = "Pending",
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.2f)
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f)
                         )
                     }
                 }
@@ -2622,7 +3136,7 @@ fun WorkflowTimelineCard(log: TimeLogEntity?, config: ShiftConfigEntity) {
 
             if (log != null && log.isApproved != "PENDING") {
                 Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -2759,7 +3273,7 @@ fun SpreadsheetScreen(
                 text = "EMPLOYEE PRODUCTIVITY PROFILES",
                 fontWeight = FontWeight.Black,
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.4f),
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
             )
@@ -2828,7 +3342,7 @@ fun SpreadsheetScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Decision:", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White.copy(alpha = 0.4f), letterSpacing = 1.sp)
+            Text("Decision:", fontSize = 11.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), letterSpacing = 1.sp)
 
             val appFilters = listOf("ALL", "PENDING", "APPROVED", "REJECTED")
             appFilters.forEach { filter ->
@@ -2871,7 +3385,7 @@ fun SpreadsheetScreen(
                             text = "CHRONO LEDGER (${filteredLogs.size} SHIFTS)",
                             fontWeight = FontWeight.Black,
                             fontSize = 11.sp,
-                            color = Color.White,
+                            color = com.example.ui.theme.AppTextColor,
                             letterSpacing = 1.sp
                         )
                     }
@@ -2891,7 +3405,7 @@ fun SpreadsheetScreen(
                     }
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
 
                 // Table Header
                 Row(
@@ -2901,13 +3415,13 @@ fun SpreadsheetScreen(
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("EMPLOYEE / DATE", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.weight(1.5f))
-                    Text("CHRONO INTERCEPTS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.weight(1.8f))
-                    Text("HOURS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.weight(0.7f), textAlign = TextAlign.End)
-                    Text("STATUS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
+                    Text("EMPLOYEE / DATE", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.weight(1.5f))
+                    Text("CHRONO INTERCEPTS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.weight(1.8f))
+                    Text("HOURS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.weight(0.7f), textAlign = TextAlign.End)
+                    Text("STATUS", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.weight(1.2f), textAlign = TextAlign.End)
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
 
                 if (filteredLogs.isEmpty()) {
                     Box(
@@ -2917,9 +3431,9 @@ fun SpreadsheetScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Color.White.copy(alpha = 0.1f), modifier = Modifier.size(40.dp))
+                            Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.1f), modifier = Modifier.size(40.dp))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("No work sessions registered.", fontSize = 12.sp, color = Color.White.copy(alpha = 0.3f))
+                            Text("No work sessions registered.", fontSize = 12.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f))
                         }
                     }
                 } else {
@@ -2930,7 +3444,7 @@ fun SpreadsheetScreen(
                                 shiftConfig = shiftConfig,
                                 onClick = { onRowClick(log) }
                             )
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.04f))
+                            HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.04f))
                         }
                     }
                 }
@@ -2970,14 +3484,14 @@ fun SpreadsheetRow(
                 text = log.employeeName,
                 fontWeight = FontWeight.Bold,
                 fontSize = 12.sp,
-                color = Color.White,
+                color = com.example.ui.theme.AppTextColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = log.date,
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.4f)
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)
             )
         }
 
@@ -2987,7 +3501,7 @@ fun SpreadsheetRow(
                 text = "In: ${formatTimestamp(log.timeIn)}",
                 fontSize = 10.sp,
                 fontFamily = FontFamily.Monospace,
-                color = Color.White.copy(alpha = 0.8f)
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.8f)
             )
             Text(
                 text = "Out: ${formatTimestamp(log.timeOut)}",
@@ -3097,7 +3611,7 @@ fun DashboardMetricCard(
                     text = title,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Black,
-                    color = Color.White.copy(alpha = 0.4f),
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                     letterSpacing = 0.5.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -3109,7 +3623,7 @@ fun DashboardMetricCard(
                 text = value,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White
+                color = com.example.ui.theme.AppTextColor
             )
         }
     }
@@ -3135,8 +3649,8 @@ fun AdminApprovalScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(48.dp))
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("RESTRICTED MODULE", fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Only HR, Managers, or Supervisors can authorize punches.", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f))
+                Text("RESTRICTED MODULE", fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
+                Text("Only HR, Managers, or Supervisors can authorize punches.", fontSize = 12.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
             }
         }
         return
@@ -3169,8 +3683,8 @@ fun AdminApprovalScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(Icons.Default.TaskAlt, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("No pending timesheets left for review!", fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("All employee timesheets are cleared.", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("No pending timesheets left for review!", fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
+                        Text("All employee timesheets are cleared.", fontSize = 12.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                 }
             } else {
@@ -3191,7 +3705,7 @@ fun AdminApprovalScreen(
         } else {
             if (allLogs.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No records found in database.", color = Color.White.copy(alpha = 0.4f))
+                    Text("No records found in database.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                 }
             } else {
                 LazyColumn(
@@ -3241,8 +3755,8 @@ fun PendingApprovalItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
-                    Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 15.sp, color = Color.White)
-                    Text(text = "Date: ${log.date}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 15.sp, color = com.example.ui.theme.AppTextColor)
+                    Text(text = "Date: ${log.date}", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                 }
                 Box(
                     modifier = Modifier
@@ -3262,20 +3776,20 @@ fun PendingApprovalItem(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text(text = "TIME IN", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                    Text(text = formatTimestamp(log.timeIn), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                    Text(text = "TIME IN", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                    Text(text = formatTimestamp(log.timeIn), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
                 Column {
-                    Text(text = "LUNCH TIME", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                    Text(text = "LUNCH TIME", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                     val lunchMins = if (log.lunchOut != null && log.lunchIn != null) (log.lunchIn - log.lunchOut) / 60000 else 0
-                    Text(text = "${lunchMins}M", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                    Text(text = "${lunchMins}M", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
                 Column {
-                    Text(text = "TIME OUT", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                    Text(text = formatTimestamp(log.timeOut), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                    Text(text = "TIME OUT", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                    Text(text = formatTimestamp(log.timeOut), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(text = "CALCULATED", fontSize = 9.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                    Text(text = "CALCULATED", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                     Text(text = "${df.format(hours)} HRS", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFFCCFF00))
                 }
             }
@@ -3302,7 +3816,7 @@ fun PendingApprovalItem(
             }
 
             Spacer(modifier = Modifier.height(14.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
             Spacer(modifier = Modifier.height(12.dp))
 
             // Action row
@@ -3328,7 +3842,7 @@ fun PendingApprovalItem(
                     contentPadding = PaddingValues(horizontal = 14.dp),
                     modifier = Modifier.height(34.dp).testTag("reject_log_action")
                 ) {
-                    Text("Reject", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    Text("Reject", fontSize = 12.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
                 }
 
                 Button(
@@ -3338,7 +3852,7 @@ fun PendingApprovalItem(
                     contentPadding = PaddingValues(horizontal = 14.dp),
                     modifier = Modifier.height(34.dp).testTag("approve_log_action")
                 ) {
-                    Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
                 }
             }
         }
@@ -3366,8 +3880,8 @@ fun AuditHistoryItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = log.employeeName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
-                Text(text = "${log.date} | Decision: ${log.isApproved}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                Text(text = log.employeeName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = com.example.ui.theme.AppTextColor)
+                Text(text = "${log.date} | Decision: ${log.isApproved}", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                 if (log.rejectionReason != null) {
                     Text(
                         text = "Policy Infraction: ${log.rejectionReason}",
@@ -3427,7 +3941,7 @@ fun LocalHolidayCalendarScreen(
                 .padding(bottom = 16.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color(0xFFCCFF00).copy(alpha = 0.15f))
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
         ) {
             Column(
                 modifier = Modifier
@@ -3438,7 +3952,7 @@ fun LocalHolidayCalendarScreen(
                     Icon(
                         imageVector = Icons.Default.EventAvailable,
                         contentDescription = null,
-                        tint = Color(0xFFCCFF00),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
@@ -3447,14 +3961,14 @@ fun LocalHolidayCalendarScreen(
                             text = "CHRONO CALENDAR HUB",
                             fontWeight = FontWeight.Black,
                             fontSize = 10.sp,
-                            color = Color(0xFFCCFF00),
+                            color = MaterialTheme.colorScheme.primary,
                             letterSpacing = 1.5.sp
                         )
                         Text(
                             text = "Interactive Calendar & Notes",
                             fontWeight = FontWeight.Black,
                             fontSize = 16.sp,
-                            color = Color.White
+                            color = com.example.ui.theme.AppTextColor
                         )
                     }
                 }
@@ -3463,7 +3977,7 @@ fun LocalHolidayCalendarScreen(
                 Text(
                     text = "Timesheet integration honors gazetted Indian national holidays, state local holidays, and custom employee notes. Set reminders with Google Calendar style notifications!",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.5f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
                 )
 
                 if (todayHoliday != null) {
@@ -3471,14 +3985,14 @@ fun LocalHolidayCalendarScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color(0xFFCCFF00).copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color(0xFFCCFF00), RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
                             .padding(12.dp)
                     ) {
                         Text(
                             text = "ACTIVE CELEBRATION: Today is ${todayHoliday.name}! Premium holiday compensation is active.",
                             fontSize = 11.sp,
-                            color = Color(0xFFCCFF00),
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3506,7 +4020,7 @@ fun LocalHolidayCalendarScreen(
                         text = "JUNE 2026",
                         fontWeight = FontWeight.Black,
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = com.example.ui.theme.AppTextColor,
                         letterSpacing = 1.sp
                     )
                     Text(
@@ -3528,7 +4042,7 @@ fun LocalHolidayCalendarScreen(
                             modifier = Modifier.weight(1f),
                             textAlign = TextAlign.Center,
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.4f),
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -3565,12 +4079,12 @@ fun LocalHolidayCalendarScreen(
                                             when {
                                                 isSelected -> MaterialTheme.colorScheme.primary
                                                 dayNum == 29 -> MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) // highlight today
-                                                else -> Color.White.copy(alpha = 0.02f)
+                                                else -> com.example.ui.theme.AppTextColor.copy(alpha = 0.03f)
                                             }
                                         )
                                         .border(
                                             1.dp,
-                                            if (isSelected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.04f),
+                                            if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.08f),
                                             RoundedCornerShape(10.dp)
                                         )
                                         .clickable { selectedDay = dayNum }
@@ -3582,7 +4096,7 @@ fun LocalHolidayCalendarScreen(
                                             text = dayNum.toString(),
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected || dayNum == 29) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (isSelected) Color.Black else Color.White
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else com.example.ui.theme.AppTextColor
                                         )
                                         
                                         // Indicator Dots
@@ -3595,7 +4109,7 @@ fun LocalHolidayCalendarScreen(
                                                     modifier = Modifier
                                                         .size(4.dp)
                                                         .clip(RoundedCornerShape(2.dp))
-                                                        .background(if (isSelected) Color.Black else Color(0xFFCCFF00))
+                                                        .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary)
                                                 )
                                                 Spacer(modifier = Modifier.width(2.dp))
                                             }
@@ -3604,7 +4118,7 @@ fun LocalHolidayCalendarScreen(
                                                     modifier = Modifier
                                                         .size(4.dp)
                                                         .clip(RoundedCornerShape(2.dp))
-                                                        .background(if (isSelected) Color.Black else Color(0xFFE879F9))
+                                                        .background(if (isSelected) MaterialTheme.colorScheme.onPrimary else Color(0xFFE879F9))
                                                 )
                                             }
                                         }
@@ -3626,7 +4140,7 @@ fun LocalHolidayCalendarScreen(
             text = "AGENDA FOR %02d JUNE 2026".format(selectedDay),
             fontWeight = FontWeight.Black,
             fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.4f),
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
             letterSpacing = 1.5.sp,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -3685,7 +4199,7 @@ fun LocalHolidayCalendarScreen(
                                         else -> "Rest Day • Off-Duty Weekend Policy"
                                     },
                                     fontSize = 10.sp,
-                                    color = Color.White.copy(alpha = 0.6f)
+                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                                 )
                             }
                         }
@@ -3714,12 +4228,12 @@ fun LocalHolidayCalendarScreen(
                                     text = holidayForSelectedDay.name,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                                 Text(
                                     text = "Regional Gazette: ${holidayForSelectedDay.description}",
                                     fontSize = 10.sp,
-                                    color = Color.White.copy(alpha = 0.6f)
+                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                                 )
                             }
                         }
@@ -3738,14 +4252,14 @@ fun LocalHolidayCalendarScreen(
                         Icon(
                             imageVector = Icons.Default.EventNote,
                             contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.2f),
+                            tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
                             modifier = Modifier.size(32.dp)
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "No notes or events scheduled for this day.",
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.4f)
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)
                         )
                     }
                 } else {
@@ -3765,7 +4279,7 @@ fun LocalHolidayCalendarScreen(
                                             text = note.title,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp,
-                                            color = Color.White
+                                            color = com.example.ui.theme.AppTextColor
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
@@ -3780,7 +4294,7 @@ fun LocalHolidayCalendarScreen(
                                         Text(
                                             text = note.description,
                                             fontSize = 11.sp,
-                                            color = Color.White.copy(alpha = 0.5f)
+                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
                                         )
                                     }
                                     if (note.syncWithGoogleCalendar) {
@@ -3807,7 +4321,7 @@ fun LocalHolidayCalendarScreen(
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete note",
-                                        tint = Color.White.copy(alpha = 0.3f),
+                                        tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.3f),
                                         modifier = Modifier.size(18.dp)
                                     )
                                 }
@@ -3823,7 +4337,7 @@ fun LocalHolidayCalendarScreen(
             text = "SCHEDULE AN INDORE CHRONO REMINDER",
             fontWeight = FontWeight.Black,
             fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.4f),
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f),
             letterSpacing = 1.5.sp,
             modifier = Modifier.padding(bottom = 8.dp)
         )
@@ -3841,7 +4355,7 @@ fun LocalHolidayCalendarScreen(
                     text = "Add Event Note",
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = Color.White
+                    color = com.example.ui.theme.AppTextColor
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -3911,12 +4425,12 @@ fun LocalHolidayCalendarScreen(
                             text = "Notify Me Google Calendar Style",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
+                            color = com.example.ui.theme.AppTextColor
                         )
                         Text(
                             text = "Triggers an instant simulated notification banner",
                             fontSize = 9.sp,
-                            color = Color.White.copy(alpha = 0.5f)
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f)
                         )
                     }
                 }
@@ -3979,7 +4493,7 @@ fun SettingsScreen(
     if (isWipeConfirmOpen) {
         AlertDialog(
             onDismissRequest = { isWipeConfirmOpen = false },
-            title = { Text("Purge Database?", color = Color.White) },
+            title = { Text("Purge Database?", color = com.example.ui.theme.AppTextColor) },
             text = { Text("Are you sure you want to delete all work sessions? This is completely irreversible.") },
             confirmButton = {
                 Button(
@@ -3989,7 +4503,7 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Purge Everything", color = Color.White)
+                    Text("Purge Everything", color = com.example.ui.theme.AppTextColor)
                 }
             },
             dismissButton = {
@@ -4027,7 +4541,7 @@ fun SettingsScreen(
                 Text(
                     text = "Transform your Shift HR interface with Apple-inspired fluid glass aesthetics. Comfort-optimized.",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -4087,7 +4601,7 @@ fun SettingsScreen(
                                     text = theme.name,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                                 
                                 Text(
@@ -4106,22 +4620,34 @@ fun SettingsScreen(
 
         // Warning/Alert block if not Admin/HR
         if (!isAuthorized) {
+            val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF3B1D22)),
-                border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.3f))
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isLightMode) Color(0xFFFFF1F2) else Color(0xFF2D161A)
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = Color(0xFFF43F5E).copy(alpha = 0.3f)
+                )
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(24.dp))
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color(0xFFF43F5E),
+                        modifier = Modifier.size(24.dp)
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Viewing Profile Only. Admin/HR role is required to modify pay scales or shift goals.",
                         fontSize = 11.sp,
-                        color = Color.White
+                        fontWeight = FontWeight.Medium,
+                        color = if (isLightMode) Color(0xFF9F1239) else Color(0xFFFDA4AF)
                     )
                 }
             }
@@ -4132,15 +4658,15 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+            border = BorderStroke(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("EMPLOYEE PROFILE IDENTITY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                Text("EMPLOYEE PROFILE IDENTITY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "This sets the target name used for attendance logs in this administrative testing environment. Logged-in regular employees are automatically synced with their own names.",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
@@ -4151,8 +4677,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().testTag("profile_name_input"),
                     enabled = isAuthorized,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFCCFF00),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.12f)
                     )
                 )
             }
@@ -4163,19 +4689,19 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+            border = BorderStroke(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
         ) {
             Column(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Column {
-                    Text("SHIFT RULE THRESHOLDS", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                    Text("SHIFT RULE THRESHOLDS", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Operational guardrails used to evaluate attendance compliance, validate active working hours, trigger lunch/break alarms, and calculate base wages.",
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                     )
                 }
 
@@ -4188,8 +4714,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().testTag("shift_hours_input"),
                     enabled = isAuthorized,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFCCFF00),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.12f)
                     )
                 )
 
@@ -4202,8 +4728,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().testTag("lunch_mins_input"),
                     enabled = isAuthorized,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFCCFF00),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.12f)
                     )
                 )
 
@@ -4216,8 +4742,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().testTag("break_mins_input"),
                     enabled = isAuthorized,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFCCFF00),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.12f)
                     )
                 )
 
@@ -4230,8 +4756,8 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth().testTag("pay_rate_input"),
                     enabled = isAuthorized,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFFCCFF00),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.12f)
                     )
                 )
             }
@@ -4243,21 +4769,21 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+            border = BorderStroke(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "DAILY SCHEDULE RECURRENCE",
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp,
-                    color = Color(0xFFCCFF00),
+                    color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Configure work schedule cycle limits (Weekly, 15 Days, or Monthly). Available to Supervisors and Department Managers only.",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -4271,8 +4797,8 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) Color(0xFFCCFF00).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f))
-                                .border(1.dp, if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else com.example.ui.theme.AppTextColor.copy(alpha = 0.04f))
+                                .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
                                 .clickable {
                                     if (isScheduleAuthorized) {
                                         viewModel.currentScheduleType.value = option
@@ -4287,7 +4813,7 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 text = option,
-                                color = if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.6f),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -4320,21 +4846,21 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+            border = BorderStroke(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "REGIONAL CURRENCY",
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp,
-                    color = Color(0xFFCCFF00),
+                    color = MaterialTheme.colorScheme.primary,
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = "Toggle currency preferences between US Dollar ($) and Philippines Peso (₱) for payroll, wage calculations, and claims.",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.6f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -4348,8 +4874,8 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) Color(0xFFCCFF00).copy(alpha = 0.15f) else Color.White.copy(alpha = 0.04f))
-                                .border(1.dp, if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else com.example.ui.theme.AppTextColor.copy(alpha = 0.04f))
+                                .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
                                 .clickable {
                                     viewModel.selectedCurrency.value = code
                                     viewModel.addNotification("Currency Changed", "Currency display set to $code.", isAlert = false)
@@ -4359,7 +4885,7 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 text = label,
-                                color = if (isSelected) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.6f),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -4373,10 +4899,10 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.04f))
+            border = BorderStroke(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text("SIMULATION & HARDWARE TELEMETRY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
+                Text("SIMULATION & HARDWARE TELEMETRY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -4385,19 +4911,19 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Simulated Offline Mode", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("Lose server connection; caches punches to local room database.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Simulated Offline Mode", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Lose server connection; caches punches to local room database.", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = isOffline,
                         onCheckedChange = onOfflineToggle,
                         modifier = Modifier.testTag("sim_offline_switch"),
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Row(
@@ -4406,20 +4932,20 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Mock GPS Co-Working Verifications", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("Record simulated mock coordinates to verify virtual presence.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Mock GPS Co-Working Verifications", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Record simulated mock coordinates to verify virtual presence.", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = remoteGps,
                         onCheckedChange = { if (isAuthorized) remoteGps = it },
                         modifier = Modifier.testTag("remote_gps_switch"),
                         enabled = isAuthorized,
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- GEOFENCE ADJUSTMENTS ---
@@ -4428,26 +4954,27 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) Color.White else Color.White.copy(alpha = 0.5f))
-                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
+                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontWeight = FontWeight.Bold)
                     }
-                    Text(if (isAuthorized) "Defines boundary around authorized coordinate hubs." else "Defines boundary around authorized coordinate hubs (Only Admin/HR can adjust).", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Text(if (isAuthorized) "Defines boundary around authorized coordinate hubs." else "Defines boundary around authorized coordinate hubs (Only Admin/HR can adjust).", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Slider(
                         value = viewModel.geofenceRadius.value,
                         onValueChange = { if (isAuthorized) viewModel.geofenceRadius.value = it },
                         valueRange = 50f..500f,
                         enabled = isAuthorized,
                         colors = SliderDefaults.colors(
-                            thumbColor = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.2f),
-                            activeTrackColor = if (isAuthorized) Color(0xFFCCFF00) else Color.White.copy(alpha = 0.2f),
-                            disabledThumbColor = Color.White.copy(alpha = 0.2f),
-                            disabledActiveTrackColor = Color.White.copy(alpha = 0.1f)
+                            thumbColor = if (isAuthorized) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
+                            activeTrackColor = if (isAuthorized) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
+                            disabledThumbColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
+                            disabledActiveTrackColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.1f)
                         )
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Column {
@@ -4455,10 +4982,11 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) Color.White else Color.White.copy(alpha = 0.5f))
-                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (!isAuthorized) Color.White.copy(alpha = 0.5f) else if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (!isAuthorized) com.example.ui.theme.AppTextColor.copy(alpha = 0.5f) else if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
                     }
-                    Text(if (isAuthorized) "Drag outward to test Geofence Out-Of-Bounds error logic." else "Drag outward to test Geofence Out-Of-Bounds error logic (Only Admin/HR can adjust).", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                    Text(if (isAuthorized) "Drag outward to test Geofence Out-Of-Bounds error logic." else "Drag outward to test Geofence Out-Of-Bounds error logic (Only Admin/HR can adjust).", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Slider(
                         value = viewModel.simulatedDistance.value,
                         onValueChange = { if (isAuthorized) viewModel.simulatedDistance.value = it },
@@ -4467,14 +4995,14 @@ fun SettingsScreen(
                         colors = SliderDefaults.colors(
                             thumbColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
                             activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
-                            disabledThumbColor = Color.White.copy(alpha = 0.2f),
-                            disabledActiveTrackColor = Color.White.copy(alpha = 0.1f)
+                            disabledThumbColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.2f),
+                            disabledActiveTrackColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.1f)
                         )
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- ONE REGISTERED DEVICE LOCK ---
@@ -4484,13 +5012,13 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("One Registered Device Matcher", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("Authorized ID: ${viewModel.registeredDeviceId.value}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("One Registered Device Matcher", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Authorized ID: ${viewModel.registeredDeviceId.value}", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isDeviceVerificationEnabled.value,
                         onCheckedChange = { viewModel.isDeviceVerificationEnabled.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                     )
                 }
 
@@ -4499,14 +5027,14 @@ fun SettingsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .background(com.example.ui.theme.AppTextColor.copy(alpha = 0.03f), RoundedCornerShape(8.dp))
+                            .border(1.dp, com.example.ui.theme.AppTextColor.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Current Terminal hardware identity", fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f))
+                            Text("Current Terminal hardware identity", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
                             Text(viewModel.currentSimulatedDevice.value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) Color(0xFF10B981) else Color(0xFFF43F5E))
                         }
                         Button(
@@ -4517,17 +5045,17 @@ fun SettingsScreen(
                                     viewModel.currentSimulatedDevice.value = viewModel.registeredDeviceId.value
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f)),
+                            colors = ButtonDefaults.buttonColors(containerColor = com.example.ui.theme.AppTextColor.copy(alpha = 0.1f)),
                             modifier = Modifier.height(30.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
                         ) {
-                            Text(if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) "Simulate Spoof" else "Reset to Match", fontSize = 9.sp, color = Color.White)
+                            Text(if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) "Simulate Spoof" else "Reset to Match", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor)
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- FACE RECOGNITION BIOMETRICS ---
@@ -4537,18 +5065,18 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Secure Face Recognition Biometrics", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("Verify vector points before completing clocks.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Secure Face Recognition Biometrics", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Verify vector points before completing clocks.", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isFaceRecognitionEnabled.value,
                         onCheckedChange = { viewModel.isFaceRecognitionEnabled.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- LIVE FIELD TRACKING ---
@@ -4558,18 +5086,18 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Live Field Location Tracking", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
-                        Text("Push continuous field coords (lat: ${String.format("%.4f", viewModel.liveFieldLat.value)}, lng: ${String.format("%.4f", viewModel.liveFieldLng.value)})", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Live Field Location Tracking", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Push continuous field coords (lat: ${String.format("%.4f", viewModel.liveFieldLat.value)}, lng: ${String.format("%.4f", viewModel.liveFieldLng.value)})", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isLiveLocationTrackingActive.value,
                         onCheckedChange = { viewModel.isLiveLocationTrackingActive.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFCCFF00))
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // --- SUSPICIOUS ATTENDANCE SCANS ---
@@ -4582,8 +5110,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Mock GPS Provider Detection", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
-                        Text("Raise alarm for software-based location spoofing.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Mock GPS Provider Detection", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Raise alarm for software-based location spoofing.", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isMockGpsActive.value,
@@ -4600,8 +5128,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Root / Jailbreak Shield Integrity", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
-                        Text("Fail check entirely if custom binary partitions detected.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Root / Jailbreak Shield Integrity", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Fail check entirely if custom binary partitions detected.", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isRootedActive.value,
@@ -4618,8 +5146,8 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Impossible Travel Time Window", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
-                        Text("Flag logs occurring across 2 remote hubs instantly.", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text("Impossible Travel Time Window", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                        Text("Flag logs occurring across 2 remote hubs instantly.", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     Switch(
                         checked = viewModel.isImpossibleTravelTriggered.value,
@@ -4711,16 +5239,16 @@ fun RetroactiveEditDialog(
                     text = "Edit Lap: ${log.employeeName}",
                     fontWeight = FontWeight.Black,
                     fontSize = 16.sp,
-                    color = Color.White
+                    color = com.example.ui.theme.AppTextColor
                 )
 
                 Text(
                     text = "Manually override checkpoint timestamps below.",
                     fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.4f)
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)
                 )
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
 
                 Text("TIME IN CHECKS (24H)", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color(0xFFCCFF00))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4767,7 +5295,7 @@ fun RetroactiveEditDialog(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("DECISION STATE", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White)
+                    Text("DECISION STATE", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         val decisionStates = listOf("PENDING", "APPROVED", "REJECTED")
                         decisionStates.forEach { state ->
@@ -4787,7 +5315,7 @@ fun RetroactiveEditDialog(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel", color = Color.White.copy(alpha = 0.6f)) }
+                    TextButton(onClick = onDismiss) { Text("Cancel", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)) }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
@@ -4853,7 +5381,7 @@ fun ShiftHRLogo(modifier: Modifier = Modifier) {
         ) {
             Text(
                 text = "S",
-                color = Color.White,
+                color = com.example.ui.theme.AppTextColor,
                 fontSize = 52.sp,
                 fontWeight = FontWeight.Black,
                 fontFamily = FontFamily.SansSerif,
@@ -4911,7 +5439,7 @@ fun MiniShiftLogo(modifier: Modifier = Modifier) {
         }
         Text(
             text = "S",
-            color = Color.White,
+            color = com.example.ui.theme.AppTextColor,
             fontSize = 18.sp,
             fontWeight = FontWeight.Black,
             fontFamily = FontFamily.SansSerif
@@ -4957,51 +5485,51 @@ fun LogDetailDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 16.sp, color = Color.White)
-                        Text(text = "Shift Date: ${log.date}", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f))
+                        Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 16.sp, color = com.example.ui.theme.AppTextColor)
+                        Text(text = "Shift Date: ${log.date}", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f))
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = com.example.ui.theme.AppTextColor)
                     }
                 }
 
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                HorizontalDivider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.08f))
 
                 Text("CHRONO CAPTURED MILESTONES", fontWeight = FontWeight.Black, fontSize = 10.sp, color = Color(0xFFCCFF00), letterSpacing = 1.sp)
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("TIME IN", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text(formatTimestamp(log.timeIn), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("TIME IN", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text(formatTimestamp(log.timeIn), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                     }
                     Column {
-                        Text("LUNCH DURATION", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text("LUNCH DURATION", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                         val lOutStr = formatTimestamp(log.lunchOut)
                         val lInStr = formatTimestamp(log.lunchIn)
-                        Text("$lOutStr ➔ $lInStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("$lOutStr ➔ $lInStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                     }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("SHORT BREAK", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text("SHORT BREAK", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                         val bOutStr = formatTimestamp(log.breakOut)
                         val bInStr = formatTimestamp(log.breakIn)
-                        Text("$bOutStr ➔ $bInStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("$bOutStr ➔ $bInStr", fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                     }
                     Column {
-                        Text("TIME OUT", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text(formatTimestamp(log.timeOut), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = Color.White)
+                        Text("TIME OUT", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text(formatTimestamp(log.timeOut), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                     }
                 }
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
-                        Text("HOURLY PAY SCALE", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
-                        Text("${currencySymbol}${log.hourlyRate}/HR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("HOURLY PAY SCALE", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text("${currencySymbol}${log.hourlyRate}/HR", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
                     }
                     Column {
-                        Text("COMPUTED WORKING", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
+                        Text("COMPUTED WORKING", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), fontWeight = FontWeight.Bold)
                         Text("${df.format(hours)} HRS", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color(0xFFCCFF00))
                     }
                 }
@@ -5016,7 +5544,7 @@ fun LogDetailDialog(
                     ) {
                         Column {
                             Text("HR AUDIT REFUSAL REASON:", fontWeight = FontWeight.Black, fontSize = 9.sp, color = Color(0xFFFFA5B5), letterSpacing = 1.sp)
-                            Text(log.rejectionReason, fontSize = 11.sp, color = Color.White)
+                            Text(log.rejectionReason, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                         }
                     }
                 }
@@ -5039,7 +5567,7 @@ fun LogDetailDialog(
                                     text = "Simulated Location Verified",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                                 Text(
                                     text = "${log.gpsLocationName}",
@@ -5049,7 +5577,7 @@ fun LogDetailDialog(
                                 Text(
                                     text = "Coordinates: ${log.gpsLatitude}, ${log.gpsLongitude}",
                                     fontSize = 10.sp,
-                                    color = Color.White.copy(alpha = 0.5f),
+                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                                     fontFamily = FontFamily.Monospace
                                 )
                             }
@@ -5221,7 +5749,7 @@ fun ProductivityLineChart(
                     Text(
                         text = "$employeeName - Weekly Compliance Profile",
                         fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                     )
                 }
                 
@@ -5259,6 +5787,7 @@ fun ProductivityLineChart(
             ) {
                 val accentColor = MaterialTheme.colorScheme.primary
                 val secondaryColor = MaterialTheme.colorScheme.secondary
+                val appTextColor = com.example.ui.theme.AppTextColor
                 
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val w = size.width
@@ -5268,7 +5797,7 @@ fun ProductivityLineChart(
                     for (i in 0..gridLines) {
                         val y = h - (h / gridLines) * i
                         drawLine(
-                            color = Color.White.copy(alpha = 0.05f),
+                            color = appTextColor.copy(alpha = 0.05f),
                             start = Offset(0f, y),
                             end = Offset(w, y),
                             strokeWidth = 2f
@@ -5405,7 +5934,7 @@ fun ProductivityLineChart(
                                     text = "Compliance Detail: ${activeRec.day}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    color = com.example.ui.theme.AppTextColor
                                 )
                             }
                             Text(
@@ -5427,6 +5956,7 @@ fun ProductivityLineChart(
 fun ChatHubScreen(
     viewModel: TimeTrackerViewModel
 ) {
+    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
     val contacts = listOf(
         "Sarah Jenkins" to "Employee (Dev)",
         "Marcus Aurelius (HR Intern)" to "HR Intern",
@@ -5480,7 +6010,7 @@ fun ChatHubScreen(
                 text = "CHANNELS",
                 fontWeight = FontWeight.Black,
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.4f),
+                color = if (isLightTheme) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                 letterSpacing = 1.5.sp,
                 modifier = Modifier.padding(vertical = 10.dp)
             )
@@ -5488,10 +6018,10 @@ fun ChatHubScreen(
             OutlinedTextField(
                 value = contactSearchQuery,
                 onValueChange = { contactSearchQuery = it },
-                placeholder = { Text("Search...", fontSize = 10.sp, color = Color.White.copy(alpha = 0.4f)) },
+                placeholder = { Text("Search...", fontSize = 10.sp, color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.6f)) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary) },
                 singleLine = true,
-                textStyle = TextStyle(color = Color.White, fontSize = 11.sp),
+                textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -5500,9 +6030,9 @@ fun ChatHubScreen(
                     .testTag("chat_contact_search"),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.08f),
-                    focusedContainerColor = Color.White.copy(alpha = 0.02f),
-                    unfocusedContainerColor = Color.White.copy(alpha = 0.01f)
+                    unfocusedBorderColor = if (isLightTheme) Color.Black.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.08f),
+                    focusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.02f) else Color.White.copy(alpha = 0.02f),
+                    unfocusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.01f) else Color.White.copy(alpha = 0.01f)
                 )
             )
             
@@ -5518,14 +6048,14 @@ fun ChatHubScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                        else Color.White.copy(alpha = 0.02f),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        else com.example.ui.theme.AppTextColor.copy(alpha = 0.03f),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .border(
                                 width = 1.dp,
                                 color = if (isSelected) MaterialTheme.colorScheme.primary
-                                        else Color.White.copy(alpha = 0.05f),
+                                        else com.example.ui.theme.AppTextColor.copy(alpha = 0.08f),
                                 shape = RoundedCornerShape(12.dp)
                             )
                             .clickable { viewModel.activeRecipient.value = name }
@@ -5544,18 +6074,19 @@ fun ChatHubScreen(
                                     text = name.substringBefore(" ("),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) Color.White else Color.White.copy(alpha = 0.7f),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
-                            Text(
-                                text = role,
-                                fontSize = 8.sp,
-                                color = Color.White.copy(alpha = 0.4f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                             Text(
+                                 text = role,
+                                 fontSize = 8.sp,
+                                 fontWeight = if (isLightTheme) FontWeight.SemiBold else FontWeight.Normal,
+                                 color = if (isLightTheme) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                                 maxLines = 1,
+                                 overflow = TextOverflow.Ellipsis
+                             )
                         }
                     }
                 }
@@ -5599,22 +6130,27 @@ fun ChatHubScreen(
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = activeRecipientName,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 13.sp
+                            color = com.example.ui.theme.AppTextColor,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = activeRole,
-                            color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 10.sp
+                            color = if (isLightTheme) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            fontWeight = if (isLightTheme) FontWeight.SemiBold else FontWeight.Normal,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
                     if (activeRecipientName != "All Employees") {
-                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = { showRequestCoverDialog = true },
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
@@ -5633,7 +6169,9 @@ fun ChatHubScreen(
                                 text = "Request Cover",
                                 color = Color.Black,
                                 fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -5658,12 +6196,12 @@ fun ChatHubScreen(
                                 text = "Today is $activeRecipientName's Birthday! 🎂",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color.White
+                                color = com.example.ui.theme.AppTextColor
                             )
                             Text(
                                 text = "Tap a Quick-Wish below to celebrate them!",
                                 fontSize = 10.sp,
-                                color = Color.White.copy(alpha = 0.6f)
+                                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -5686,9 +6224,19 @@ fun ChatHubScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = Color.White.copy(alpha = 0.1f), modifier = Modifier.size(32.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ChatBubbleOutline,
+                                    contentDescription = null,
+                                    tint = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.4f) else com.example.ui.theme.AppTextColor.copy(alpha = 0.15f),
+                                    modifier = Modifier.size(32.dp)
+                                )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("No compliance messages yet.", fontSize = 11.sp, color = Color.White.copy(alpha = 0.3f))
+                                Text(
+                                    text = "No compliance messages yet.",
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isLightTheme) FontWeight.Medium else FontWeight.Normal,
+                                    color = if (isLightTheme) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)
+                                )
                             }
                         }
                     }
@@ -5762,7 +6310,7 @@ fun ChatHubScreen(
                                                 Text(
                                                     text = if (isMe) "You requested coverage for:" else "${msg.sender} requested coverage for:",
                                                     fontSize = 11.sp,
-                                                    color = Color.White.copy(alpha = 0.7f),
+                                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
                                                     modifier = Modifier.padding(bottom = 4.dp)
                                                 )
 
@@ -5778,12 +6326,12 @@ fun ChatHubScreen(
                                                             text = msg.swapDate,
                                                             fontWeight = FontWeight.Bold,
                                                             fontSize = 12.sp,
-                                                            color = Color.White
+                                                            color = com.example.ui.theme.AppTextColor
                                                         )
                                                         Text(
                                                             text = msg.swapShiftName,
                                                             fontSize = 10.sp,
-                                                            color = Color.White.copy(alpha = 0.6f)
+                                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f)
                                                         )
                                                     }
                                                 }
@@ -5802,7 +6350,7 @@ fun ChatHubScreen(
                                                             ) {
                                                                 Text(
                                                                     text = "⌛ Awaiting coworker accept",
-                                                                    color = Color.White.copy(alpha = 0.5f),
+                                                                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                                                                     fontSize = 9.5.sp,
                                                                     fontWeight = FontWeight.Bold
                                                                 )
@@ -5819,7 +6367,7 @@ fun ChatHubScreen(
                                                                     shape = RoundedCornerShape(6.dp),
                                                                     modifier = Modifier.weight(1f).height(28.dp).testTag("decline_cover_btn")
                                                                 ) {
-                                                                    Text("Decline", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                                    Text("Decline", color = com.example.ui.theme.AppTextColor, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                                                 }
                                                                 Button(
                                                                     onClick = { viewModel.respondToCoverRequest(msg.id, true) },
@@ -5892,7 +6440,7 @@ fun ChatHubScreen(
                                         } else {
                                             Text(
                                                 text = msg.text,
-                                                color = Color.White,
+                                                color = com.example.ui.theme.AppTextColor,
                                                 fontSize = 12.sp
                                             )
                                         }
@@ -5900,7 +6448,7 @@ fun ChatHubScreen(
                                         Text(
                                             text = msg.timestamp,
                                             fontSize = 8.sp,
-                                            color = Color.White.copy(alpha = 0.5f),
+                                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                                             modifier = Modifier.align(Alignment.End)
                                         )
                                     }
@@ -5924,7 +6472,7 @@ fun ChatHubScreen(
                 text = "QUICK COMPLIANCE HINTS",
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White.copy(alpha = 0.4f),
+                color = if (isLightTheme) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
@@ -5939,52 +6487,94 @@ fun ChatHubScreen(
                 quickWishes.forEach { wish ->
                     Box(
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                            .widthIn(max = 200.dp)
+                            .background(
+                                color = if (isLightTheme) Color.Black.copy(alpha = 0.04f) else Color.White.copy(alpha = 0.04f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isLightTheme) Color.Black.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
                             .clickable { messageText = wish }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                     ) {
-                        Text(text = wish, fontSize = 9.sp, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
+                        Text(
+                            text = wish,
+                            fontSize = 9.sp,
+                            color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.9f) else com.example.ui.theme.AppTextColor.copy(alpha = 0.8f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
             
-            Row(
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    placeholder = { Text("Compose secure compliance note...", fontSize = 11.sp) },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(50.dp)
-                        .testTag("chat_input_field"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.08f)
-                    )
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isLightTheme) Color(0xFFF1F5F9) else Color.White.copy(alpha = 0.03f)
+                ),
+                border = BorderStroke(
+                    width = 1.dp,
+                    color = if (isLightTheme) Color.Black.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.08f)
                 )
-                
-                IconButton(
-                    onClick = {
-                        if (messageText.isNotBlank()) {
-                            viewModel.sendMessage(activeRecipientName, messageText)
-                            messageText = ""
-                        }
-                    },
+            ) {
+                Row(
                     modifier = Modifier
-                        .size(46.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape)
-                        .testTag("chat_send_button")
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.Black, modifier = Modifier.size(16.dp))
+                    androidx.compose.material3.TextField(
+                        value = messageText,
+                        onValueChange = { messageText = it },
+                        placeholder = {
+                            Text(
+                                text = "Compose secure compliance note...",
+                                fontSize = 11.sp,
+                                color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.6f) else Color.White.copy(alpha = 0.6f)
+                            )
+                        },
+                        singleLine = true,
+                        colors = androidx.compose.material3.TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            disabledContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent,
+                            disabledIndicatorColor = Color.Transparent,
+                            focusedTextColor = com.example.ui.theme.AppTextColor,
+                            unfocusedTextColor = com.example.ui.theme.AppTextColor
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("chat_input_field")
+                    )
+                    
+                    IconButton(
+                        onClick = {
+                            if (messageText.isNotBlank()) {
+                                viewModel.sendMessage(activeRecipientName, messageText)
+                                messageText = ""
+                            }
+                        },
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                            .testTag("chat_send_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send",
+                            tint = Color.Black,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
             }
         }
@@ -5998,14 +6588,14 @@ fun ChatHubScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Select Shift to Cover", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text("Select Shift to Cover", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
                 }
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = "Choose one of your scheduled shifts to request coverage from $activeRecipientName.",
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
@@ -6018,7 +6608,7 @@ fun ChatHubScreen(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No scheduled shifts found to cover.", color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                            Text("No scheduled shifts found to cover.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f), fontSize = 11.sp)
                         }
                     } else {
                         LazyColumn(
@@ -6043,10 +6633,10 @@ fun ChatHubScreen(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Column {
-                                            Text(shift.date, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                            Text(shift.date, color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                             Text(shift.shiftName, color = MaterialTheme.colorScheme.primary, fontSize = 10.sp)
                                         }
-                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -6056,7 +6646,7 @@ fun ChatHubScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showRequestCoverDialog = false }) {
-                    Text("Cancel", color = Color.White.copy(alpha = 0.6f))
+                    Text("Cancel", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f))
                 }
             },
             containerColor = Color(0xFF1E293B),

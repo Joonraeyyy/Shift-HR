@@ -19,7 +19,11 @@ data class CorrectionRequest(
     val requestedTimeIn: String,
     val requestedTimeOut: String,
     val reason: String,
-    val status: String = "PENDING" // PENDING, APPROVED, REJECTED
+    val status: String = "PENDING", // PENDING, APPROVED, REJECTED
+    val disputeType: String = "GPS Drift", // GPS Drift, NFC Error, False Positive, Anti-Spoofing Mismatch
+    val originalTelemetry: String = "GPS Accuracy: 180m (Required < 50m)",
+    val isPunchDispute: Boolean = false,
+    val systemRemarks: String = ""
 )
 
 data class ReimbursementRequest(
@@ -122,6 +126,9 @@ data class EmployeeProfile(
     val vacationLeaveBalance: Int = 15,
     val sickLeaveBalance: Int = 10,
     val otherLeaveBalances: Int = 5,
+    val maternityLeaveBalance: Int = 105,
+    val paternityLeaveBalance: Int = 7,
+    val soloParentLeaveBalance: Int = 7,
     val totalLate: Int = 2,
     val absences: Int = 0,
     val overtimeHours: Double = 4.5,
@@ -149,5 +156,76 @@ data class TeamSchedule(
     val date: String, // format "YYYY-MM-DD", e.g., "2026-06-29"
     val shiftName: String // "Manila Dev Shift", "Indore Day Flex", "Night Ops", "Off"
 )
+
+// --- COMPLIANCE WORKFLOW MODELS ---
+
+data class DisciplinaryCase(
+    val id: String = UUID.randomUUID().toString(),
+    val employeeName: String,
+    val infractionTitle: String,
+    val infractionDate: String,
+    val noticeToExplainDate: String,
+    val noticeToExplainContent: String,
+    val employeeExplanation: String = "",
+    val employeeExplanationDate: String = "",
+    val noticeOfDecisionDate: String = "",
+    val noticeOfDecisionContent: String = "",
+    val status: String = "NOTICE_TO_EXPLAIN_ISSUED", // NOTICE_TO_EXPLAIN_ISSUED, EXPLANATION_SUBMITTED, NOTICE_OF_DECISION_ISSUED, CASE_RESOLVED
+    val severity: String = "Medium", // Low, Medium, High
+    val policyViabilityLink: String = "https://handbook.shifthr.corp/policies/attendance-irregularities"
+)
+
+data class OffboardingClearance(
+    val id: String = UUID.randomUUID().toString(),
+    val employeeName: String,
+    val separationDate: String, // e.g. 2026-07-31
+    val department: String,
+    val itClearanceStatus: String = "PENDING", // PENDING, CLEARED, N/A
+    val financeClearanceStatus: String = "PENDING", // PENDING, CLEARED, N/A
+    val adminClearanceStatus: String = "PENDING", // PENDING, CLEARED, N/A
+    val coeReady: Boolean = false,
+    val finalPayReady: Boolean = false,
+    val status: String = "IN_PROGRESS", // IN_PROGRESS, FULLY_CLEARED
+    val comments: String = ""
+)
+
+data class OkrRecord(
+    val id: String = UUID.randomUUID().toString(),
+    val employeeName: String,
+    val objective: String,
+    val keyResult: String,
+    val targetValue: String,
+    val currentValue: String,
+    val progress: Int, // 0 to 100
+    val selfAppraisal: String = "",
+    val managerFeedback: String = "",
+    val status: String = "ACTIVE" // ACTIVE, ACHIEVED, DEFERRED
+)
+
+// Define structured HR categories
+enum class DossierCategory(val label: String) {
+    IDENTITY("Government Issued ID"),
+    MEDICAL("Medical Certificate / Leaves"),
+    FINANCIAL("Reimbursement Receipts"),
+    CONTRACTUAL("Signed Agreements")
+}
+
+// Data model tracking the scanned output natively inside Core HR
+data class ScannedDossierDocument(
+    val fileId: String,
+    val fileName: String,
+    val localUri: String,
+    val fileCategory: DossierCategory,
+    val dateCaptured: String = "2026-07-13" // Captures active fiscal period
+)
+
+fun getCategoryForFile(fileName: String): DossierCategory {
+    return when {
+        fileName.startsWith("IDENTITY_", ignoreCase = true) || fileName.contains("passport", ignoreCase = true) -> DossierCategory.IDENTITY
+        fileName.startsWith("MEDICAL_", ignoreCase = true) || fileName.contains("medical", ignoreCase = true) -> DossierCategory.MEDICAL
+        fileName.startsWith("FINANCIAL_", ignoreCase = true) || fileName.contains("tax", ignoreCase = true) || fileName.contains("receipt", ignoreCase = true) -> DossierCategory.FINANCIAL
+        else -> DossierCategory.CONTRACTUAL
+    }
+}
 
 

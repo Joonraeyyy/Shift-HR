@@ -261,7 +261,7 @@ fun StepperGuideSection(viewModel: TimeTrackerViewModel, context: Context) {
                 text = stepTitle,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
+                color = com.example.ui.theme.AppTextColor,
                 textAlign = TextAlign.Center
             )
 
@@ -270,7 +270,7 @@ fun StepperGuideSection(viewModel: TimeTrackerViewModel, context: Context) {
             Text(
                 text = stepDesc,
                 fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.7f),
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
                 lineHeight = 18.sp
             )
@@ -390,6 +390,8 @@ fun TimeTrackingAnimation() {
         )
     )
 
+    val appTextColor = com.example.ui.theme.AppTextColor
+
     Canvas(modifier = Modifier.size(120.dp)) {
         val center = Offset(size.width / 2, size.height / 2)
         val radius = size.width / 2.5f
@@ -409,13 +411,13 @@ fun TimeTrackingAnimation() {
 
         // Draw crosshairs
         drawLine(
-            color = Color.White.copy(alpha = 0.15f),
+            color = appTextColor.copy(alpha = 0.15f),
             start = Offset(center.x - radius * 1.3f, center.y),
             end = Offset(center.x + radius * 1.3f, center.y),
             strokeWidth = 1.dp.toPx()
         )
         drawLine(
-            color = Color.White.copy(alpha = 0.15f),
+            color = appTextColor.copy(alpha = 0.15f),
             start = Offset(center.x, center.y - radius * 1.3f),
             end = Offset(center.x, center.y + radius * 1.3f),
             strokeWidth = 1.dp.toPx()
@@ -498,7 +500,7 @@ fun DigitalIdAnimation() {
                         Spacer(modifier = Modifier.height(4.dp))
                         Box(modifier = Modifier.size(width = 45.dp, height = 3.dp).background(Color.White.copy(alpha = 0.4f)))
                     }
-                    Icon(Icons.Default.QrCode, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Default.QrCode, contentDescription = null, tint = com.example.ui.theme.AppTextColor, modifier = Modifier.size(24.dp))
                 }
             }
         }
@@ -647,7 +649,7 @@ fun SpreadsheetAnimation() {
             Box(modifier = Modifier.weight(1f).height(6.dp).background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(2.dp)))
         }
 
-        Divider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.fillMaxWidth())
+        Divider(color = com.example.ui.theme.AppTextColor.copy(alpha = 0.1f), modifier = Modifier.fillMaxWidth())
 
         // Grid Rows
         repeat(3) { row ->
@@ -731,7 +733,7 @@ fun TryOutPunchSimulator(viewModel: TimeTrackerViewModel, context: Context) {
                         String.format("Timer: %02d:%02d:%02d", hrs, mins, secs)
                     } else "Simulation Standby",
                     fontSize = 12.sp,
-                    color = Color.White
+                    color = com.example.ui.theme.AppTextColor
                 )
             }
 
@@ -792,8 +794,8 @@ fun TryOutSelfServiceSimulator(viewModel: TimeTrackerViewModel, context: Context
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text("Vacation Balance Simulator", fontSize = 10.sp, color = Color.White.copy(alpha = 0.5f))
-            Text("$vacationBal Days Available", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text("Vacation Balance Simulator", fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+            Text("$vacationBal Days Available", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -835,7 +837,7 @@ fun TryOutAiSimulator(viewModel: TimeTrackerViewModel, context: Context) {
         Text(
             text = "Frequently Asked Compliance Question:",
             fontSize = 9.sp,
-            color = Color.White.copy(alpha = 0.4f)
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.4f)
         )
         
         Spacer(modifier = Modifier.height(4.dp))
@@ -860,7 +862,7 @@ fun TryOutAiSimulator(viewModel: TimeTrackerViewModel, context: Context) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.QuestionAnswer, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(12.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Tap: \"How are my overtime rates calculated?\"", fontSize = 11.sp, color = Color.White)
+                Text("Tap: \"How are my overtime rates calculated?\"", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
             }
         }
 
@@ -917,7 +919,7 @@ fun InteractiveDiagramSection(context: Context) {
         Text(
             "Interactive System Audit & Compliance Flowchart. Tap nodes to investigate audit steps.",
             fontSize = 11.sp,
-            color = Color.White.copy(alpha = 0.5f),
+            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 8.dp)
         )
@@ -1029,9 +1031,9 @@ fun InteractiveDiagramSection(context: Context) {
                             Text(nodeDetails.first, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(nodeDetails.second, color = Color.White, fontSize = 12.sp, lineHeight = 18.sp)
+                        Text(nodeDetails.second, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, lineHeight = 18.sp)
                         Spacer(modifier = Modifier.height(10.dp))
-                        Text("SYSTEM SERVICE: ${nodeDetails.third}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.5f))
+                        Text("SYSTEM SERVICE: ${nodeDetails.third}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
                     }
                 }
             }
@@ -1080,7 +1082,7 @@ fun DiagramNode(
         Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSelected) NeonGreen else Color.White)
-            Text(desc, fontSize = 9.sp, color = Color.White.copy(alpha = 0.5f))
+            Text(desc, fontSize = 9.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
         }
         Icon(
             imageVector = if (isSelected) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -1370,7 +1372,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
             Text(
                 text = "Tap the button below to witness a high-performance fluid gooey effect running fully on GPU RenderThread (60+ FPS).",
                 fontSize = 11.sp,
-                color = Color.White.copy(alpha = 0.6f),
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
                 textAlign = TextAlign.Center
             )
 
@@ -1408,7 +1410,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                 text = "PHYSICS PRESETS",
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.5f),
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                 modifier = Modifier.align(Alignment.Start)
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -1457,7 +1459,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                 text = "GOOEY ENGINE FINE-TUNING",
                 fontWeight = FontWeight.Bold,
                 fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.5f),
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                 modifier = Modifier.align(Alignment.Start)
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -1468,7 +1470,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Blur Radius (feGaussianBlur)", fontSize = 11.sp, color = Color.White)
+                    Text("Blur Radius (feGaussianBlur)", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                     Text("${blurRadius.toInt()}px", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                 }
                 Slider(
@@ -1492,7 +1494,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Contrast Multiplier (feColorMatrix)", fontSize = 11.sp, color = Color.White)
+                    Text("Contrast Multiplier (feColorMatrix)", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                     Text("${contrast.toInt()}x", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                 }
                 Slider(
@@ -1516,7 +1518,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Alpha Threshold (Offset)", fontSize = 11.sp, color = Color.White)
+                    Text("Alpha Threshold (Offset)", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                     Text("${alphaOffset.toInt()}", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                 }
                 Slider(
@@ -1540,7 +1542,7 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Splash Satellite Droplets", fontSize = 11.sp, color = Color.White)
+                    Text("Splash Satellite Droplets", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
                     Text("$numSatellites bubbles", fontSize = 11.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
                 }
                 Slider(
@@ -1570,14 +1572,14 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
                         text = "⚙️ Under The Hood (Hardware Acceleration)",
-                        color = Color.White,
+                        color = com.example.ui.theme.AppTextColor,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Metaballs (organic liquid merging) are drawn on a single hardware-accelerated Skia graphics layer. First, we apply a high-radius blur filter. Second, we apply a Color Matrix filter that amplifies the Alpha channel contrast by 30x or 40x and shifts the threshold using offset, sharpening the blurred alpha outline instantly on the GPU (RenderThread) for perfect 60+ FPS.",
-                        color = Color.White.copy(alpha = 0.5f),
+                        color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
                         fontSize = 9.sp,
                         lineHeight = 13.sp
                     )
