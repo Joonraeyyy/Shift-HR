@@ -228,4 +228,123 @@ fun getCategoryForFile(fileName: String): DossierCategory {
     }
 }
 
+data class DoleHoursBreakdown(
+    var regular: Double = 0.0,
+    var nd: Double = 0.0,
+    var ot: Double = 0.0,
+    var otNd: Double = 0.0
+)
+
+data class DoleEarningsBreakdown(
+    val regularPay: Double,
+    val ndPay: Double,
+    val otPay: Double,
+    val otNdPay: Double,
+    val totalGrossPay: Double
+)
+
+data class DoleCalculationResult(
+    val hours: DoleHoursBreakdown,
+    val earnings: DoleEarningsBreakdown,
+    val baseMultiplier: Double,
+    val otMultiplier: Double,
+    val ndPremium: Double,
+    val totalWorkedBeforeMeal: Double,
+    val totalWorkedAfterMeal: Double
+)
+
+fun calculateDoleShiftPay(
+    clockIn: java.util.Date,
+    clockOut: java.util.Date,
+    isRestDay: Boolean,
+    holidayType: String?, // "REGULAR", "SPECIAL", or null/""
+    hourlyRate: Double
+): DoleCalculationResult {
+    val totalWorkedMillis = clockOut.time - clockIn.time
+    var totalWorkedHours = totalWorkedMillis.toDouble() / 3600000.0
+    val originalTotalHours = totalWorkedHours
+    
+    if (totalWorkedHours > 5.0) {
+        totalWorkedHours -= 1.0 // Subtract the mandatory 60-min unpaid meal break
+    }
+    totalWorkedHours = maxOf(0.0, totalWorkedHours)
+
+    // Determine day multiplier factors based on Article 93 and 94
+    val baseMultiplier = when (holidayType) {
+        "REGULAR" -> if (isRestDay) 2.60 else 2.00
+        "SPECIAL" -> if (isRestDay) 1.50 else 1.30
+        else -> if (isRestDay) 1.30 else 1.0
+    }
+
+    // Compounding premiums
+    val otMultiplier = if (baseMultiplier == 1.0) 1.25 else 1.30
+    val ndPremium = 0.10 // 10% premium for Night Diff hours
+
+    val hoursBreakdown = DoleHoursBreakdown()
+
+    val cal = java.util.Calendar.getInstance()
+    cal.time = clockIn
+    
+    var hourIndex = 0.0
+    
+    while (cal.time.before(clockOut)) {
+        // Unpaid meal break jump halfway through
+        if (originalTotalHours > 5.0 && hourIndex == 4.0) {
+            cal.add(java.util.Calendar.HOUR_OF_DAY, 1)
+            if (!cal.time.before(clockOut)) {
+                break
+            }
+        }
+
+        val hourOfDay = cal.get(java.util.Calendar.HOUR_OF_DAY)
+        val isNdHour = (hourOfDay >= 22 || hourOfDay < 6)
+        val isOvertime = (hourIndex >= 8.0)
+
+        val stepSize = 0.25
+
+        if (isOvertime) {
+            if (isNdHour) {
+                hoursBreakdown.otNd += stepSize
+            } else {
+                hoursBreakdown.ot += stepSize
+            }
+        } else {
+            if (isNdHour) {
+                hoursBreakdown.nd += stepSize
+            } else {
+                hoursBreakdown.regular += stepSize
+            }
+        }
+
+        hourIndex += stepSize
+        cal.add(java.util.Calendar.MINUTE, 15)
+    }
+
+    val hourlyBasePay = hourlyRate * baseMultiplier
+
+    val payRegular = hoursBreakdown.regular * hourlyBasePay
+    val payNd = hoursBreakdown.nd * hourlyBasePay * (1 + ndPremium)
+    val payOt = hoursBreakdown.ot * hourlyBasePay * otMultiplier
+    val payOtNd = hoursBreakdown.otNd * hourlyBasePay * otMultiplier * (1 + ndPremium)
+    val totalGross = payRegular + payNd + payOt + payOtNd
+
+    return DoleCalculationResult(
+        hours = hoursBreakdown,
+        earnings = DoleEarningsBreakdown(
+            regularPay = payRegular,
+            ndPay = payNd,
+            otPay = payOt,
+            otNdPay = payOtNd,
+            totalGrossPay = totalGross
+        ),
+        baseMultiplier = baseMultiplier,
+        otMultiplier = otMultiplier,
+        ndPremium = ndPremium,
+        totalWorkedBeforeMeal = originalTotalHours,
+        totalWorkedAfterMeal = totalWorkedHours
+    )
+}
+
+
+
 

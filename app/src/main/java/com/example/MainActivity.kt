@@ -4548,100 +4548,89 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         // LIQUID GLASS THEME STUDIO (Comfort-optimized Apple Glass UI Editor)
+        val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+        val studioBg = if (isSystemDark) Color(0x660F172A) else Color(0x73FFFFFF)
+        val studioBorder = if (isSystemDark) Color(0x1AFFFFFF) else Color(0x333B82F6)
+        val titleColor = if (isSystemDark) Color(0xFF34D399) else Color(0xFF1D4ED8)
+        val bodyColor = if (isSystemDark) Color(0xFF94A3B8) else Color(0xFF475569)
+
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
-            border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
+            colors = CardDefaults.cardColors(containerColor = studioBg),
+            border = BorderStroke(1.dp, studioBorder)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text(
                     text = "LIQUID GLASS THEME STUDIO",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.5.sp
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = titleColor,
+                    letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Transform your Shift HR interface with Apple-inspired fluid glass aesthetics. Comfort-optimized.",
-                    fontSize = 11.sp,
-                    color = getAdaptiveTextColor(0.6f)
+                    text = "Transform your Shift HR interface with Apple-inspired fluid glass aesthetics.",
+                    fontSize = 12.sp,
+                    color = bodyColor
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Scrollable row of Apple Glass Themes
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
                     com.example.ui.theme.LiquidThemeRegistry.allThemes.forEach { theme ->
                         val isSelected = theme.name == viewModel.selectedTheme.value
                         
-                        Box(
+                        val selectionBorder = if (isSelected) {
+                            BorderStroke(2.dp, if (isSystemDark) Color(0xFF34D399) else Color(0xFF2563EB))
+                        } else {
+                            BorderStroke(1.dp, if (isSystemDark) Color(0x1AFFFFFF) else Color(0x1A000000))
+                        }
+
+                        val previewBg = if (theme.isLightTheme) Color(0xFFF8FAFC) else Color(0xFF15171C)
+                        val previewText = if (theme.isLightTheme) Color(0xFF0F172A) else Color(0xFFE2E8F0)
+                        val dotColor = theme.primaryAccent
+                        val secondaryDotColor = theme.secondaryAccent
+
+                        Column(
                             modifier = Modifier
-                                .width(120.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    brush = if (isLightMode) {
-                                        androidx.compose.ui.graphics.Brush.linearGradient(
-                                            colors = listOf(Color(0xFFFFFFFF).copy(alpha = 0.8f), Color(0xFFF1F5F9).copy(alpha = 0.8f))
-                                        )
-                                    } else {
-                                        androidx.compose.ui.graphics.Brush.linearGradient(
-                                            colors = listOf(theme.bgGradientStart, theme.bgGradientEnd)
-                                        )
-                                    }
-                                )
-                                .border(
-                                    width = if (isSelected) 2.dp else 1.dp,
-                                    color = if (isSelected) theme.primaryAccent else (if (isLightMode) Color(0xFFE2E8F0) else getAdaptiveColor(0.1f)),
-                                    shape = RoundedCornerShape(16.dp)
-                                )
+                                .width(110.dp)
+                                .height(110.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(previewBg)
+                                .border(selectionBorder, RoundedCornerShape(12.dp))
                                 .clickable {
                                     viewModel.selectedTheme.value = theme.name
                                 }
-                                .padding(12.dp)
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.Start,
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                // Draw a miniature glass pill inside the theme preview
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(36.dp)
-                                        .background(theme.cardSurface, RoundedCornerShape(8.dp))
-                                        .border(1.dp, theme.cardBorder, RoundedCornerShape(8.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(theme.primaryAccent))
-                                        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(theme.secondaryAccent))
-                                    }
-                                }
+                            // Accent Preview Dots
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(dotColor))
+                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(secondaryDotColor))
+                            }
 
+                            // Metadata Text
+                            Column {
                                 Text(
                                     text = theme.name,
+                                    color = previewText,
                                     fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isLightMode) Color(0xFF1E293B) else com.example.ui.theme.AppTextColor
+                                    fontWeight = FontWeight.Bold
                                 )
-                                
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (isSelected) "ACTIVE" else "SELECT",
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (isSelected) theme.primaryAccent else (if (isLightMode) Color(0xFF64748B) else getAdaptiveColor(0.4f)),
-                                    letterSpacing = 1.sp
+                                    color = if (isSelected) dotColor else previewText.copy(alpha = 0.6f),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -4652,36 +4641,33 @@ fun SettingsScreen(
 
         // Warning/Alert block if not Admin/HR
         if (!isAuthorized) {
-            val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isLightMode) Color(0xFFFEF2F2) else Color(0xFF2D161A)
-                ),
-                border = BorderStroke(
-                    width = 1.dp,
-                    color = Color(0xFFF43F5E).copy(alpha = 0.3f)
-                )
+            val bg = if (isSystemDark) Color(0x26EF4444) else Color(0xFFFEF2F2)
+            val border = if (isSystemDark) Color(0x40EF4444) else Color(0xFFFEE2E2)
+            val textColor = if (isSystemDark) Color(0xFFFCA5A5) else Color(0xFF991B1B)
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(bg)
+                    .border(BorderStroke(1.dp, border), RoundedCornerShape(12.dp))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = null,
-                        tint = Color(0xFFF43F5E),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Viewing Profile Only. Admin/HR role is required to modify pay scales or shift goals.",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isLightMode) Color(0xFF9F1239) else Color(0xFFFDA4AF)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = textColor,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = "Viewing Profile Only. Admin/HR role is required to modify pay scales or shift goals.",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor
+                )
             }
         }
 

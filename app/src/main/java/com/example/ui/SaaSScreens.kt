@@ -84,14 +84,24 @@ fun SmartCaptureTerminal(
     onUploadPhotoClick: () -> Unit,
     themeAccentColor: Color = Color(0xFF00E676)
 ) {
+    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+
+    // Layout configuration values from adaptive glass formula
+    val containerColor = if (isLightTheme) Color(0xA6FFFFFF) else Color(0x730F172A)
+    val containerBorderColor = if (isLightTheme) Color(0xCCFFFFFF) else Color(0x1FFFFFFF)
+    val accentIconColor = if (isLightTheme) Color(0xFF059669) else Color(0xFF34D399)
+    val headingTextColor = if (isLightTheme) Color(0xFF0F172A) else Color(0xFFFFFFFF)
+    val subtitleTextColor = if (isLightTheme) Color(0xFF475569) else Color(0xFF94A3B8)
+    val cardElevation = if (isLightTheme) 4.dp else 0.dp
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = if (MaterialTheme.colorScheme.onBackground == Color(0xFFFFFFFF)) Color(0xFF1E1E22) else Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(1.dp, BorderGrey)
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation),
+        border = BorderStroke(1.dp, containerBorderColor)
     ) {
         Column(
             modifier = Modifier
@@ -105,13 +115,13 @@ fun SmartCaptureTerminal(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(themeAccentColor.copy(alpha = 0.15f), CircleShape),
+                        .background(accentIconColor.copy(alpha = if (isLightTheme) 0.12f else 0.20f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Description,
                         contentDescription = null,
-                        tint = themeAccentColor,
+                        tint = accentIconColor,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -121,12 +131,12 @@ fun SmartCaptureTerminal(
                         text = "Smart Capture Terminal",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = com.example.ui.theme.AppTextColor
+                        color = headingTextColor
                     )
                     Text(
                         text = "Powered by Shift AI Document Engine",
                         fontSize = 10.sp,
-                        color = getAdaptiveTextColor(0.6f)
+                        color = subtitleTextColor
                     )
                 }
             }
@@ -140,7 +150,7 @@ fun SmartCaptureTerminal(
                 RowActionButton(
                     icon = Icons.Default.CameraAlt,
                     label = "Scan Document",
-                    color = themeAccentColor,
+                    color = accentIconColor,
                     onClick = onScanDocumentClick,
                     modifier = Modifier.weight(1f)
                 )
@@ -148,7 +158,7 @@ fun SmartCaptureTerminal(
                 RowActionButton(
                     icon = Icons.Default.PhotoLibrary,
                     label = "Upload Photo",
-                    color = themeAccentColor,
+                    color = accentIconColor,
                     onClick = onUploadPhotoClick,
                     modifier = Modifier.weight(1f)
                 )
@@ -165,11 +175,17 @@ fun RowActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+
+    val innerCardBg = if (isLightTheme) Color(0xCCF1F5F9) else Color(0x0FFFFFFF)
+    val innerCardBorder = if (isLightTheme) Color(0x260F172A) else Color(0x1FFFFFFF)
+    val labelTextColor = if (isLightTheme) Color(0xFF475569) else Color(0xFF94A3B8)
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
-            .background(if (MaterialTheme.colorScheme.onBackground == Color(0xFFFFFFFF)) Color(0xFF2C2C32) else Color(0xFFF8FAFC))
-            .border(1.dp, BorderGrey, RoundedCornerShape(12.dp))
+            .background(innerCardBg)
+            .border(1.dp, innerCardBorder, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center
@@ -186,7 +202,7 @@ fun RowActionButton(
                 text = label,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = getAdaptiveTextColor(0.8f)
+                color = labelTextColor
             )
         }
     }
@@ -4215,6 +4231,58 @@ fun ClickableIdRow(label: String, value: String, onClick: () -> Unit) {
 
 // ---------------------- 3. PAYROLL & REPORTS SCREEN ----------------------
 @Composable
+fun AdaptivePayrollButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme() || MaterialTheme.colorScheme.onBackground == Color(0xFFFFFFFF)
+
+    // Dynamic styling based on App Theme & Selection State
+    val backgroundColor = when {
+        isSelected && !isDark -> Color(0xFF1D4ED8) // Solid Blue (Light Mode Selected)
+        isSelected && isDark  -> Color(0x3310B981) // Translucent Emerald (Dark Mode Selected)
+        !isSelected && !isDark -> Color(0xB3FFFFFF) // Translucent White 70% (Light Mode Unselected)
+        else -> Color(0x801E293B) // Translucent Slate 50% (Dark Mode Unselected)
+    }
+
+    val textColor = when {
+        isSelected && !isDark -> Color(0xFFFFFFFF) // White text on dark blue
+        isSelected && isDark  -> Color(0xFF34D399) // Vivid mint text
+        !isSelected && !isDark -> Color(0xFF334155) // Dark slate gray text (Solves invisible text bug!)
+        else -> Color(0xFF94A3B8) // Soft silver text
+    }
+
+    val borderColor = when {
+        isSelected && !isDark -> null
+        isSelected && isDark  -> BorderStroke(1.dp, Color(0x6610B981))
+        !isSelected && !isDark -> BorderStroke(1.dp, Color(0xFFE2E8F0))
+        else -> BorderStroke(1.dp, Color(0x14FFFFFF))
+    }
+
+    Box(
+        modifier = modifier
+            .height(54.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .then(if (borderColor != null) Modifier.border(borderColor, RoundedCornerShape(12.dp)) else Modifier)
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 11.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
+    }
+}
+
+@Composable
 fun PayrollScreen(viewModel: TimeTrackerViewModel) {
     var activeSubView by remember { mutableStateOf("calc") } // calc, ph_compliance, payslips, reports
     val context = LocalContext.current
@@ -4234,70 +4302,42 @@ fun PayrollScreen(viewModel: TimeTrackerViewModel) {
         )
 
         Column(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(CardGreyBg, RoundedCornerShape(10.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val row1 = listOf(
-                    "calc" to "Salary Calculator",
-                    "ph_compliance" to "PH Compliance & 13th Month"
+                AdaptivePayrollButton(
+                    text = "Salary Calculator",
+                    isSelected = activeSubView == "calc",
+                    onClick = { activeSubView = "calc" },
+                    modifier = Modifier.weight(1f)
                 )
-                row1.forEach { (key, label) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (activeSubView == key) NeonGreen else Color.Transparent)
-                            .clickable { activeSubView = key }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (activeSubView == key) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                AdaptivePayrollButton(
+                    text = "PH Compliance & 13th Month",
+                    isSelected = activeSubView == "ph_compliance",
+                    onClick = { activeSubView = "ph_compliance" },
+                    modifier = Modifier.weight(1f)
+                )
             }
-            Spacer(modifier = Modifier.height(6.dp))
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(CardGreyBg, RoundedCornerShape(10.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                val row2 = listOf(
-                    "payslips" to "My Payslips",
-                    "reports" to "Analytics Reports"
+                AdaptivePayrollButton(
+                    text = "My Payslips",
+                    isSelected = activeSubView == "payslips",
+                    onClick = { activeSubView = "payslips" },
+                    modifier = Modifier.weight(1f)
                 )
-                row2.forEach { (key, label) ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (activeSubView == key) NeonGreen else Color.Transparent)
-                            .clickable { activeSubView = key }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (activeSubView == key) Color.Black else Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
+                AdaptivePayrollButton(
+                    text = "Analytics Reports",
+                    isSelected = activeSubView == "reports",
+                    onClick = { activeSubView = "reports" },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
@@ -4321,116 +4361,365 @@ fun PayrollScreen(viewModel: TimeTrackerViewModel) {
 }
 
 @Composable
-fun SalaryCalculatorView(viewModel: TimeTrackerViewModel, context: Context) {
-    val allLogs by viewModel.allTimeLogs.collectAsState()
-    val config by viewModel.shiftConfig.collectAsState()
+fun InteractiveDoleSimulatorView() {
+    var hourlyRateInput by remember { mutableStateOf("150.0") }
+    var clockInHour by remember { mutableStateOf(14.0f) } // slider 0 to 23
+    var shiftDurationInput by remember { mutableStateOf("9.0") }
+    var isRestDay by remember { mutableStateOf(false) }
+    var holidayType by remember { mutableStateOf("NONE") }
 
-    // Calculate dynamic salary items for the currently active user
-    val userLogs = allLogs.filter { it.employeeName == viewModel.currentUserName.value && it.isApproved == "APPROVED" }
+    val rate = hourlyRateInput.toDoubleOrNull() ?: 150.0
+    val durationHours = shiftDurationInput.toDoubleOrNull() ?: 9.0
+
+    // Construct clock-in date/time: e.g. July 15, 2026 at clockInHour:00
+    val calendarIn = java.util.Calendar.getInstance()
+    calendarIn.set(2026, java.util.Calendar.JULY, 15, clockInHour.toInt(), 0, 0)
     
-    var basicHourly = config.hourlyRate.toDouble()
-    if (basicHourly <= 0.0) basicHourly = 25.0
+    val calendarOut = calendarIn.clone() as java.util.Calendar
+    calendarOut.add(java.util.Calendar.MINUTE, (durationHours * 60).toInt())
 
-    var totalHours = 0.0
-    var overtimeHours = 0.0
-    var holidayHours = 0.0
-    var nightDiffHours = 0.0
+    val sdf = SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault())
+    val clockInStr = sdf.format(calendarIn.time)
+    val clockOutStr = sdf.format(calendarOut.time)
 
-    userLogs.forEach { log ->
-        val punchIn = log.timeIn ?: return@forEach
-        val punchOut = log.timeOut ?: return@forEach
-        val totalMillis = punchOut - punchIn
-        
-        val hours = totalMillis.toDouble() / 3600000.0
-        totalHours += hours
-
-        // Overtime check (hours exceeding shift standard config)
-        val shiftDuration = config.shiftDurationHours.toDouble()
-        if (hours > shiftDuration) {
-            overtimeHours += (hours - shiftDuration)
-        }
-
-        // Holiday pay detection (if log date is in holiday list)
-        val isHolidayLog = viewModel.localHolidays.value.any { it.date == log.date }
-        if (isHolidayLog) {
-            holidayHours += hours
-        }
-
-        // Night Differential (10 PM - 6 AM portions simulation)
-        // Let's assume 15% of total clocked hours fall inside night shifts
-        nightDiffHours += (hours * 0.15)
-    }
-
-    // Money math
-    val basicSalary = totalHours * basicHourly
-    val overtimePay = overtimeHours * (basicHourly * 1.5)
-    val holidayPay = holidayHours * (basicHourly * 2.0)
-    val nightDiffPay = nightDiffHours * (basicHourly * 0.1)
-    
-    val allowances = 150.0 // Standard hybrid workplace allowance
-    val bonuses = if (totalHours > 40.0) 100.0 else 0.0 // Over-target bonus
-    val deductions = 45.0 // Tax & health lock deductions
-    val loansRepayment = viewModel.loansList.value
-        .filter { it.employeeName == viewModel.currentUserName.value }
-        .sumOf { it.monthlyDeduction }
-
-    val netSalary = basicSalary + overtimePay + holidayPay + nightDiffPay + allowances + bonuses - deductions - loansRepayment
+    // Calculate pay using the DOLE core algorithm
+    val result = calculateDoleShiftPay(
+        clockIn = calendarIn.time,
+        clockOut = calendarOut.time,
+        isRestDay = isRestDay,
+        holidayType = if (holidayType == "NONE") null else holidayType,
+        hourlyRate = rate
+    )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         colors = CardDefaults.cardColors(containerColor = CardGreyBg),
         border = BorderStroke(1.dp, BorderGrey)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Salary Ledger: ${viewModel.currentUserName.value}", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Box(
-                    modifier = Modifier
-                        .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+            Text(
+                "Philippine Labor Code (Book III) Simulator",
+                color = NeonGreen,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+            Text(
+                "Simulates 15-min slicing, Night Differential (10 PM - 6 AM), overtime, and meal deduction.",
+                color = getAdaptiveTextColor(0.5f),
+                fontSize = 10.sp,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // Hourly Rate input
+            OutlinedTextField(
+                value = hourlyRateInput,
+                onValueChange = { hourlyRateInput = it },
+                label = { Text("Base Hourly Rate (₱)") },
+                textStyle = TextStyle(color = com.example.ui.theme.AppTextColor),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+
+            // Shift Duration input
+            OutlinedTextField(
+                value = shiftDurationInput,
+                onValueChange = { shiftDurationInput = it },
+                label = { Text("Shift Duration (Hours)") },
+                textStyle = TextStyle(color = com.example.ui.theme.AppTextColor),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+            )
+
+            // Clock In Hour Slider
+            Text(
+                "Clock-In Time: ${String.format("%02d:00", clockInHour.toInt())}",
+                color = com.example.ui.theme.AppTextColor,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Slider(
+                value = clockInHour,
+                onValueChange = { clockInHour = it },
+                valueRange = 0f..23f,
+                steps = 23,
+                colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen)
+            )
+
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Rest day switch
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f).background(getAdaptiveColor(0.04f), RoundedCornerShape(8.dp)).padding(8.dp)
                 ) {
-                    Text("LIVE ESTIMATE", color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    Checkbox(
+                        checked = isRestDay,
+                        onCheckedChange = { isRestDay = it },
+                        colors = CheckboxDefaults.colors(checkedColor = NeonGreen)
+                    )
+                    Text("Rest Day", fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                }
+
+                // Holiday Type Selection dropdown
+                Box(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    var expandedHolidayMenu by remember { mutableStateOf(false) }
+                    Button(
+                        onClick = { expandedHolidayMenu = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveColor(0.06f)),
+                        modifier = Modifier.fillMaxWidth(),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        Text("Holiday: $holidayType", color = NeonGreen, fontSize = 11.sp)
+                    }
+                    DropdownMenu(
+                        expanded = expandedHolidayMenu,
+                        onDismissRequest = { expandedHolidayMenu = false },
+                        modifier = Modifier.background(CardGreyBg)
+                    ) {
+                        listOf("NONE", "REGULAR", "SPECIAL").forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type, color = com.example.ui.theme.AppTextColor) },
+                                onClick = {
+                                    holidayType = type
+                                    expandedHolidayMenu = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
-            Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
 
-            PayrollDetailRow(label = "Total Approved Hours", value = String.format("%.2f hrs", totalHours))
-            val currSym = viewModel.getCurrencySymbol()
-            PayrollDetailRow(label = "Basic Rate (per hr)", value = String.format("${currSym}%.2f", basicHourly))
-            PayrollDetailRow(label = "Basic Earned Salary", value = String.format("${currSym}%.2f", basicSalary))
-            PayrollDetailRow(label = "Overtime Pay (1.5x, ${String.format("%.1f", overtimeHours)}h)", value = String.format("${currSym}%.2f", overtimePay))
-            PayrollDetailRow(label = "Holiday Pay (2x, ${String.format("%.1f", holidayHours)}h)", value = String.format("${currSym}%.2f", holidayPay))
-            PayrollDetailRow(label = "Night Diff (1.1x, ${String.format("%.1f", nightDiffHours)}h)", value = String.format("${currSym}%.2f", nightDiffPay))
-            PayrollDetailRow(label = "Standard Allowance", value = String.format("${currSym}%.2f", allowances))
-            PayrollDetailRow(label = "Performance Bonuses", value = String.format("${currSym}%.2f", bonuses))
-            PayrollDetailRow(label = "Tax Deductions", value = String.format("-${currSym}%.2f", deductions))
-            PayrollDetailRow(label = "Active Loan Repayments", value = String.format("-${currSym}%.2f", loansRepayment))
+            Spacer(modifier = Modifier.height(14.dp))
+            Divider(color = BorderGrey)
+            Spacer(modifier = Modifier.height(14.dp))
 
-            Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Net Compute Salary", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                Text(String.format("${currSym}%.2f", netSalary), color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            // Timestamps
+            Text("🔏 SIMULATED PERIOD STATUS:", color = NeonGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Text("In: $clockInStr", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
+            Text("Out: $clockOutStr", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
+            Text(
+                "Duration: ${String.format("%.2f", result.totalWorkedBeforeMeal)}h total (${String.format("%.2f", result.totalWorkedAfterMeal)}h net after meal break)",
+                color = getAdaptiveTextColor(0.6f),
+                fontSize = 10.sp
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Multipliers info box
+            Row(
+                modifier = Modifier.fillMaxWidth().background(getAdaptiveColor(0.03f), RoundedCornerShape(8.dp)).padding(10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Base Rate", color = getAdaptiveTextColor(0.5f), fontSize = 9.sp)
+                    Text("${String.format("%.2f", result.baseMultiplier)}x", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("OT Rate", color = getAdaptiveTextColor(0.5f), fontSize = 9.sp)
+                    Text("${String.format("%.2f", result.otMultiplier)}x", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("ND Premium", color = getAdaptiveTextColor(0.5f), fontSize = 9.sp)
+                    Text("+10% (1.1x)", color = NeonGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Action: Export Bank Transfer File
-            Button(
-                onClick = {
-                    val csvText = buildString {
-                        append("BankCode,RecipientAccount,Amount,RecipientName,ReferenceCode\n")
-                        append("CLAUSE_BANK,1223-4556-991,${String.format("%.2f", netSalary)},${viewModel.currentUserName.value},PAY_CYCLE_JUNE\n")
-                        append("CLAUSE_BANK,1223-4556-992,340.50,Robert Chen,PAY_CYCLE_JUNE\n")
+            // Hour slices breakdown
+            Text("📊 DETAILED HOUR SLICES:", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            val breakdownRows = listOf(
+                Triple("Regular Day Hours", result.hours.regular, result.earnings.regularPay),
+                Triple("Regular Night Diff (10PM - 6AM)", result.hours.nd, result.earnings.ndPay),
+                Triple("Overtime Day Hours", result.hours.ot, result.earnings.otPay),
+                Triple("Overtime Night Diff Hours", result.hours.otNd, result.earnings.otNdPay)
+            )
+
+            breakdownRows.forEach { (label, hr, pay) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(label, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("${String.format("%.2f", hr)} hrs", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                     }
-                    saveCSVToDownloads(context, "Bank_Transfer_Ledger.csv", csvText)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                shape = RoundedCornerShape(10.dp)
+                    Text("₱${String.format("%.2f", pay)}", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                }
+                Divider(color = BorderGrey.copy(alpha = 0.5f))
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(8.dp)).padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.UploadFile, contentDescription = null, tint = Color.Black)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Export Bank Transfer CSV", color = Color.Black, fontWeight = FontWeight.Bold)
+                Text("TOTAL GROSS EARNED", color = NeonGreen, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                Text("₱${String.format("%.2f", result.earnings.totalGrossPay)}", color = NeonGreen, fontWeight = FontWeight.Black, fontSize = 16.sp)
+            }
+        }
+    }
+}
+
+@Composable
+fun SalaryCalculatorView(viewModel: TimeTrackerViewModel, context: Context) {
+    var calcSubTab by remember { mutableStateOf("overview") } // overview, simulator
+    val allLogs by viewModel.allTimeLogs.collectAsState()
+    val config by viewModel.shiftConfig.collectAsState()
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+                .background(getAdaptiveColor(0.04f), RoundedCornerShape(8.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            val tabs = listOf(
+                "overview" to "Wages Ledger",
+                "simulator" to "DOLE Simulator"
+            )
+            tabs.forEach { (tab, label) ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (calcSubTab == tab) NeonGreen else Color.Transparent)
+                        .clickable { calcSubTab = tab }
+                        .padding(vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        color = if (calcSubTab == tab) Color.Black else com.example.ui.theme.AppTextColor,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        when (calcSubTab) {
+            "simulator" -> {
+                InteractiveDoleSimulatorView()
+            }
+            else -> {
+                // Calculate dynamic salary items for the currently active user
+                val userLogs = allLogs.filter { it.employeeName == viewModel.currentUserName.value && it.isApproved == "APPROVED" }
+                
+                var basicHourly = config.hourlyRate.toDouble()
+                if (basicHourly <= 0.0) basicHourly = 25.0
+
+                var totalHours = 0.0
+                var overtimeHours = 0.0
+                var holidayHours = 0.0
+                var nightDiffHours = 0.0
+
+                userLogs.forEach { log ->
+                    val punchIn = log.timeIn ?: return@forEach
+                    val punchOut = log.timeOut ?: return@forEach
+                    val totalMillis = punchOut - punchIn
+                    
+                    val hours = totalMillis.toDouble() / 3600000.0
+                    totalHours += hours
+
+                    // Overtime check (hours exceeding shift standard config)
+                    val shiftDuration = config.shiftDurationHours.toDouble()
+                    if (hours > shiftDuration) {
+                        overtimeHours += (hours - shiftDuration)
+                    }
+
+                    // Holiday pay detection (if log date is in holiday list)
+                    val isHolidayLog = viewModel.localHolidays.value.any { it.date == log.date }
+                    if (isHolidayLog) {
+                        holidayHours += hours
+                    }
+
+                    // Night Differential (10 PM - 6 AM portions simulation)
+                    // Let's assume 15% of total clocked hours fall inside night shifts
+                    nightDiffHours += (hours * 0.15)
+                }
+
+                // Money math
+                val basicSalary = totalHours * basicHourly
+                val overtimePay = overtimeHours * (basicHourly * 1.5)
+                val holidayPay = holidayHours * (basicHourly * 2.0)
+                val nightDiffPay = nightDiffHours * (basicHourly * 0.1)
+                
+                val allowances = 150.0 // Standard hybrid workplace allowance
+                val bonuses = if (totalHours > 40.0) 100.0 else 0.0 // Over-target bonus
+                val deductions = 45.0 // Tax & health lock deductions
+                val loansRepayment = viewModel.loansList.value
+                    .filter { it.employeeName == viewModel.currentUserName.value }
+                    .sumOf { it.monthlyDeduction }
+
+                val netSalary = basicSalary + overtimePay + holidayPay + nightDiffPay + allowances + bonuses - deductions - loansRepayment
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Salary Ledger: ${viewModel.currentUserName.value}", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                            Box(
+                                modifier = Modifier
+                                    .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text("LIVE ESTIMATE", color = NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
+
+                        PayrollDetailRow(label = "Total Approved Hours", value = String.format("%.2f hrs", totalHours))
+                        val currSym = viewModel.getCurrencySymbol()
+                        PayrollDetailRow(label = "Basic Rate (per hr)", value = String.format("${currSym}%.2f", basicHourly))
+                        PayrollDetailRow(label = "Basic Earned Salary", value = String.format("${currSym}%.2f", basicSalary))
+                        PayrollDetailRow(label = "Overtime Pay (1.5x, ${String.format("%.1f", overtimeHours)}h)", value = String.format("${currSym}%.2f", overtimePay))
+                        PayrollDetailRow(label = "Holiday Pay (2x, ${String.format("%.1f", holidayHours)}h)", value = String.format("${currSym}%.2f", holidayPay))
+                        PayrollDetailRow(label = "Night Diff (1.1x, ${String.format("%.1f", nightDiffHours)}h)", value = String.format("${currSym}%.2f", nightDiffPay))
+                        PayrollDetailRow(label = "Standard Allowance", value = String.format("${currSym}%.2f", allowances))
+                        PayrollDetailRow(label = "Performance Bonuses", value = String.format("${currSym}%.2f", bonuses))
+                        PayrollDetailRow(label = "Tax Deductions", value = String.format("-${currSym}%.2f", deductions))
+                        PayrollDetailRow(label = "Active Loan Repayments", value = String.format("-${currSym}%.2f", loansRepayment))
+
+                        Divider(color = BorderGrey, modifier = Modifier.padding(vertical = 10.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Net Compute Salary", color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(String.format("${currSym}%.2f", netSalary), color = NeonGreen, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Action: Export Bank Transfer File
+                        Button(
+                            onClick = {
+                                val csvText = buildString {
+                                    append("BankCode,RecipientAccount,Amount,RecipientName,ReferenceCode\n")
+                                    append("CLAUSE_BANK,1223-4556-991,${String.format("%.2f", netSalary)},${viewModel.currentUserName.value},PAY_CYCLE_JUNE\n")
+                                    append("CLAUSE_BANK,1223-4556-992,340.50,Robert Chen,PAY_CYCLE_JUNE\n")
+                                }
+                                saveCSVToDownloads(context, "Bank_Transfer_Ledger.csv", csvText)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.UploadFile, contentDescription = null, tint = Color.Black)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Export Bank Transfer CSV", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
             }
         }
     }
