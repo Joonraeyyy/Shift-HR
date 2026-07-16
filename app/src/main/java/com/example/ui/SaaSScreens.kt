@@ -1220,15 +1220,14 @@ fun SelfServiceScreen(viewModel: TimeTrackerViewModel, context: Context = LocalC
             .verticalScroll(rememberScrollState())
             .padding(bottom = 100.dp)
     ) {
-        val isLightTheme = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+        val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
 
         // Sub Navigation Tabs for Self-Service
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(CardGreyBg, RoundedCornerShape(10.dp))
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val subTabs = listOf(
                 "leave" to "Leaves",
@@ -1238,20 +1237,38 @@ fun SelfServiceScreen(viewModel: TimeTrackerViewModel, context: Context = LocalC
                 "compliance" to "Legal & OKRs"
             )
             subTabs.forEach { (key, label) ->
+                val isSelected = activeSubTab == key
+
+                // Dynamic color state routing
+                val containerColor = when {
+                    isSelected && !isDarkTheme -> Color(0xFF1D4ED8) // Solid Blue
+                    isSelected && isDarkTheme  -> Color(0x330EA5E9) // 20% Cyan
+                    else -> Color.Transparent
+                }
+
+                val textColor = when {
+                    isSelected && !isDarkTheme -> Color(0xFFFFFFFF)
+                    isSelected && isDarkTheme  -> Color(0xFF38BDF8) // Bright Cyan
+                    !isSelected && !isDarkTheme -> Color(0xFF475569) // Dark Slate Gray
+                    else -> Color(0xFF94A3B8) // Soft Silver
+                }
+
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(if (activeSubTab == key) NeonGreen else Color.Transparent)
+                        .background(containerColor)
                         .clickable { viewModel.selfServiceTab.value = key }
                         .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = label,
-                        color = if (activeSubTab == key) Color.Black else (if (isLightTheme) Color(0xFF475569) else Color.White),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
+                        color = textColor,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        maxLines = 1
                     )
                 }
             }
@@ -1294,35 +1311,52 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
 
     // Live Balances Grid
     Text("My Statutory Leave Balances", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 6.dp))
+    
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+    val cardBg = if (isDark) Color(0x990F172A) else Color(0xD9FFFFFF)
+    val cardBorder = if (isDark) Color(0x14FFFFFF) else Color(0xFFE2E8F0)
+    val textLabelColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+
+    val vacationColor = if (isDark) Color(0xFF60A5FA) else Color(0xFF2563EB)
+    val sickColor = if (isDark) Color(0xFF2DD4BF) else Color(0xFF0D9488)
+    val maternityColor = if (isDark) Color(0xFFFB7185) else Color(0xFFE11D48)
+    val paternityColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF0284C7)
+    val soloParentColor = if (isDark) Color(0xFFFBBF24) else Color(0xFFB45309)
+
     Card(
         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E2124)),
-        border = BorderStroke(1.dp, BorderGrey.copy(alpha = 0.5f))
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, cardBorder)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("Vacation", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    Text("${profile?.vacationLeaveBalance ?: 15} d", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Vacation", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${profile?.vacationLeaveBalance ?: 15} d", color = vacationColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                    Text("Sick", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    Text("${profile?.sickLeaveBalance ?: 10} d", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Sick", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${profile?.sickLeaveBalance ?: 10} d", color = sickColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 if (gender == "Female") {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Maternity (F)", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                        Text("${profile?.maternityLeaveBalance ?: 105} d", color = Color(0xFFFF69B4), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Maternity (F)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("${profile?.maternityLeaveBalance ?: 105} d", color = maternityColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Paternity (M)", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                        Text("${profile?.paternityLeaveBalance ?: 7} d", color = Color(0xFF33B5E5), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text("Paternity (M)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("${profile?.paternityLeaveBalance ?: 7} d", color = paternityColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.2f)) {
-                    Text("Solo Parent", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    Text("${profile?.soloParentLeaveBalance ?: 7} d", color = Color(0xFFFFBB33), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("Solo Parent", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text("${profile?.soloParentLeaveBalance ?: 7} d", color = soloParentColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -3414,11 +3448,23 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
             // ==================== 1. IDENTITY CARD (HERO COMPONENT) ====================
             val currentLog = activeLog
             val isClockedIn = currentLog != null && currentLog.timeIn != null && currentLog.timeOut == null
+            val isDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+
+            // Base card color systems
+            val cardBg = if (isDark) Color(0x990F172A) else Color(0xD9FFFFFF)
+            val cardBorder = if (isDark) Color(0x14FFFFFF) else Color(0xFFE2E8F0)
+            val textPrimary = if (isDark) Color(0xFFFFFFFF) else Color(0xFF0F172A)
+            val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF475569)
+
+            // Sub-badge color systems
+            val badgeBg = if (isDark) Color(0x1AFFFFFF) else Color(0xFFF1F5F9)
+            val badgeText = if (isDark) Color(0xFFE2E8F0) else Color(0xFF334155)
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
-                border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
+                colors = CardDefaults.cardColors(containerColor = cardBg),
+                border = BorderStroke(1.dp, cardBorder)
             ) {
                 Row(
                     modifier = Modifier
@@ -3432,7 +3478,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             .background(getAdaptiveColor(0.05f), CircleShape)
                             .border(
                                 3.dp,
-                                if (isClockedIn) NeonGreen else Color.Gray,
+                                if (isClockedIn) (if (isDark) Color(0xFF34D399) else Color(0xFF10B981)) else Color.Gray,
                                 CircleShape
                             )
                             .padding(4.dp),
@@ -3452,7 +3498,7 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         } else {
                             Text(
                                 text = myProfile.name.take(2).uppercase(),
-                                color = com.example.ui.theme.AppTextColor,
+                                color = textPrimary,
                                 fontSize = 24.sp,
                                 fontWeight = FontWeight.Black
                             )
@@ -3465,13 +3511,13 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         val pronouns = if (myProfile.gender.equals("Female", ignoreCase = true)) "(She/Her)" else "(He/Him)"
                         Text(
                             text = "${myProfile.name} $pronouns",
-                            color = com.example.ui.theme.AppTextColor,
+                            color = textPrimary,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${myProfile.position} • ${myProfile.department}",
-                            color = getAdaptiveTextColor(0.6f),
+                            color = textSecondary,
                             fontSize = 12.sp
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -3481,12 +3527,12 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .background(getAdaptiveColor(0.08f), RoundedCornerShape(6.dp))
+                                    .background(badgeBg, RoundedCornerShape(6.dp))
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "#${myProfile.id}",
-                                    color = getAdaptiveTextColor(0.8f),
+                                    color = badgeText,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -3494,19 +3540,19 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                             Box(
                                 modifier = Modifier
                                     .background(
-                                        if (isClockedIn) NeonGreen.copy(alpha = 0.1f) else getAdaptiveColor(0.05f),
+                                        if (isClockedIn) (if (isDark) Color(0x2610B981) else Color(0xFFE6F4EA)) else badgeBg,
                                         RoundedCornerShape(6.dp)
                                     )
                                     .border(
                                         1.dp,
-                                        if (isClockedIn) NeonGreen.copy(alpha = 0.3f) else getAdaptiveColor(0.15f),
+                                        if (isClockedIn) (if (isDark) Color(0x4010B981) else Color(0xFF137333).copy(alpha = 0.3f)) else cardBorder,
                                         RoundedCornerShape(6.dp)
                                     )
                                     .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = if (isClockedIn) "Clocked In • Regular" else "Clocked Out • Regular",
-                                    color = if (isClockedIn) NeonGreen else getAdaptiveColor(0.6f),
+                                    color = if (isClockedIn) (if (isDark) Color(0xFF34D399) else Color(0xFF137333)) else badgeText,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold
                                 )
