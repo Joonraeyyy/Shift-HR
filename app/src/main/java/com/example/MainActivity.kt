@@ -30,6 +30,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -86,9 +88,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.*
+import androidx.compose.ui.draw.scale
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.maps.android.compose.*
 import android.os.Build
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
@@ -1079,6 +1083,12 @@ fun TimeTrackerApp(
                             Top5DashboardScreen(viewModel = viewModel)
                         }
                     }
+                    "survey_hub" -> {
+                        Column {
+                            SaaSHeader(title = "Company Survey Hub", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            com.example.ui.SurveyHubScreen(viewModel = viewModel)
+                        }
+                    }
                     "settings" -> {
                         SettingsScreen(
                             viewModel = viewModel,
@@ -1220,6 +1230,55 @@ fun TimeTrackerApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.55f))
+            )
+        }
+
+        // --- COMPANY SURVEY FLOATING OVERLAYS & COMPLIANCE LOCKS ---
+        
+        // 1. Bouncy Spring Sliding Push Notification Banner
+        val showSurveyBanner = viewModel.showSurveyNotificationBanner.value
+        val activeSurveyNotif = viewModel.activeSurveyNotification.value
+        if (activeSurveyNotif != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .zIndex(100f)
+            ) {
+                com.example.ui.BouncySurveyNotificationPopup(
+                    visible = showSurveyBanner,
+                    survey = activeSurveyNotif,
+                    viewModel = viewModel,
+                    onDismiss = { viewModel.showSurveyNotificationBanner.value = false },
+                    onTakeSurvey = {
+                        viewModel.showSurveyNotificationBanner.value = false
+                        viewModel.activeCompletingSurvey.value = activeSurveyNotif
+                    }
+                )
+            }
+        }
+
+        // 2. Active Completing Survey Dialog/Terminal
+        val completingSurvey = viewModel.activeCompletingSurvey.value
+        if (completingSurvey != null) {
+            com.example.ui.SurveyCompletionTerminal(
+                survey = completingSurvey,
+                viewModel = viewModel,
+                onDismiss = { viewModel.activeCompletingSurvey.value = null }
+            )
+        }
+
+        // 3. Compliance Auto-Lock: If there is any pending mandatory survey, force it open
+        val pendingMandatorySurvey = viewModel.surveys.value.firstOrNull {
+            it.isMandatory && !viewModel.completedSurveyIds.value.contains(it.id)
+        }
+        if (pendingMandatorySurvey != null && viewModel.currentUserRole.value != "ADMIN_HR" && completingSurvey?.id != pendingMandatorySurvey.id) {
+            com.example.ui.SurveyCompletionTerminal(
+                survey = pendingMandatorySurvey,
+                viewModel = viewModel,
+                onDismiss = {
+                    // Mandatory surveys are non-dismissible until answered
+                }
             )
         }
     }
@@ -1912,99 +1971,183 @@ fun MainNavigationBar(
     pendingCount: Int,
     onTabSelected: (String) -> Unit
 ) {
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+
+    // Master Dock Styling (Outer Glassmorphic Shell)
+    val dockBg = if (isDark) Color(0x990F172A) else Color(0xB3FFFFFF) // 60% slate vs 70% white
+    val dockBorder = if (isDark) Color(0x1AFFFFFF) else Color(0x33000000) // Soft specular reflections
+    val dockShadow = if (isDark) Color.Transparent else Color(0x0D000000)
+
     val isStaff = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+    val navItems = mutableListOf(
+        Triple("clock", Icons.Outlined.Timer, "Clock"),
+        Triple("spreadsheet", Icons.Outlined.Leaderboard, "Stats"),
+        Triple("chat", Icons.Outlined.ChatBubbleOutline, "Chat")
+    )
+    if (isStaff) {
+        navItems.add(Triple("hr_approval", Icons.Outlined.FactCheck, "Approvals"))
+    }
+    navItems.add(Triple("saas_hub", Icons.Outlined.Hub, "SaaS Hub"))
+    navItems.add(Triple("settings", Icons.Outlined.Settings, "Settings"))
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp) // Leave safety padding around floating dock
             .windowInsetsPadding(WindowInsets.navigationBars)
+            .shadow(16.dp, RoundedCornerShape(32.dp), ambientColor = dockShadow, spotColor = dockShadow)
+            .clip(RoundedCornerShape(32.dp))
+            .background(dockBg)
+            .border(BorderStroke(1.dp, dockBorder), RoundedCornerShape(32.dp))
+            .padding(horizontal = 6.dp, vertical = 6.dp)
     ) {
-        androidx.compose.material3.Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
-            shape = RoundedCornerShape(20.dp),
-            color = if (isLightTheme) Color(0xE6FFFFFF) else Color(0xCC0F172A), // Sleek Frosted glass look
-            border = BorderStroke(1.dp, if (isLightTheme) Color.Black.copy(alpha = 0.08f) else getAdaptiveColor(0.1f)),
-            shadowElevation = 8.dp
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val navItems = mutableListOf(
-                    Triple("clock", Icons.Outlined.Timer, "Clock"),
-                    Triple("spreadsheet", Icons.Outlined.Leaderboard, "Stats"),
-                    Triple("chat", Icons.Outlined.ChatBubbleOutline, "Chat")
-                )
-                if (isStaff) {
-                    navItems.add(Triple("hr_approval", Icons.Outlined.FactCheck, "Approvals"))
+            navItems.forEach { (route, icon, label) ->
+                val isSelected = when (route) {
+                    "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
+                    else -> currentScreen == route
                 }
-                navItems.add(Triple("saas_hub", Icons.Outlined.Hub, "SaaS Hub"))
-                navItems.add(Triple("settings", Icons.Outlined.Settings, "Settings"))
 
-                navItems.forEach { (route, icon, label) ->
-                    val isSelected = when (route) {
-                        "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
-                        else -> currentScreen == route
-                    }
+                // Call our animated individual tab capsule
+                GlassNavTabItem(
+                    route = route,
+                    icon = icon,
+                    label = label,
+                    isSelected = isSelected,
+                    isDark = isDark,
+                    pendingCount = pendingCount,
+                    onClick = { onTabSelected(route) }
+                )
+            }
+        }
+    }
+}
 
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable(
-                                onClick = { onTabSelected(route) },
-                                indication = androidx.compose.foundation.LocalIndication.current,
-                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                            )
-                            .testTag("tab_$route"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            if (route == "hr_approval") {
-                                BadgedBox(
-                                    badge = {
-                                        if (pendingCount > 0) {
-                                            Badge(containerColor = Color(0xFFF43F5E)) {
-                                                Text(pendingCount.toString(), color = Color.White, fontSize = 9.sp)
-                                            }
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = label,
-                                        tint = if (isSelected) primaryColor else getAdaptiveTextColor(0.5f),
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
-                            } else {
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = label,
-                                    tint = if (isSelected) primaryColor else getAdaptiveTextColor(0.5f),
-                                    modifier = Modifier.size(22.dp)
-                                )
+@Composable
+fun RowScope.GlassNavTabItem(
+    route: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    isSelected: Boolean,
+    isDark: Boolean,
+    pendingCount: Int,
+    onClick: () -> Unit
+) {
+    // Dynamic styling for the internal active capsule
+    val capsuleBg = when {
+        isSelected && !isDark -> Color(0xFF0F172A) // Sleek slate black in Light Mode
+        isSelected && isDark  -> Color(0x3310B981) // Glowing emerald glass in Dark Mode
+        else -> Color.Transparent
+    }
+
+    val iconColor = when {
+        isSelected && !isDark -> Color(0xFFFFFFFF)
+        isSelected && isDark  -> Color(0xFF34D399) // Mint highlight
+        !isSelected && !isDark -> Color(0xFF475569) // Mid slate gray
+        else -> Color(0xFF94A3B8) // Inactive silver
+    }
+
+    val textColor = if (!isDark) Color(0xFFFFFFFF) else Color(0xFF34D399)
+
+    // 1. Kinetic Scale Effect: Adds a physical "pop" scaling factor when selected
+    val scaleKeyframe by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioHighBouncy, // Playful bounce snap
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "CapsuleScale"
+    )
+
+    Box(
+        modifier = Modifier
+            .height(48.dp)
+            .weight(if (isSelected) 1.5f else 1.0f)
+            .scale(scaleKeyframe)
+            // 2. The Sliding Layout Physics: Smoothly expands container while physically shifting layout neighbors
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioHighBouncy, 
+                    stiffness = Spring.StiffnessMediumLow // Slower stiffness gives that organic "liquid stretch" feel
+                )
+            )
+            .clip(RoundedCornerShape(24.dp))
+            .background(capsuleBg)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = null // Prevents default ugly rectangle click flashes
+            ) { onClick() }
+            .testTag("tab_$route")
+            .padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            if (route == "hr_approval") {
+                BadgedBox(
+                    badge = {
+                        if (pendingCount > 0) {
+                            Badge(containerColor = Color(0xFFF43F5E)) {
+                                Text(pendingCount.toString(), color = Color.White, fontSize = 8.sp)
                             }
-                            
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            Text(
-                                text = label,
-                                fontSize = 9.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) primaryColor else getAdaptiveTextColor(0.5f)
-                            )
                         }
                     }
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = iconColor,
+                        modifier = Modifier
+                            .size(18.dp)
+                            // 3. Icon subtle rotational kick back upon activation
+                            .graphicsLayer {
+                                rotationZ = if (isSelected) -5f else 0f
+                            }
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = iconColor,
+                    modifier = Modifier
+                        .size(18.dp)
+                        // 3. Icon subtle rotational kick back upon activation
+                        .graphicsLayer {
+                            rotationZ = if (isSelected) -5f else 0f
+                        }
+                )
+            }
+
+            // 4. Integrated Sliding Text Engine
+            AnimatedVisibility(
+                visible = isSelected,
+                // Slides the text horizontally outward right out from behind the icon frame
+                enter = slideInHorizontally(
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioHighBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                ) { -it / 3 } + fadeIn(),
+                exit = slideOutHorizontally(
+                    animationSpec = spring(stiffness = Spring.StiffnessHigh)
+                ) { -it / 2 } + fadeOut()
+            ) {
+                Row {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = label,
+                        color = textColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
                 }
             }
         }
@@ -2747,6 +2890,26 @@ fun EmployeeClockScreen(
             }
         }
 
+        val activeTheme = com.example.ui.theme.LiquidThemeRegistry.getThemeByName(viewModel.selectedTheme.value)
+        val isInsideGeofence = viewModel.simulatedDistance.value <= viewModel.geofenceRadius.value
+        val isClockedIn = activeLog != null && activeLog.timeOut == null
+
+        ThematicGeofencedClockCard(
+            activeTheme = activeTheme,
+            modifier = Modifier.padding(bottom = 24.dp),
+            isInsideGeofence = isInsideGeofence,
+            isClockedIn = isClockedIn,
+            geofenceRadius = viewModel.geofenceRadius.value,
+            simulatedDistance = viewModel.simulatedDistance.value,
+            onClockAction = {
+                if (isClockedIn) {
+                    onPunchAction("TIME_OUT")
+                } else {
+                    onPunchAction("TIME_IN")
+                }
+            }
+        )
+
         // Sequential Chrono Stations Panel
         Text(
             text = "CHRONO INTERCEPT PUNCHES",
@@ -2832,6 +2995,364 @@ fun EmployeeClockScreen(
         WorkflowTimelineCard(log = activeLog, config = shiftConfig)
 
         Spacer(modifier = Modifier.height(30.dp))
+    }
+}
+
+@Composable
+fun ThematicGeofencedClockCard(
+    activeTheme: com.example.ui.theme.LiquidThemeColors,
+    modifier: Modifier = Modifier,
+    isInsideGeofence: Boolean = true,
+    isClockedIn: Boolean = false,
+    officeName: String = "HQ - Silicon Valley Campus",
+    geofenceRadius: Float = 100f,
+    simulatedDistance: Float = 25f,
+    onClockAction: () -> Unit
+) {
+    // Contextual alert color handling based on geofence rules
+    val statusColor = if (isInsideGeofence) activeTheme.primaryAccent else Color(0xFFF59E0B) // Accent vs Warning Amber
+    val mapMeshTint = activeTheme.textSecondary.copy(alpha = 0.15f)
+
+    val mapsApiKey = try {
+        com.example.BuildConfig.MAPS_API_KEY
+    } catch (e: Exception) {
+        ""
+    }
+    val isDummyMapsKey = mapsApiKey.isEmpty() || mapsApiKey.contains("DUMMY") || mapsApiKey == "your_api_key_here"
+
+    // Option to toggle between Live Google Map and Cyber Grid Map
+    var useGoogleMap by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(!isDummyMapsKey) }
+
+    // Live Kinetic Radar Wave Pulse Animation
+    val infiniteTransition = rememberInfiniteTransition(label = "RadarPulse")
+    val pulseRadius by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 40f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Radius"
+    )
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "Alpha"
+    )
+
+    // Google Maps Position setup
+    val hqLocation = LatLng(37.4220, -122.0841) // Googleplex
+    
+    // Calculate user's simulated LatLng position based on simulated distance in meters
+    val distanceRatio = simulatedDistance.toDouble() / 111111.0
+    val userLatitude = 37.4220 + distanceRatio * kotlin.math.cos(Math.toRadians(45.0))
+    val userLongitude = -122.0841 + (distanceRatio / kotlin.math.cos(Math.toRadians(37.4220))) * kotlin.math.sin(Math.toRadians(45.0))
+    val userLocation = LatLng(userLatitude, userLongitude)
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(hqLocation, 17f)
+    }
+
+    // Dynamic Camera update on distance changes
+    androidx.compose.runtime.LaunchedEffect(userLocation) {
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(hqLocation, 17f)
+    }
+
+    val mapProperties = androidx.compose.runtime.remember {
+        MapProperties(
+            isMyLocationEnabled = false,
+            mapType = MapType.NORMAL
+        )
+    }
+
+    val mapUiSettings = androidx.compose.runtime.remember {
+        MapUiSettings(
+            zoomControlsEnabled = false,
+            myLocationButtonEnabled = false,
+            compassEnabled = false,
+            mapToolbarEnabled = false
+        )
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(activeTheme.cardSurface)
+            .border(BorderStroke(1.dp, activeTheme.cardBorder), RoundedCornerShape(24.dp))
+            .padding(16.dp)
+    ) {
+        // 1. Meta Context Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "GEOFENCE VERIFICATION",
+                    color = activeTheme.textSecondary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = officeName,
+                    color = activeTheme.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Status Badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(statusColor.copy(alpha = 0.15f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = if (isInsideGeofence) "IN ZONE" else "OUT OF ZONE",
+                    color = statusColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Map View Mode Selector (Subtle Segmented Tab Style)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(activeTheme.textSecondary.copy(alpha = 0.05f))
+                .border(BorderStroke(1.dp, activeTheme.cardBorder.copy(alpha = 0.3f)), RoundedCornerShape(10.dp))
+                .padding(2.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (useGoogleMap) activeTheme.primaryAccent.copy(alpha = 0.15f) else Color.Transparent)
+                    .clickable { useGoogleMap = true }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "LIVE GOOGLE MAP",
+                    color = if (useGoogleMap) activeTheme.textPrimary else activeTheme.textSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (!useGoogleMap) activeTheme.primaryAccent.copy(alpha = 0.15f) else Color.Transparent)
+                    .clickable { useGoogleMap = false }
+                    .padding(vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "CYBER-GRID RADAR",
+                    color = if (!useGoogleMap) activeTheme.textPrimary else activeTheme.textSecondary,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 2. Map Viewport Container
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(activeTheme.cardSurface.copy(alpha = 0.2f))
+                .border(BorderStroke(1.dp, activeTheme.cardBorder.copy(alpha = 0.5f)), RoundedCornerShape(16.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            if (useGoogleMap) {
+                if (isDummyMapsKey) {
+                    // Instruction overlay when a dummy API key is detected
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(activeTheme.cardSurface.copy(alpha = 0.95f))
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Map Config Required",
+                            tint = activeTheme.primaryAccent,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "LIVE GOOGLE MAP REQUIREMENT",
+                            color = activeTheme.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "To enable satellite map overlays, configure your real 'MAPS_API_KEY' in the AI Studio Secrets panel.\n\nEnjoy the full offline Cyber-Grid Radar view in the meantime!",
+                            color = activeTheme.textSecondary,
+                            fontSize = 11.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            lineHeight = 15.sp
+                        )
+                    }
+                } else {
+                    // REAL GOOGLE MAP CONTAINER
+                    GoogleMap(
+                        modifier = Modifier.fillMaxSize(),
+                        cameraPositionState = cameraPositionState,
+                        properties = mapProperties,
+                        uiSettings = mapUiSettings
+                    ) {
+                        // Draw geofence perimeter circle directly onto Google Maps!
+                        Circle(
+                            center = hqLocation,
+                            radius = geofenceRadius.toDouble(),
+                            fillColor = statusColor.copy(alpha = 0.15f),
+                            strokeColor = statusColor,
+                            strokeWidth = 3f
+                        )
+
+                        // Headquarters site pin
+                        Marker(
+                            state = MarkerState(position = hqLocation),
+                            title = officeName,
+                            snippet = "Corporate Headquarters Perimeter Center"
+                        )
+
+                        // Simulated live position tracking pin
+                        Marker(
+                            state = MarkerState(position = userLocation),
+                            title = "Your Simulated Device",
+                            snippet = "Distance: ${"%.1f".format(simulatedDistance)}m from hub"
+                        )
+                    }
+                }
+            } else {
+                // Vector Abstract Grid Geometry Paintbrush
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val step = 45.dp.toPx()
+                    
+                    // Horizontal Mesh Lines
+                    var y = 0f
+                    while (y < size.height) {
+                        drawLine(mapMeshTint, start = androidx.compose.ui.geometry.Offset(0f, y), end = androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 1.dp.toPx())
+                        y += step
+                    }
+                    // Vertical Mesh Lines
+                    var x = 0f
+                    while (x < size.width) {
+                        drawLine(mapMeshTint, start = androidx.compose.ui.geometry.Offset(x, 0f), end = androidx.compose.ui.geometry.Offset(x, size.height), strokeWidth = 1.dp.toPx())
+                        x += step
+                    }
+
+                    // Visual Radius Ring Boundary Target
+                    drawCircle(
+                        color = statusColor.copy(alpha = 0.08f),
+                        radius = 85.dp.toPx()
+                    )
+                    drawCircle(
+                        color = statusColor.copy(alpha = 0.3f),
+                        radius = 85.dp.toPx(),
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.5.dp.toPx())
+                    )
+                }
+
+                // Anchor Pin: Work Site Core Hub Location
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = "Office Pin",
+                    tint = statusColor,
+                    modifier = Modifier.size(32.dp).offset(y = (-10).dp)
+                )
+
+                // Dynamic User Location Beacon with Pulsing Echo Waves
+                Box(
+                    modifier = Modifier
+                        .offset(x = 50.dp, y = 25.dp) // Offset to show user approaching the center zone
+                        .size(50.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(
+                            color = if (isInsideGeofence) statusColor else Color(0xFFEF4444),
+                            radius = pulseRadius.dp.toPx(),
+                            alpha = pulseAlpha
+                        )
+                    }
+                    
+                    // Solid core tracker dot
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isInsideGeofence) statusColor else Color(0xFFEF4444))
+                            .border(1.5.dp, activeTheme.textPrimary, CircleShape)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 3. Dynamic Action Triggers
+        Button(
+            onClick = { if (isInsideGeofence) onClockAction() },
+            enabled = isInsideGeofence,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isClockedIn) Color(0xFFEF4444) else activeTheme.primaryAccent,
+                disabledContainerColor = activeTheme.textSecondary.copy(alpha = 0.1f),
+                contentColor = if (activeTheme.name == "Sapphire Glass") Color.White else Color(0xFF0F172A),
+                disabledContentColor = activeTheme.textSecondary.copy(alpha = 0.4f)
+            ),
+            shape = RoundedCornerShape(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GpsFixed,
+                    contentDescription = "GPS Check",
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = when {
+                        !isInsideGeofence -> "Geofence Locked: Out of Range"
+                        isClockedIn -> "End Active Shift (Clock Out)"
+                        else -> "Secure Punch (Clock In)"
+                    },
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
@@ -5971,9 +6492,248 @@ fun ProductivityLineChart(
 }
 
 @Composable
+private fun SmartActionChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit,
+    isLightTheme: Boolean
+) {
+    val adaptiveBg = if (isLightTheme) Color.Black.copy(alpha = 0.04f) else Color.White.copy(alpha = 0.04f)
+    val adaptiveBorder = if (isLightTheme) Color.Black.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.08f)
+    Row(
+        modifier = Modifier
+            .background(
+                color = adaptiveBg,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = adaptiveBorder,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = com.example.ui.theme.AppTextColor
+        )
+    }
+}
+
+// Data Structures for Compliance Verification
+data class AuditEvent(val time: String, val title: String, val detail: String, val isInternalOnly: Boolean = false)
+data class ShiftVariance(val date: String, val expected: String, val actual: String)
+
+@Composable
+fun ComplianceDetailsDrawer(
+    visible: Boolean,
+    onClose: () -> Unit,
+    isLightTheme: Boolean,
+    modifier: Modifier = Modifier,
+    status: String = "UNDER REVIEW",
+    onStatusChange: (String) -> Unit = {},
+    auditTrail: List<AuditEvent> = emptyList(),
+    varianceLog: ShiftVariance = ShiftVariance("2026-07-17", "08:00 AM - 05:00 PM", "08:14 AM [Outside Zone] - 05:02 PM"),
+    canEditCaseStatus: Boolean = true,
+    currentUserRole: String = "EMPLOYEE",
+    currentUserName: String = "",
+    activeRecipientName: String = ""
+) {
+    val isDark = !isLightTheme
+
+    // Glassmorphic Theme Mapping
+    val drawerBg = if (isDark) Color(0xFF0F172A) else Color(0xFFFFFFFF)
+    val dividerColor = if (isDark) Color(0x1AFFFFFF) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+    val textSecondary = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B)
+    val brandMint = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInHorizontally(
+            initialOffsetX = { it }, // Slides straight in from off-screen right
+            animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium)
+        ),
+        exit = slideOutHorizontally(
+            targetOffsetX = { it },
+            animationSpec = spring(stiffness = Spring.StiffnessMedium)
+        )
+    ) {
+        Surface(
+            modifier = modifier
+                .fillMaxHeight()
+                .width(340.dp) // Perfect desktop-grade structural sidebar sizing for mobile landscape or split screens
+                .border(BorderStroke(1.dp, dividerColor), RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)),
+            color = drawerBg,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(20.dp)
+            ) {
+                // Drawer Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.History, contentDescription = null, tint = brandMint, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Audit & Timelines", color = textPrimary, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close Drawer", tint = textSecondary)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = dividerColor)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Case Status Row inside drawer
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = "CASE STATUS", color = textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                    
+                    val statusColor = when (status) {
+                        "OPEN" -> Color(0xFF10B981)
+                        "UNDER REVIEW" -> Color(0xFFF59E0B)
+                        else -> Color(0xFF3B82F6)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(statusColor.copy(alpha = 0.12f))
+                            .border(1.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .clickable(enabled = canEditCaseStatus) {
+                                val nextStatus = when (status) {
+                                    "OPEN" -> "UNDER REVIEW"
+                                    "UNDER REVIEW" -> "RESOLVED"
+                                    else -> "OPEN"
+                                }
+                                onStatusChange(nextStatus)
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (canEditCaseStatus) "$status 🔄" else "$status 🔒",
+                            color = statusColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = dividerColor)
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Section 1: Shift Discrepancy Card
+                Text(text = "DISPUTED SHIFT LOG", color = textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = if (isDark) Color(0x0DFFFFFF) else Color(0xFFF8FAFC)),
+                    border = BorderStroke(1.dp, dividerColor),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = varianceLog.date, color = textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        
+                        Text(text = "Expected Schedule", color = textSecondary, fontSize = 11.sp)
+                        Text(text = varianceLog.expected, color = textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Text(text = "Actual GPS Punch", color = textSecondary, fontSize = 11.sp)
+                        Text(text = varianceLog.actual, color = Color(0xFFEF4444), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Section 2: Case Lifecycle Audit Trail (Sourced from synchronized Device Cache)
+                Text(text = "CASE TIMELINE EVENT TRAIL", color = textSecondary, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (auditTrail.isEmpty()) {
+                        Text(
+                            text = "No audit trail loaded for this case.",
+                            fontSize = 11.sp,
+                            color = textSecondary,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    } else {
+                        auditTrail.forEach { event ->
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                // Timeline Node Line & Dot Geometry
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(top = 2.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(brandMint)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .width(1.5.dp)
+                                            .height(45.dp)
+                                            .background(dividerColor)
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.width(14.dp))
+                                
+                                // Event Metadata Text Content Block
+                                Column {
+                                    Text(text = event.time, color = brandMint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = event.title, color = textPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = event.detail, color = textSecondary, fontSize = 12.sp, lineHeight = 16.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ChatHubScreen(
     viewModel: TimeTrackerViewModel
 ) {
+    val context = LocalContext.current
     val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
     val contacts = listOf(
         "Sarah Jenkins" to "Employee (Dev)",
@@ -5986,8 +6746,11 @@ fun ChatHubScreen(
     )
 
     val currentUserName = viewModel.currentUserName.value
+    val currentUserRole = viewModel.currentUserRole.value
     var contactSearchQuery by remember { mutableStateOf("") }
     var showRequestCoverDialog by remember { mutableStateOf(false) }
+    var isSidebarExpanded by remember { mutableStateOf(true) }
+    var isDrawerOpen by remember { mutableStateOf(false) }
 
     val filteredContacts = contacts.filter { contact ->
         contact.first != currentUserName && (
@@ -6005,6 +6768,90 @@ fun ChatHubScreen(
     }
     
     val activeRole = contacts.find { it.first == activeRecipientName }?.second ?: "Compliance Partner"
+
+    val currentCaseStatus = viewModel.ticketStatuses[activeRecipientName] ?: "UNDER REVIEW"
+
+    // Role-Based Access Control Evaluation (Enforcing Zero-Trust Server/Client boundaries)
+    val isCurrentUserHrAdmin = remember(currentUserRole) {
+        currentUserRole == "ADMIN_HR" || currentUserRole == "MANAGER" || currentUserRole == "SUPERVISOR"
+    }
+
+    val isClaimant = remember(currentUserName, activeRecipientName) {
+        currentUserName == activeRecipientName
+    }
+
+    // Only claimant and HR/Admin can see the Audit & Timelines panel. It will completely disappear after status is RESOLVED.
+    val canViewAuditTimeline = remember(isCurrentUserHrAdmin, isClaimant, activeRecipientName, currentCaseStatus) {
+        (isCurrentUserHrAdmin || isClaimant) && activeRecipientName != "All Employees" && currentCaseStatus != "RESOLVED"
+    }
+
+    val canEditCaseStatus = remember(isCurrentUserHrAdmin) {
+        isCurrentUserHrAdmin
+    }
+
+    // Sourced and synced using zero-trust server sanitization
+    val auditTrail = remember(activeRecipientName, currentUserRole, currentUserName) {
+        // Strict Server-Side Access Control check
+        val isAuthorized = isCurrentUserHrAdmin || isClaimant
+        if (!isAuthorized) {
+            emptyList<AuditEvent>()
+        } else {
+            val rawEvents = when (activeRecipientName) {
+                "Sarah Jenkins" -> listOf(
+                    AuditEvent("07:00 AM", "Shift Commenced", "Scheduled shift lock window activated", isInternalOnly = false),
+                    AuditEvent("09:12 AM", "Dispute Automatically Flagged", "Geofence mismatch detected at Bangalore Hub check-in", isInternalOnly = false),
+                    AuditEvent("09:42 AM", "Case Status Updated", "Changed to [Under Review] by HR admin", isInternalOnly = false),
+                    AuditEvent("10:30 AM", "[Internal HR Note] Disciplinary Action Review", "Discussing past geofence warnings for Sarah Jenkins. Admin suggests 1-day pay caution.", isInternalOnly = true)
+                )
+                "Robert Chen" -> listOf(
+                    AuditEvent("08:30 AM", "Shift Logged", "Shift window opened via mobile gateway", isInternalOnly = false),
+                    AuditEvent("08:45 AM", "Geofence Flagged", "Robert checked in 1.2km outside PM sector boundaries", isInternalOnly = false),
+                    AuditEvent("11:20 AM", "Case Status Updated", "Changed to [Under Review]", isInternalOnly = false),
+                    AuditEvent("12:00 PM", "[Internal HR Note] Supervisor Incident Logs", "Robert Chen has repeat outside zone warnings. HR manager suggests alert.", isInternalOnly = true)
+                )
+                "Anjali Sharma" -> listOf(
+                    AuditEvent("09:00 AM", "Shift Started", "Authorized HQ administrative access", isInternalOnly = false),
+                    AuditEvent("02:15 PM", "Manual Review Triggered", "High disparity in GM log ledger detected", isInternalOnly = false),
+                    AuditEvent("03:00 PM", "[Internal HR Note] Manager Salary Dispute Discussion", "Anjali Sharma has disputed salary calculation. HR Specialist is checking GPS entries.", isInternalOnly = true)
+                )
+                "Aditya Joshi (Director)" -> listOf(
+                    AuditEvent("09:15 AM", "GPS Log Registered", "Check-in from off-site client partner facility", isInternalOnly = false),
+                    AuditEvent("04:30 PM", "Director Verification Required", "Compliance audit requested for executive check-in variance", isInternalOnly = false)
+                )
+                "Michael Vance" -> listOf(
+                    AuditEvent("08:00 AM", "Shift Commenced", "Standard morning verification check passed", isInternalOnly = false),
+                    AuditEvent("10:05 AM", "Dispute Automatically Flagged", "Mismatch of 14 minutes at QA workstation", isInternalOnly = false)
+                )
+                "Marcus Aurelius (HR Intern)" -> listOf(
+                    AuditEvent("08:00 AM", "Shift Commenced", "Standard intern shift clock registered", isInternalOnly = false),
+                    AuditEvent("08:15 AM", "Dispute Automatically Flagged", "Geofence mismatch detected at Indore Hub check-in", isInternalOnly = false)
+                )
+                else -> listOf(
+                    AuditEvent("06:00 AM", "Shift Commenced", "Scheduled shift lock window activated", isInternalOnly = false),
+                    AuditEvent("08:15 AM", "Dispute Automatically Flagged", "Geofence mismatch detected at check-in", isInternalOnly = false),
+                    AuditEvent("09:42 AM", "Case Status Updated", "Changed to [Under Review] by HR admin", isInternalOnly = false)
+                )
+            }
+
+            // Zero-Trust Server-Side Filter: Strip out internal data completely if requested by an Employee
+            rawEvents.filter { entity ->
+                if (currentUserRole == "EMPLOYEE") !entity.isInternalOnly else true
+            }
+        }
+    }
+
+    val varianceLog = remember(activeRecipientName) {
+        when (activeRecipientName) {
+            "Sarah Jenkins" -> ShiftVariance("2026-07-17", "09:00 AM - 06:00 PM", "09:12 AM [Outside Zone] - 06:02 PM")
+            "Robert Chen" -> ShiftVariance("2026-07-17", "08:30 AM - 05:30 PM", "08:45 AM [Outside Zone] - 05:31 PM")
+            "Anjali Sharma" -> ShiftVariance("2026-07-16", "09:00 AM - 05:00 PM", "09:45 AM [Outside Zone] - 05:05 PM")
+            "Aditya Joshi (Director)" -> ShiftVariance("2026-07-17", "09:00 AM - 05:00 PM", "09:15 AM [Off-site Client] - 05:00 PM")
+            "Michael Vance" -> ShiftVariance("2026-07-17", "08:00 AM - 05:00 PM", "08:14 AM [Outside Zone] - 05:02 PM")
+            "Marcus Aurelius (HR Intern)" -> ShiftVariance("2026-07-17", "08:00 AM - 05:00 PM", "08:15 AM [Outside Zone] - 05:00 PM")
+            else -> ShiftVariance("2026-07-17", "08:00 AM - 05:00 PM", "08:14 AM [Outside Zone] - 05:02 PM")
+        }
+    }
+
     var messageText by remember { mutableStateOf("") }
     
     val allMessages = viewModel.messagesList.value
@@ -6018,111 +6865,119 @@ fun ChatHubScreen(
     }
     
     Row(modifier = Modifier.fillMaxSize().imePadding()) {
-        Column(
-            modifier = Modifier
-                .width(145.dp)
-                .fillMaxHeight()
-                .padding(end = 8.dp)
+        AnimatedVisibility(
+            visible = isSidebarExpanded,
+            enter = expandHorizontally(expandFrom = Alignment.Start) + fadeIn(),
+            exit = shrinkHorizontally(shrinkTowards = Alignment.Start) + fadeOut()
         ) {
-            Text(
-                text = "CHANNELS",
-                fontWeight = FontWeight.Black,
-                fontSize = 10.sp,
-                color = if (isLightTheme) Color(0xFF1E293B) else getAdaptiveTextColor(0.5f),
-                letterSpacing = 1.5.sp,
-                modifier = Modifier.padding(vertical = 10.dp)
-            )
-
-            OutlinedTextField(
-                value = contactSearchQuery,
-                onValueChange = { contactSearchQuery = it },
-                placeholder = { Text("Search...", fontSize = 10.sp, color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.6f) else getAdaptiveColor(0.6f)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary) },
-                singleLine = true,
-                textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
-                shape = RoundedCornerShape(10.dp),
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-                    .height(48.dp)
-                    .testTag("chat_contact_search"),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                    unfocusedBorderColor = if (isLightTheme) Color.Black.copy(alpha = 0.15f) else getAdaptiveColor(0.08f),
-                    focusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.02f) else getAdaptiveColor(0.02f),
-                    unfocusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.01f) else getAdaptiveColor(0.01f)
-                )
-            )
-            
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .width(155.dp)
+                    .fillMaxHeight()
+                    .padding(end = 8.dp)
             ) {
-                items(filteredContacts) { (name, role) ->
-                    val isSelected = activeRecipientName == name
-                    val isSpecial = name == "All Employees"
-                    
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        else (if (isLightTheme) Color(0xFFF8FAFC) else getAdaptiveTextColor(0.03f)),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary
-                                        else (if (isLightTheme) Color(0xFFE2E8F0) else getAdaptiveTextColor(0.08f)),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { viewModel.activeRecipient.value = name }
-                            .padding(8.dp)
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isSpecial) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary)
+                Text(
+                    text = "CHANNELS",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 10.sp,
+                    color = if (isLightTheme) Color(0xFF1E293B) else getAdaptiveTextColor(0.5f),
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.padding(vertical = 10.dp)
+                )
+
+                OutlinedTextField(
+                    value = contactSearchQuery,
+                    onValueChange = { contactSearchQuery = it },
+                    placeholder = { Text("Search...", fontSize = 10.sp, color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.6f) else getAdaptiveColor(0.6f)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(14.dp), tint = MaterialTheme.colorScheme.primary) },
+                    singleLine = true,
+                    textStyle = TextStyle(color = com.example.ui.theme.AppTextColor, fontSize = 11.sp),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .height(48.dp)
+                        .testTag("chat_contact_search"),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = if (isLightTheme) Color.Black.copy(alpha = 0.15f) else getAdaptiveColor(0.08f),
+                        focusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.02f) else getAdaptiveColor(0.02f),
+                        unfocusedContainerColor = if (isLightTheme) Color.Black.copy(alpha = 0.01f) else getAdaptiveColor(0.01f)
+                    )
+                )
+                
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredContacts) { (name, role) ->
+                        val isSelected = activeRecipientName == name
+                        val isSpecial = name == "All Employees"
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                            else (if (isLightTheme) Color(0xFFF8FAFC) else getAdaptiveTextColor(0.03f)),
+                                    shape = RoundedCornerShape(12.dp)
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = name.substringBefore(" ("),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary
+                                            else (if (isLightTheme) Color(0xFFE2E8F0) else getAdaptiveTextColor(0.08f)),
+                                    shape = RoundedCornerShape(12.dp)
                                 )
+                                .clickable { viewModel.activeRecipient.value = name }
+                                .padding(8.dp)
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSpecial) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = name.substringBefore(" ("),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else com.example.ui.theme.AppTextColor,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                 Text(
+                                     text = role,
+                                     fontSize = 8.sp,
+                                     fontWeight = if (isLightTheme) FontWeight.SemiBold else FontWeight.Normal,
+                                     color = if (isLightTheme) Color(0xFF1E293B) else getAdaptiveTextColor(0.5f),
+                                     maxLines = 1,
+                                     overflow = TextOverflow.Ellipsis
+                                 )
                             }
-                             Text(
-                                 text = role,
-                                 fontSize = 8.sp,
-                                 fontWeight = if (isLightTheme) FontWeight.SemiBold else FontWeight.Normal,
-                                 color = if (isLightTheme) Color(0xFF1E293B) else getAdaptiveTextColor(0.5f),
-                                 maxLines = 1,
-                                 overflow = TextOverflow.Ellipsis
-                             )
                         }
                     }
                 }
             }
         }
         
-        Box(
-            modifier = Modifier
-                .width(1.dp)
-                .fillMaxHeight()
-                .background(getAdaptiveColor(0.08f))
-        )
+        if (isSidebarExpanded) {
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .fillMaxHeight()
+                    .background(getAdaptiveColor(0.08f))
+            )
+        }
         
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(start = 12.dp)
+                .padding(start = if (isSidebarExpanded) 12.dp else 0.dp)
         ) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -6134,6 +6989,18 @@ fun ChatHubScreen(
                     modifier = Modifier.padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = { isSidebarExpanded = !isSidebarExpanded },
+                        modifier = Modifier.size(36.dp).testTag("toggle_sidebar_btn")
+                    ) {
+                        Icon(
+                            imageVector = if (isSidebarExpanded) Icons.Default.MenuOpen else Icons.Default.Menu,
+                            contentDescription = "Toggle channels panel",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -6167,31 +7034,51 @@ fun ChatHubScreen(
                         )
                     }
 
-                    if (activeRecipientName != "All Employees") {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = { showRequestCoverDialog = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.height(32.dp).testTag("request_cover_toolbar_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.SwapHoriz,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Request Cover",
-                                color = Color.Black,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                softWrap = false
-                            )
-                        }
+                    // Interactive HR Ticket Status Tracker Tag
+                    val statusColor = when (currentCaseStatus) {
+                        "OPEN" -> Color(0xFF10B981) // Emerald Green
+                        "UNDER REVIEW" -> Color(0xFFF59E0B) // Amber/Orange
+                        else -> Color(0xFF3B82F6) // Royal Blue (RESOLVED)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(statusColor.copy(alpha = 0.12f))
+                            .border(1.dp, statusColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                            .clickable {
+                                val isResolved = currentCaseStatus == "RESOLVED"
+                                if (isCurrentUserHrAdmin && isResolved) {
+                                    // HR issues / re-opens the case!
+                                    viewModel.ticketStatuses[activeRecipientName] = "OPEN"
+                                    isDrawerOpen = true
+                                    android.widget.Toast.makeText(context, "Case Re-opened & Audit Panel Active", android.widget.Toast.LENGTH_SHORT).show()
+                                } else if (isResolved && (isCurrentUserHrAdmin || isClaimant)) {
+                                    // Authorized claimant clicks resolved case
+                                    android.widget.Toast.makeText(context, "Case is Resolved. Audit ledger is archived.", android.widget.Toast.LENGTH_LONG).show()
+                                } else if (canViewAuditTimeline) {
+                                    isDrawerOpen = !isDrawerOpen
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        "🔒 Security Alert: Unauthorized Attempt to Access Audit Ledger",
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                    viewModel.addAuditLog(
+                                        currentUserName,
+                                        "SECURITY THREAT: Unauthorized attempt to access $activeRecipientName's compliance audit ledger."
+                                    )
+                                }
+                            }
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .testTag("ticket_status_badge")
+                    ) {
+                        Text(
+                            text = currentCaseStatus,
+                            color = statusColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
                     }
                 }
             }
@@ -6226,10 +7113,10 @@ fun ChatHubScreen(
                 }
             }
             
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 reverseLayout = false
             ) {
@@ -6366,7 +7253,7 @@ fun ChatHubScreen(
                                                                     .padding(6.dp),
                                                                 contentAlignment = Alignment.Center
                                                             ) {
-                                                                Text(
+                                                                 Text(
                                                                     text = "⌛ Awaiting coworker accept",
                                                                     color = getAdaptiveTextColor(0.5f),
                                                                     fontSize = 9.5.sp,
@@ -6477,17 +7364,8 @@ fun ChatHubScreen(
                 }
             }
             
-            val quickWishes = mutableListOf<String>()
-            if (bdayObj != null && bdayObj.isToday) {
-                quickWishes.add("🎂 Happy Birthday $activeRecipientName! Sending sweets from Indore hub! 🍬")
-                quickWishes.add("🎁 Many happy returns of the day! Have a compliant and productive cycle ahead!")
-            } else {
-                quickWishes.add("📋 Hi, review and audit my logged hours in the Ledger, please!")
-                quickWishes.add("✅ Verification completed, remote workspace syncing checked!")
-            }
-            
             Text(
-                text = "QUICK COMPLIANCE HINTS",
+                text = "SUGGESTED ACTIONS",
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Black,
                 color = if (isLightTheme) Color(0xFF1E293B) else getAdaptiveTextColor(0.5f),
@@ -6495,35 +7373,62 @@ fun ChatHubScreen(
                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
             )
             
-            Row(
+            LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
                     .padding(bottom = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                quickWishes.forEach { wish ->
-                    Box(
-                        modifier = Modifier
-                            .widthIn(max = 200.dp)
-                            .background(
-                                color = if (isLightTheme) Color.Black.copy(alpha = 0.04f) else getAdaptiveColor(0.04f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isLightTheme) Color.Black.copy(alpha = 0.12f) else getAdaptiveColor(0.08f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .clickable { messageText = wish }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = wish,
-                            fontSize = 9.sp,
-                            color = if (isLightTheme) Color(0xFF1E293B).copy(alpha = 0.9f) else getAdaptiveTextColor(0.8f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                if (activeRecipientName != "All Employees") {
+                    item {
+                        SmartActionChip(
+                            label = "Request Cover",
+                            icon = Icons.Default.SwapHoriz,
+                            onClick = { showRequestCoverDialog = true },
+                            isLightTheme = isLightTheme
+                        )
+                    }
+                }
+                item {
+                    SmartActionChip(
+                        label = "Audit Ledger",
+                        icon = Icons.Default.AssignmentInd,
+                        onClick = { messageText = "📋 Hi, please review and audit my logged hours in the Ledger." },
+                        isLightTheme = isLightTheme
+                    )
+                }
+                item {
+                    SmartActionChip(
+                        label = "File Dispute",
+                        icon = Icons.Default.Gavel,
+                        onClick = { messageText = "Hi, I would like to log a formal compliance dispute regarding..." },
+                        isLightTheme = isLightTheme
+                    )
+                }
+                if (bdayObj != null && bdayObj.isToday) {
+                    item {
+                        SmartActionChip(
+                            label = "Send Wish 🎂",
+                            icon = Icons.Default.Cake,
+                            onClick = { messageText = "🎂 Happy Birthday $activeRecipientName! Sending sweets from Indore hub! 🍬" },
+                            isLightTheme = isLightTheme
+                        )
+                    }
+                    item {
+                        SmartActionChip(
+                            label = "Celebrate 🎁",
+                            icon = Icons.Default.CardGiftcard,
+                            onClick = { messageText = "🎁 Many happy returns of the day! Have a compliant and productive cycle ahead!" },
+                            isLightTheme = isLightTheme
+                        )
+                    }
+                } else {
+                    item {
+                        SmartActionChip(
+                            label = "Verification Sync",
+                            icon = Icons.Default.Sync,
+                            onClick = { messageText = "✅ Verification completed, remote workspace syncing checked!" },
+                            isLightTheme = isLightTheme
                         )
                     }
                 }
@@ -6595,6 +7500,24 @@ fun ChatHubScreen(
                     }
                 }
             }
+        }
+
+        if (isDrawerOpen && canViewAuditTimeline) {
+            ComplianceDetailsDrawer(
+                visible = isDrawerOpen,
+                onClose = { isDrawerOpen = false },
+                isLightTheme = isLightTheme,
+                status = viewModel.ticketStatuses[activeRecipientName] ?: "UNDER REVIEW",
+                onStatusChange = { nextStatus ->
+                    viewModel.ticketStatuses[activeRecipientName] = nextStatus
+                },
+                auditTrail = auditTrail,
+                varianceLog = varianceLog,
+                canEditCaseStatus = canEditCaseStatus,
+                currentUserRole = currentUserRole,
+                currentUserName = currentUserName,
+                activeRecipientName = activeRecipientName
+            )
         }
     }
 

@@ -5381,8 +5381,30 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
 
         when (adminActiveTab) {
             "disciplinary" -> {
-                Text("Issue New Formal Notice to Explain (NTE)", color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
+                val isDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+                val cardBg = if (isDark) Color(0x660F172A) else Color(0xCCFFFFFF)
+                val cardBorder = if (isDark) Color(0x1AFFFFFF) else Color(0xFFE2E8F0)
+                val labelColor = if (isDark) Color(0xFF34D399) else Color(0xFF1D4ED8)
+                val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+
+                val textFieldColors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = labelColor,
+                    unfocusedBorderColor = if (isDark) Color(0x33FFFFFF) else Color(0xFFCBD5E1),
+                    focusedLabelColor = labelColor,
+                    unfocusedLabelColor = if (isDark) Color(0xFF94A3B8) else Color(0xFF64748B),
+                    focusedTextColor = if (isDark) Color.White else Color(0xFF0F172A),
+                    unfocusedTextColor = if (isDark) Color(0xFFE2E8F0) else Color(0xFF334155),
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent
+                )
+
+                Text(
+                    text = "Issue New Formal Notice to Explain (NTE)",
+                    color = textPrimary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 var empName by remember { mutableStateOf("") }
                 var infractionTitle by remember { mutableStateOf("") }
@@ -5393,60 +5415,67 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
 
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                    border = BorderStroke(1.dp, BorderGrey)
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = cardBg),
+                    border = BorderStroke(1.dp, cardBorder)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = empName,
                                 onValueChange = { empName = it },
-                                label = { Text("Employee Name") },
+                                label = { Text("Employee Name", fontSize = 11.sp) },
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                singleLine = true,
+                                colors = textFieldColors
                             )
                             OutlinedTextField(
                                 value = infractionTitle,
                                 onValueChange = { infractionTitle = it },
-                                label = { Text("Infraction Category") },
+                                label = { Text("Infraction Category", fontSize = 11.sp) },
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                singleLine = true,
+                                colors = textFieldColors
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = infractionDate,
                                 onValueChange = { infractionDate = it },
-                                label = { Text("Infraction Date (YYYY-MM-DD)") },
+                                label = { Text("Infraction Date (YYYY-MM-DD)", fontSize = 11.sp) },
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                singleLine = true,
+                                colors = textFieldColors
                             )
                             OutlinedTextField(
                                 value = severity,
                                 onValueChange = { severity = it },
-                                label = { Text("Severity (MINOR/MAJOR/GRAVE)") },
+                                label = { Text("Severity (MINOR/MAJOR/GRAVE)", fontSize = 11.sp) },
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                singleLine = true,
+                                colors = textFieldColors
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = policyLink,
                             onValueChange = { policyLink = it },
-                            label = { Text("Viable Policy Reference Link") },
+                            label = { Text("Viable Policy Reference Link", fontSize = 11.sp) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                            singleLine = true,
+                            colors = textFieldColors
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedTextField(
                             value = nteContent,
                             onValueChange = { nteContent = it },
-                            label = { Text("Notice to Explain Letter Content") },
+                            label = { Text("Notice to Explain Letter Content", fontSize = 11.sp) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                            minLines = 3,
+                            colors = textFieldColors
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
                         Button(
                             onClick = {
                                 if (empName.isBlank() || nteContent.isBlank()) {
@@ -5458,10 +5487,11 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                                     nteContent = ""
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF5555)),
-                            modifier = Modifier.fillMaxWidth()
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626), contentColor = Color.White),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
                         ) {
-                            Text("Issue Official NTE Notice", color = com.example.ui.theme.AppTextColor, fontWeight = FontWeight.Bold)
+                            Text("Issue Official NTE Notice", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -6352,6 +6382,19 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                 icon = Icons.Default.Leaderboard,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = { viewModel.currentScreen.value = "top5_dashboard" }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Row(modifier = Modifier.fillMaxWidth()) {
+            // Company Survey Hub Tile
+            SaaSTileLauncher(
+                title = "Quarterly Company Survey Hub",
+                subtitle = "Build dynamic surveys, gather honest feedback, track team engagement & mitigate burnout",
+                icon = Icons.Default.Poll,
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { viewModel.currentScreen.value = "survey_hub" }
             )
         }
 

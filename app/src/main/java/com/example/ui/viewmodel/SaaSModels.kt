@@ -345,6 +345,32 @@ fun calculateDoleShiftPay(
     )
 }
 
+// --- COMPANY SURVEY MODULE DATA MODELS ---
+enum class QuestionType { TEXT, RATING_1_TO_5 }
+
+data class SurveyQuestion(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val text: String,
+    val type: QuestionType
+)
+
+data class CompanySurvey(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val description: String,
+    val isMandatory: Boolean,
+    val questions: List<SurveyQuestion>,
+    val responsesCount: Int = 0
+)
+
+data class SurveyResponse(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val surveyId: String,
+    val employeeName: String,
+    val answers: Map<String, String> // questionId to answer text or rating
+)
+
+
 
 
 

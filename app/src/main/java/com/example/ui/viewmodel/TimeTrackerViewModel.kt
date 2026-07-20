@@ -3,6 +3,7 @@ package com.example.ui.viewmodel
 import android.app.Application
 import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import com.example.data.WeatherResponse
 import com.example.data.ForecastResponse
 import com.example.data.WeatherServiceClient
@@ -594,6 +595,7 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var activeRecipient = mutableStateOf("Marcus Aurelius")
     var messagesList = mutableStateOf<List<Message>>(emptyList())
     var birthdayList = mutableStateOf<List<BirthdayInfo>>(emptyList())
+    var ticketStatuses = androidx.compose.runtime.mutableStateMapOf<String, String>()
 
     val productivityRecords = mapOf(
         "Sarah Jenkins" to listOf(
@@ -1803,7 +1805,105 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         )
         selectedWeatherCity.value = city
     }
+
+    // --- COMPANY SURVEY MODULE STATES & METRIC ENGINES ---
+    var surveys = mutableStateOf<List<CompanySurvey>>(listOf(
+        CompanySurvey(
+            id = "prepopulated-1",
+            title = "Q2 2026 Shift-Timing & Flexibility Survey",
+            description = "Gathering insights on remote shift tracking and timezone overlap adjustments.",
+            isMandatory = false,
+            questions = listOf(
+                SurveyQuestion("q1", "Rate the flexibility of our current core hour policy (1-5)", QuestionType.RATING_1_TO_5),
+                SurveyQuestion("q2", "Describe any scheduling conflicts you face with other teams", QuestionType.TEXT)
+            ),
+            responsesCount = 18
+        ),
+        CompanySurvey(
+            id = "prepopulated-2",
+            title = "Annual Workstation & Tooling Evaluation",
+            description = "A standard compliance survey evaluating physical desk ergonomics and IDE licensing.",
+            isMandatory = true,
+            questions = listOf(
+                SurveyQuestion("q3", "Rate your hardware/laptop performance for daily compilation (1-5)", QuestionType.RATING_1_TO_5),
+                SurveyQuestion("q4", "What software tools do you require to improve daily output?", QuestionType.TEXT)
+            ),
+            responsesCount = 24
+        )
+    ))
+
+    var surveyResponses = mutableStateOf<List<SurveyResponse>>(listOf(
+        SurveyResponse("r1", "prepopulated-1", "Aditya Joshi", mapOf("q1" to "4", "q2" to "Occasional meetings outside standard hours.")),
+        SurveyResponse("r2", "prepopulated-1", "Liam Vance", mapOf("q1" to "5", "q2" to "None, scheduling is very smooth.")),
+        SurveyResponse("r3", "prepopulated-2", "Sophia Martinez", mapOf("q3" to "3", "q4" to "More memory/RAM for local Docker development."))
+    ))
+
+    var activeSurveyNotification = mutableStateOf<CompanySurvey?>(null)
+    var showSurveyNotificationBanner = mutableStateOf(false)
+    var activeCompletingSurvey = mutableStateOf<CompanySurvey?>(null)
+    var completedSurveyIds = mutableStateOf<Set<String>>(setOf("prepopulated-2"))
+    var activeDraftAnswers = mutableStateMapOf<String, String>()
+
+    fun postSurvey(survey: CompanySurvey) {
+        surveys.value = surveys.value + survey
+        activeSurveyNotification.value = survey
+        showSurveyNotificationBanner.value = true
+        
+        addNotification(
+            title = "New Survey Broadcasted",
+            message = "A new survey '${survey.title}' has been successfully published for employee completion.",
+            isAlert = survey.isMandatory
+        )
+    }
+
+    fun submitSurveyResponse(surveyId: String, answers: Map<String, String>) {
+        val response = SurveyResponse(
+            surveyId = surveyId,
+            employeeName = currentUserName.value,
+            answers = answers
+        )
+        surveyResponses.value = surveyResponses.value + response
+        
+        // Update response count in surveys
+        surveys.value = surveys.value.map {
+            if (it.id == surveyId) {
+                it.copy(responsesCount = it.responsesCount + 1)
+            } else {
+                it
+            }
+        }
+        
+        // Mark as completed
+        completedSurveyIds.value = completedSurveyIds.value + surveyId
+        
+        // Clear active completing survey
+        if (activeCompletingSurvey.value?.id == surveyId) {
+            activeCompletingSurvey.value = null
+        }
+        
+        // Clear draft answers
+        activeDraftAnswers.clear()
+        
+        addNotification(
+            title = "Survey Submitted",
+            message = "Thank you! Response recorded for: ${surveys.value.find { it.id == surveyId }?.title ?: ""}",
+            isAlert = false
+        )
+    }
+
+    fun deleteSurvey(surveyId: String) {
+        surveys.value = surveys.value.filter { it.id != surveyId }
+        surveyResponses.value = surveyResponses.value.filter { it.surveyId != surveyId }
+        if (activeSurveyNotification.value?.id == surveyId) {
+            activeSurveyNotification.value = null
+            showSurveyNotificationBanner.value = false
+        }
+        if (activeCompletingSurvey.value?.id == surveyId) {
+            activeCompletingSurvey.value = null
+        }
+    }
 }
+
 
 data class NotificationItem(
     val id: String,

@@ -184,8 +184,7 @@ object LiquidThemeRegistry {
     )
 
     val allThemes = listOf(
-        SapphireGlass, EmeraldGlass, MidnightGlass, AmethystGlass, SunsetGlass,
-        SapphireLightGlass, EmeraldLightGlass, AlabasterLightGlass, AmethystLightGlass, SunsetLightGlass
+        SapphireGlass, EmeraldGlass, MidnightGlass, AmethystGlass, SunsetGlass
     )
 
     fun getThemeByName(name: String): LiquidThemeColors {
