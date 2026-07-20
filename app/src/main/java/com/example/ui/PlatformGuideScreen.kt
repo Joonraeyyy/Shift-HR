@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -901,9 +902,11 @@ fun TryOutSpreadsheetSimulator(viewModel: TimeTrackerViewModel, context: Context
 // INTERACTIVE PLATFORM FLOWCHART & ARCHITECTURE
 // ==========================================
 
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun InteractiveDiagramSection(context: Context) {
     var selectedNode by remember { mutableStateOf<String?>(null) }
+    var selectedSubTab by remember { mutableStateOf("flowchart") } // "flowchart", "system", "database", "apis", "ui", "files"
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -915,125 +918,521 @@ fun InteractiveDiagramSection(context: Context) {
             fontWeight = FontWeight.Black,
             color = NeonGreen,
             letterSpacing = 1.5.sp
-            )
+        )
         Text(
-            "Interactive System Audit & Compliance Flowchart. Tap nodes to investigate audit steps.",
+            "Designed by Senior Staff Engineers to Scale to Millions of Users",
             fontSize = 11.sp,
             color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Flowchart Layout drawing lines & nodes
-        Column(
+        // Horizontal Scrollable Sub-Tabs for Deep-Dive Architecture
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(16.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .horizontalScroll(rememberScrollState())
+                .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(8.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Node 1
-            DiagramNode(
-                id = "trust",
-                label = "1. CLIENT DEVICE TRUST",
-                desc = "MDM hardware binding & jailbreak check",
-                icon = Icons.Default.Security,
-                isSelected = selectedNode == "trust",
-                onClick = { selectedNode = "trust" }
+            val tabs = listOf(
+                "flowchart" to "🔗 Flow",
+                "system" to "🌐 System",
+                "database" to "🗄️ Database",
+                "apis" to "🔌 APIs",
+                "ui" to "🎨 UI Flow",
+                "files" to "📂 Files"
             )
-
-            // Connection Arrow 1
-            FlowArrow()
-
-            // Node 2
-            DiagramNode(
-                id = "biometrics",
-                label = "2. BIOMETRIC FACE LIVENESS",
-                desc = "Liveness checking & biometric verification",
-                icon = Icons.Default.Face,
-                isSelected = selectedNode == "biometrics",
-                onClick = { selectedNode = "biometrics" }
-            )
-
-            // Connection Arrow 2
-            FlowArrow()
-
-            // Node 3
-            DiagramNode(
-                id = "geofence",
-                label = "3. GPS GEOFENCE AUDITING",
-                desc = "Real-time perimeter coordinate bounding",
-                icon = Icons.Default.MyLocation,
-                isSelected = selectedNode == "geofence",
-                onClick = { selectedNode = "geofence" }
-            )
-
-            // Connection Arrow 3
-            FlowArrow()
-
-            // Node 4
-            DiagramNode(
-                id = "ledger",
-                label = "4. LEDGER SYNC & PAYROLL EXPORT",
-                desc = "Calculates basic, night-diff, overtime & logs",
-                icon = Icons.Default.Analytics,
-                isSelected = selectedNode == "ledger",
-                onClick = { selectedNode = "ledger" }
-            )
+            tabs.forEach { (id, title) ->
+                val isSelected = selectedSubTab == id
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isSelected) NeonGreen else Color.Transparent)
+                        .clickable { selectedSubTab = id }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = if (isSelected) Color.Black else Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Popover Details panel based on selectedNode
-        AnimatedVisibility(
-            visible = selectedNode != null,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            if (selectedNode != null) {
-                val nodeDetails = when (selectedNode) {
-                    "trust" -> Triple(
-                        "Client Device Trust Gateway",
-                        "The system binds a secure MDM identifier token on initial login. Every check-in/out action validates that the device is approved and has not been rooted/compromised, immediately blocking spoofed environments.",
-                        "API Guard: SecureHardwareIDCheck / Mock COORDINATES BLOCKED"
-                    )
-                    "biometrics" -> Triple(
-                        "Real-time Liveness Biometrics Match",
-                        "Leverages edge computing camera frames to execute instant biometric checks. Confirms that the physical face matches the registered profile parameters in high fidelity, preventing visual image fraud.",
-                        "Core Validator: FaceIdentityMatcher / LivenessCheck"
-                    )
-                    "geofence" -> Triple(
-                        "GPS Geofence Auditor",
-                        "Triggers sub-second geodesic audits checking proximity to corporate branches (e.g. Indore Hub/Manila Hub). Blocks the action immediately if the employee falls outside the 100-meter safety radius.",
-                        "Radius Controller: GeodistanceValidator / GeofenceShield"
-                    )
-                    "ledger" -> Triple(
-                        "Secured Payroll & Compliance Ledger",
-                        "Combines shifts configurations, worked hours, custom lunch breaks, and holidays calendar to automatically compute exact earnings (including 1.5x Standard Overtime rates and Night-Shift differentials). Reports are permanently compiled.",
-                        "Payroll Core: LedgerExporter / OvertimeCalculator"
-                    )
-                    else -> Triple("", "", "")
-                }
+        AnimatedContent(
+            targetState = selectedSubTab,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(250)) with fadeOut(animationSpec = tween(250))
+            }
+        ) { targetSubTab ->
+            when (targetSubTab) {
+                "flowchart" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Interactive System Audit & Compliance Flowchart. Tap nodes to investigate audit steps.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                            textAlign = TextAlign.Center
+                        )
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = NeonGreen.copy(alpha = 0.08f)),
-                    border = BorderStroke(1.dp, NeonGreen)
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Verified, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(nodeDetails.first, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.02f), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(16.dp))
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            // Node 1
+                            DiagramNode(
+                                id = "trust",
+                                label = "1. CLIENT DEVICE TRUST",
+                                desc = "MDM hardware binding & jailbreak check",
+                                icon = Icons.Default.Security,
+                                isSelected = selectedNode == "trust",
+                                onClick = { selectedNode = "trust" }
+                            )
+
+                            // Connection Arrow 1
+                            FlowArrow()
+
+                            // Node 2
+                            DiagramNode(
+                                id = "biometrics",
+                                label = "2. BIOMETRIC FACE LIVENESS",
+                                desc = "Liveness checking & biometric verification",
+                                icon = Icons.Default.Face,
+                                isSelected = selectedNode == "biometrics",
+                                onClick = { selectedNode = "biometrics" }
+                            )
+
+                            // Connection Arrow 2
+                            FlowArrow()
+
+                            // Node 3
+                            DiagramNode(
+                                id = "geofence",
+                                label = "3. GPS GEOFENCE AUDITING",
+                                desc = "Real-time perimeter coordinate bounding",
+                                icon = Icons.Default.MyLocation,
+                                isSelected = selectedNode == "geofence",
+                                onClick = { selectedNode = "geofence" }
+                            )
+
+                            // Connection Arrow 3
+                            FlowArrow()
+
+                            // Node 4
+                            DiagramNode(
+                                id = "ledger",
+                                label = "4. LEDGER SYNC & PAYROLL EXPORT",
+                                desc = "Calculates basic, night-diff, overtime & logs",
+                                icon = Icons.Default.Analytics,
+                                isSelected = selectedNode == "ledger",
+                                onClick = { selectedNode = "ledger" }
+                            )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(nodeDetails.second, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, lineHeight = 18.sp)
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("SYSTEM SERVICE: ${nodeDetails.third}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        AnimatedVisibility(
+                            visible = selectedNode != null,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            if (selectedNode != null) {
+                                val nodeDetails = when (selectedNode) {
+                                    "trust" -> Triple(
+                                        "Client Device Trust Gateway",
+                                        "The system binds a secure MDM identifier token on initial login. Every check-in/out action validates that the device is approved and has not been rooted/compromised, immediately blocking spoofed environments.",
+                                        "API Guard: SecureHardwareIDCheck / Mock COORDINATES BLOCKED"
+                                    )
+                                    "biometrics" -> Triple(
+                                        "Real-time Liveness Biometrics Match",
+                                        "Leverages edge computing camera frames to execute instant biometric checks. Confirms that the physical face matches the registered profile parameters in high fidelity, preventing visual image fraud.",
+                                        "Core Validator: FaceIdentityMatcher / LivenessCheck"
+                                    )
+                                    "geofence" -> Triple(
+                                        "GPS Geofence Auditor",
+                                        "Triggers sub-second geodesic audits checking proximity to corporate branches (e.g. Indore Hub/Manila Hub). Blocks the action immediately if the employee falls outside the 100-meter safety radius.",
+                                        "Radius Controller: GeodistanceValidator / GeofenceShield"
+                                    )
+                                    "ledger" -> Triple(
+                                        "Secured Payroll & Compliance Ledger",
+                                        "Combines shifts configurations, worked hours, custom lunch breaks, and holidays calendar to automatically compute exact earnings (including 1.5x Standard Overtime rates and Night-Shift differentials). Reports are permanently compiled.",
+                                        "Payroll Core: LedgerExporter / OvertimeCalculator"
+                                    )
+                                    else -> Triple("", "", "")
+                                }
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = NeonGreen.copy(alpha = 0.08f)),
+                                    border = BorderStroke(1.dp, NeonGreen)
+                                ) {
+                                    Column(modifier = Modifier.padding(14.dp)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(Icons.Default.Verified, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(nodeDetails.first, color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(nodeDetails.second, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, lineHeight = 18.sp)
+                                        Spacer(modifier = Modifier.height(10.dp))
+                                        Text("SYSTEM SERVICE: ${nodeDetails.third}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "system" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🌐 HYBRID CLOUD SYSTEM ARCHITECTURE",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = "To scale to 10M+ users with sub-100ms response times globally, we deploy an offline-first hybrid architecture featuring a local Room DB, local biometrics processing, and an asynchronous, background sync-worker pipeline that integrates with a multi-region Google Cloud deployment.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+
+                        // Key Architectural Layers
+                        val layers = listOf(
+                            Triple("1. EDGE / CLIENT CONTAINER", "Android App (Kotlin, Compose, Room DB) implements dynamic Geofencing, offline SQLite indexing, and local encryption. Network failures are handled gracefully using an automatic retry mechanism.", Icons.Default.Smartphone),
+                            Triple("2. GLOBAL CDN & EDGE GATEWAY", "Cloudflare CDN and Google Cloud API Gateway manage TLS termination, DDoS filtering, IP geofencing, and Token-Bucket rate-limiting to prevent heavy bot spam.", Icons.Default.CloudQueue),
+                            Triple("3. SECURE AUTHENTICATION", "Firebase Authentication combined with JSON Web Tokens (JWT) and customized dynamic Role-Based Access Control (RBAC) securely protects confidential HR ledgers from unauthorized internal personnel.", Icons.Default.VpnKey),
+                            Triple("4. DISTRIBUTED MICROSERVICES", "High-performance Go/Kotlin microservices run on Google Cloud Run with autoscaling. They handle audit trail generation, document parsing pipelines, and biometrics matches.", Icons.Default.Dns),
+                            Triple("5. TRANSACTIONAL & ANALYTICAL DB", "Google Cloud Spanner guarantees high-availability ACID database transactions globally for time-clock logs, coupled with a distributed Redis cluster for read cache layers.", Icons.Default.Storage)
+                        )
+
+                        layers.forEach { (title, desc, icon) ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.02f)),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Icon(icon, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(title, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(desc, fontSize = 10.sp, color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), lineHeight = 14.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                "database" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🗄️ PRODUCTION DATABASE SCHEMA",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = "This application utilizes a clean, normalized relational database structure. Locally, Jetpack Room SQLite tables guarantee data durability during network dropouts, which is automatically synchronized with Google Cloud Spanner.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+
+                        // Table Schema card 1: Time Logs
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("TABLE: time_logs (Local-First Offline Ledger)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "• id (PrimaryKey, AutoGenerate): Long\n" +
+                                           "• date (Indexed): String [YYYY-MM-DD]\n" +
+                                           "• employeeName: String\n" +
+                                           "• timeIn / timeOut: Long (Timestamp)\n" +
+                                           "• lunchOut / lunchIn: Long (Timestamp)\n" +
+                                           "• gpsLatitude / gpsLongitude: Double\n" +
+                                           "• gpsLocationName: String\n" +
+                                           "• isSynced (Boolean): default false\n" +
+                                           "• isApproved (String): PENDING | APPROVED | REJECTED\n" +
+                                           "• hourlyRate: Double (For instant serverless payout calculations)",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+
+                        // Table Schema card 2: Shift Config
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("TABLE: shift_configs (Compliance Perimeters)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "• id (PrimaryKey): String [Branch UID]\n" +
+                                           "• branchName: String\n" +
+                                           "• latitude / longitude: Double\n" +
+                                           "• allowedRadiusMeters: Double [Default: 100.0]\n" +
+                                           "• shiftStartHour / shiftEndHour: Int\n" +
+                                           "• nightDiffMultiplier: Double [Default: 1.15]",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+
+                        // Table Schema card 3: Dossier Documents
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.03f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("TABLE: dossier_documents (Encrypted Attachment Index)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "• id (PrimaryKey): String [UUID]\n" +
+                                           "• fileName: String\n" +
+                                           "• localFilePath: String (Encrypted App sandbox storage)\n" +
+                                           "• category: String [LEAVE_SLIP | CORRECTION_RECEIPT | OTHER]\n" +
+                                           "• profileId: String (Foreign key matching employee)\n" +
+                                           "• timestamp: Long (Creation time)\n" +
+                                           "• syncStatus: String [PENDING | SYNCING | SYNCED | FAILED]",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                "apis" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🔌 SECURE ENDPOINT SPECIFICATIONS",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = "All communications use HTTPS/TLS 1.3. Payloads contain SHA-256 HMAC cryptographic signatures of timestamps to completely neutralize replay and man-in-the-middle attacks.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+
+                        // Endpoint 1: Sync Time Clock
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF030712)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("POST /api/v1/sync/punches", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                    Text("RATE LIMIT: 30r/m", fontSize = 8.sp, color = Color(0xFFF59E0B), fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Request Payload:\n{\n  \"device_id\": \"mdm-android-99178-vba\",\n  \"punches\": [\n    {\n      \"uuid\": \"d290f1ee-6c54-4b01-90e6-d701748f0851\",\n      \"employee_name\": \"Sarah Jenkins\",\n      \"timestamp\": 1784534400000,\n      \"type\": \"TIME_IN\",\n      \"gps_coords\": { \"lat\": 12.97159, \"lng\": 77.59456 },\n      \"signature\": \"8a7f96b27...\"\n    }\n  ]\n}",
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF34D399),
+                                    lineHeight = 12.sp
+                                )
+                            }
+                        }
+
+                        // Endpoint 2: Biometrics Match
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF030712)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("POST /api/v1/verify/biometrics", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                    Text("SECURE PIPELINE", fontSize = 8.sp, color = NeonGreen, fontWeight = FontWeight.Bold)
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Request Payload:\n{\n  \"employee_name\": \"Sarah Jenkins\",\n  \"facial_vector\": [0.015, -0.224, 0.451, ...],\n  \"liveness_confidence_score\": 0.9984,\n  \"is_spoof_detected\": false\n}\n\nResponse (200 OK):\n{\n  \"match_verified\": true,\n  \"access_token\": \"jwt-access-token-string-...\"\n}",
+                                    fontSize = 9.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF34D399),
+                                    lineHeight = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+                "ui" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "🎨 UNIDIRECTIONAL STATE FLOW (UDF)",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = "The application UI is fully reactive and robust, complying strictly with Android Modern Architecture rules. User events bubble up to the TimeTrackerViewModel, which statefully modifies standard Kotlin Flow structures. The Compose views automatically recompose based on those updates with absolute performance.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+
+                        // Render dynamic UDF flowchart
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.02f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.05f))
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, NeonGreen, RoundedCornerShape(4.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Text("1. COMPOSE COMPOSABLE (USER UI EVENT)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                }
+                                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Text("2. VIEWMODEL STATE MUTATION (MUTABLESTATEFLOW)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Text("3. ASYNC COROUTINE & ROOM DB UPDATE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                                Icon(Icons.Default.ArrowDownward, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                                        .border(1.dp, NeonGreen, RoundedCornerShape(4.dp))
+                                        .padding(8.dp)
+                                ) {
+                                    Text("4. COMPOSABLE COLLECTS STATE (AUTOMATIC RECOMPOSITION)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                                }
+                            }
+                        }
+                    }
+                }
+                "files" -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "📂 PROJECT ARCHITECTURE FILE STRUCTURE",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonGreen
+                        )
+                        Text(
+                            text = "Clean Architecture is followed in our codebase, dividing files logically into data, domain, repository, database, viewmodel, and ui. This is highly scalable, enabling multiple developers to build features concurrently without conflict.",
+                            fontSize = 11.sp,
+                            color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                            lineHeight = 16.sp
+                        )
+
+                        // Interactive Tree View
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "📁 app/src/main/java/com/example/\n" +
+                                           " ├── 📁 data/\n" +
+                                           " │    ├── 📁 database/        [Room SQLite AppDatabase, DAOs, Entities]\n" +
+                                           " │    │    ├── AppDatabase.kt\n" +
+                                           " │    │    ├── TimeLogEntity.kt\n" +
+                                           " │    │    ├── ShiftConfigEntity.kt\n" +
+                                           " │    │    └── DossierDocumentEntity.kt\n" +
+                                           " │    ├── 📁 repository/      [Clean Repository Interface pattern]\n" +
+                                           " │    │    └── TimeTrackerRepository.kt\n" +
+                                           " │    └── 📁 services/        [REST GeminiModels/Weather API clients]\n" +
+                                           " ├── 📁 ui/\n" +
+                                           " │    ├── 📁 theme/           [Central Colors, Fonts & Material3 styles]\n" +
+                                           " │    ├── 📁 viewmodel/       [Unidirectional state handlers]\n" +
+                                           " │    │    └── TimeTrackerViewModel.kt\n" +
+                                           " │    ├── SaasScreens.kt      [Dynamic Multi-Tenant SaaS Workspace]\n" +
+                                           " │    ├── Top5DashboardScreen.kt [Staff analytics and active metrics]\n" +
+                                           " │    └── PlatformGuideScreen.kt [This Interactive Architectural Guide]\n" +
+                                           " └── MainActivity.kt         [Single Activity Root Coordinator]",
+                                    fontSize = 10.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    color = Color(0xFF38BDF8),
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
                     }
                 }
             }
