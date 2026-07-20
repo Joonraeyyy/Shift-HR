@@ -59,6 +59,13 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+  packaging {
+    resources {
+      excludes += "META-INF/LICENSE*"
+      excludes += "META-INF/NOTICE*"
+      excludes += "META-INF/DEPENDENCIES"
+    }
+  }
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
@@ -113,6 +120,10 @@ dependencies {
   implementation(libs.retrofit)
   implementation(libs.play.services.maps)
   implementation(libs.maps.compose)
+
+  // OpenHTMLtoPDF core engine and PDF rendering box
+  implementation("com.openhtmltopdf:openhtmltopdf-core:1.0.10")
+  implementation("com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

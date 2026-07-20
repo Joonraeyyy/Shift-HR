@@ -1281,6 +1281,28 @@ fun TimeTrackerApp(
                 }
             )
         }
+
+        // Floating Liquid Dynamic Menu Overlay for rapid terminal access
+        com.example.ui.RadialLiquidMenuWrapper(
+            onTerminalSelected = { selection ->
+                when (selection) {
+                    "CAPTURE" -> {
+                        viewModel.currentScreen.value = "core_hr"
+                        val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(viewModel.currentUserName.value, ignoreCase = true) }
+                        currentUserProfile?.let { profile ->
+                            onScanDocument(profile.id)
+                        }
+                    }
+                    "PAYSLIP" -> {
+                        viewModel.currentScreen.value = "payroll"
+                        viewModel.activePayrollSubView.value = "payslips"
+                    }
+                    "CALENDAR" -> {
+                        viewModel.currentScreen.value = "supervisor_schedule"
+                    }
+                }
+            }
+        )
     }
     }
     }

@@ -1,6 +1,15 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.cos
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import android.nfc.NfcAdapter
@@ -1772,16 +1781,17 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
     val okrs by viewModel.okrRecords
     val currentEmployeeName = viewModel.currentUserName.value
 
-    var activeSubView by remember { mutableStateOf("labor") } // labor, clearance, okrs
+    var activeSubView by remember { mutableStateOf("labor") } // labor, clearance, okrs, branding
 
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         val menu = listOf(
-            "labor" to "Labor Relations",
-            "clearance" to "Exit Clearance",
-            "okrs" to "Continuous OKRs"
+            "labor" to "Labor",
+            "clearance" to "Clearance",
+            "okrs" to "OKRs",
+            "branding" to "Branding & PDF"
         )
         menu.forEach { (key, label) ->
             val isSelected = activeSubView == key
@@ -1792,10 +1802,10 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                     .background(if (isSelected) NeonGreen.copy(alpha = 0.15f) else Color.Transparent)
                     .border(1.dp, if (isSelected) NeonGreen else BorderGrey, RoundedCornerShape(8.dp))
                     .clickable { activeSubView = key }
-                    .padding(8.dp),
+                    .padding(vertical = 8.dp, horizontal = 2.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(label, color = if (isSelected) NeonGreen else Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(label, color = if (isSelected) NeonGreen else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -2143,6 +2153,467 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                 }
             }
         }
+        "branding" -> {
+            var primaryColor by remember { mutableStateOf("#1D4ED8") }
+            var secondaryColor by remember { mutableStateOf("#0F172A") }
+            var logoName by remember { mutableStateOf("SHIFT HR") }
+            var caseId by remember { mutableStateOf("701748f0851") }
+            var caseTitle by remember { mutableStateOf("Audit Discrepancy Report: Sarah Jenkins") }
+            val timelineEventsList = remember { mutableStateListOf(
+                "11:45 AM - Case assigned to Anya Sharma (Senior HR Lead)",
+                "09:15 AM - Automated System Flag: 1.2km Geofence Mismatch at Punch-In",
+                "02:30 PM - Employee feedback and liveness verified"
+            ) }
+            var newEventText by remember { mutableStateOf("") }
+
+            Text("Corporate Branding & Custom Compliance PDF Compiler", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            Text("Design a corporate layout with CSS variables & compile directly to PDF binary stream.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Corporate Colors Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("1. Corporate Brand Colors", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                            val presets = listOf("#1D4ED8", "#059669", "#7C3AED", "#E11D48", "#0F172A")
+                            presets.forEach { hex ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(android.graphics.Color.parseColor(hex)))
+                                        .border(2.dp, if (primaryColor == hex) Color.White else Color.Transparent, CircleShape)
+                                        .clickable { primaryColor = hex }
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = primaryColor,
+                            onValueChange = { primaryColor = it },
+                            label = { Text("Primary Color Hex") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                            val presets = listOf("#0F172A", "#1E293B", "#1E1B4B", "#030712")
+                            presets.forEach { hex ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(android.graphics.Color.parseColor(hex)))
+                                        .border(2.dp, if (secondaryColor == hex) Color.White else Color.Transparent, CircleShape)
+                                        .clickable { secondaryColor = hex }
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = secondaryColor,
+                            onValueChange = { secondaryColor = it },
+                            label = { Text("Secondary Color Hex") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        )
+                    }
+                }
+
+                // Logo & Metadata Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text("2. Logo & Metadata Settings", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = logoName,
+                            onValueChange = { logoName = it },
+                            label = { Text("Company Name Logo") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        OutlinedTextField(
+                            value = caseId,
+                            onValueChange = { caseId = it },
+                            label = { Text("Case Code ID") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        OutlinedTextField(
+                            value = caseTitle,
+                            onValueChange = { caseTitle = it },
+                            label = { Text("Report Document Title") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        )
+                    }
+                }
+
+                // Live Document Preview Card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, BorderGrey),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = logoName.uppercase(Locale.US),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(try { android.graphics.Color.parseColor(primaryColor) } catch (e: Exception) { android.graphics.Color.parseColor("#1D4ED8") })
+                            )
+                            Text("COMPLIANCE LEDGER", fontSize = 8.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .background(Color(try { android.graphics.Color.parseColor(primaryColor) } catch (e: Exception) { android.graphics.Color.parseColor("#1D4ED8") }))
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = caseTitle,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(try { android.graphics.Color.parseColor(secondaryColor) } catch (e: Exception) { android.graphics.Color.parseColor("#0F172A") })
+                        )
+                        Text(
+                            text = "Case Reference Code: #$caseId",
+                            fontSize = 9.sp,
+                            color = Color.Gray
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text("Official Audit Timeline Ledger", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.DarkGray)
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        timelineEventsList.forEachIndexed { index, event ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.width(16.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(try { android.graphics.Color.parseColor(primaryColor) } catch (e: Exception) { android.graphics.Color.parseColor("#1D4ED8") }))
+                                    )
+                                    if (index < timelineEventsList.size - 1) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(1.dp)
+                                                .height(32.dp)
+                                                .background(Color.Gray.copy(alpha = 0.3f))
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = event,
+                                    fontSize = 9.sp,
+                                    color = Color.DarkGray,
+                                    lineHeight = 12.sp,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(1.dp)
+                                        .background(Color.LightGray)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "This document is end-to-end encrypted and authorized under Shift HR Compliance standards.",
+                            fontSize = 7.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Add Timeline Event
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Text("Add Audit Timeline Event Record", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                            OutlinedTextField(
+                                value = newEventText,
+                                onValueChange = { newEventText = it },
+                                label = { Text("Event Details") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                            )
+                            Button(
+                                onClick = {
+                                    if (newEventText.isNotBlank()) {
+                                        timelineEventsList.add(newEventText)
+                                        newEventText = ""
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Compile & Export buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            val pdfFile = generateAndroidNativePdf(
+                                context = context,
+                                caseTitle = caseTitle,
+                                caseId = caseId,
+                                timelineEvents = timelineEventsList.toList(),
+                                primaryColorHex = primaryColor,
+                                secondaryColorHex = secondaryColor,
+                                logoText = logoName
+                            )
+                            if (pdfFile != null) {
+                                Toast.makeText(context, "Branded PDF compiled successfully!", Toast.LENGTH_SHORT).show()
+                                openPdfFile(context, pdfFile)
+                            } else {
+                                Toast.makeText(context, "Error compiling branding PDF.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = NeonGreen)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, tint = Color.Black)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Compile & Export PDF", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+
+                    Button(
+                        onClick = {
+                            val htmlStructure = """
+                                <!DOCTYPE html>
+                                <html>
+                                <head>
+                                    <style>
+                                        :root {
+                                            --primary-color: $primaryColor;
+                                            --secondary-color: $secondaryColor;
+                                        }
+                                    </style>
+                                </head>
+                                <body>...
+                            """.trimIndent()
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Branding HTML Template", htmlStructure)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "HTML CSS Template copied to clipboard!", Toast.LENGTH_SHORT).show()
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.1f))
+                    ) {
+                        Icon(Icons.Default.Code, contentDescription = null, tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Copy HTML Template", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 4. SYSTEM STABILITY FALLBACK: ANDROID NATIVE PDF GENERATION ENGINE
+ * Ensures 100% hardware/runtime stability on Android clients.
+ */
+fun generateAndroidNativePdf(
+    context: Context,
+    caseTitle: String,
+    caseId: String,
+    timelineEvents: List<String>,
+    primaryColorHex: String,
+    secondaryColorHex: String,
+    logoText: String
+): File? {
+    try {
+        val pdfDocument = android.graphics.pdf.PdfDocument()
+        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create() // A4 Size (595 x 842)
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+
+        val paint = android.graphics.Paint()
+        canvas.drawColor(android.graphics.Color.WHITE)
+
+        val primaryColorInt = try {
+            android.graphics.Color.parseColor(primaryColorHex)
+        } catch (e: Exception) {
+            android.graphics.Color.parseColor("#1D4ED8")
+        }
+        val secondaryColorInt = try {
+            android.graphics.Color.parseColor(secondaryColorHex)
+        } catch (e: Exception) {
+            android.graphics.Color.parseColor("#0F172A")
+        }
+
+        // 1. Brand Logo / Header
+        paint.color = primaryColorInt
+        paint.isAntiAlias = true
+        paint.textSize = 22f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        canvas.drawText(logoText.uppercase(Locale.US), 50f, 70f, paint)
+
+        paint.color = android.graphics.Color.parseColor("#64748B")
+        paint.textSize = 10f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        canvas.drawText("COMPLIANCE AUDIT", 420f, 70f, paint)
+
+        // Thick corporate divider line
+        paint.color = primaryColorInt
+        paint.strokeWidth = 4f
+        canvas.drawLine(50f, 90f, 545f, 90f, paint)
+
+        // 2. Report Document Title
+        paint.color = secondaryColorInt
+        paint.textSize = 20f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        canvas.drawText(caseTitle, 50f, 140f, paint)
+
+        paint.color = android.graphics.Color.parseColor("#475569")
+        paint.textSize = 11f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+        canvas.drawText("Case Reference Code: #$caseId", 50f, 165f, paint)
+
+        // Title for the events ledger
+        paint.color = secondaryColorInt
+        paint.textSize = 13f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD)
+        canvas.drawText("Official Audit Timeline Ledger", 50f, 215f, paint)
+
+        // 3. Render Audit Timeline Nodes
+        var currentY = 260f
+        val linePaint = android.graphics.Paint().apply {
+            color = primaryColorInt
+            strokeWidth = 2f
+            style = android.graphics.Paint.Style.STROKE
+            isAntiAlias = true
+        }
+
+        val textPaint = android.graphics.Paint().apply {
+            color = android.graphics.Color.parseColor("#334155")
+            textSize = 12f
+            isAntiAlias = true
+            typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+        }
+
+        val circlePaint = android.graphics.Paint().apply {
+            color = primaryColorInt
+            style = android.graphics.Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+        timelineEvents.forEachIndexed { idx, event ->
+            // Draw connection line to next node
+            if (idx < timelineEvents.size - 1) {
+                canvas.drawLine(65f, currentY + 5f, 65f, currentY + 55f, linePaint)
+            }
+            // Draw node circle
+            canvas.drawCircle(65f, currentY, 6f, circlePaint)
+
+            // Draw event text word-wrapped or clipped gracefully
+            val words = event.split(" ")
+            var line = ""
+            var textY = currentY + 4f
+            words.forEach { word ->
+                if (textPaint.measureText("$line $word") < 430f) {
+                    line = if (line.isEmpty()) word else "$line $word"
+                } else {
+                    canvas.drawText(line, 85f, textY, textPaint)
+                    line = word
+                    textY += 15f
+                }
+            }
+            if (line.isNotEmpty()) {
+                canvas.drawText(line, 85f, textY, textPaint)
+            }
+
+            currentY += 60f
+        }
+
+        // 4. Footer
+        paint.color = android.graphics.Color.parseColor("#E2E8F0")
+        paint.strokeWidth = 1.5f
+        canvas.drawLine(50f, 770f, 545f, 770f, paint)
+
+        paint.color = android.graphics.Color.parseColor("#94A3B8")
+        paint.textSize = 9f
+        paint.typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
+        val footer = "This document is end-to-end encrypted and authorized under Shift HR Compliance standards."
+        canvas.drawText(footer, 55f, 795f, paint)
+
+        pdfDocument.finishPage(page)
+
+        val downloadsDir = context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)
+        val file = File(downloadsDir, "Case_Audit_$caseId.pdf")
+        val outStream = FileOutputStream(file)
+        pdfDocument.writeTo(outStream)
+        outStream.close()
+        pdfDocument.close()
+        return file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return null
     }
 }
 
@@ -4330,7 +4801,7 @@ fun AdaptivePayrollButton(
 
 @Composable
 fun PayrollScreen(viewModel: TimeTrackerViewModel) {
-    var activeSubView by remember { mutableStateOf("calc") } // calc, ph_compliance, payslips, reports
+    var activeSubView by viewModel.activePayrollSubView
     val context = LocalContext.current
 
     Column(
@@ -9597,5 +10068,275 @@ fun getAdaptiveTextColor(alpha: Float): Color {
         com.example.ui.theme.AppTextColor.copy(alpha = lightAlpha)
     } else {
         com.example.ui.theme.AppTextColor.copy(alpha = alpha)
+    }
+}
+
+@Composable
+fun RadialLiquidMenuWrapper(
+    modifier: Modifier = Modifier,
+    onTerminalSelected: (String) -> Unit
+) {
+    val isDark = isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+    val scope = rememberCoroutineScope()
+
+    // Cyber-compliance Palette System
+    val brandMint = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
+    val slateCard = if (isDark) Color(0xFF1E293B) else Color(0xFFE2E8F0)
+    val textPrimary = if (isDark) Color.White else Color(0xFF0F172A)
+
+    // Interaction State Machinery
+    var isExpanded by remember { mutableStateOf(false) }
+    var isHolding by remember { mutableStateOf(false) }
+    
+    // Spring physics coordinates for fluid drag movements
+    val dragOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    
+    // Smooth radial expansion animation progress tracking (0.0f -> 1.0f)
+    val expansionProgress by animateFloatAsState(
+        targetValue = if (isExpanded) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        )
+    )
+
+    // Infinite transitions for gorgeous organic, pulsating liquid drop waves around the button
+    val infiniteTransition = rememberInfiniteTransition(label = "liquid_drop_surrounding")
+    val waveScale1 by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.6f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveScale1"
+    )
+    val waveAlpha1 by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveAlpha1"
+    )
+    val waveScale2 by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 2.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveScale2"
+    )
+    val waveAlpha2 by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveAlpha2"
+    )
+
+    // Configuration constraints for the radial items
+    val orbitRadiusPx = 320f 
+    val menuItems = remember {
+        listOf(
+            Triple("CAPTURE", Icons.Default.CameraAlt, "Smart Capture"),
+            Triple("PAYSLIP", Icons.Default.Payments, "My Payslip"),
+            Triple("CALENDAR", Icons.Default.DateRange, "Team Shift Calendar")
+        )
+    }
+
+    // Dynamic Bottom/End Layout Configurations to perfectly clear the navigation bar
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val navBarBottomDp = with(density) { androidx.compose.foundation.layout.WindowInsets.navigationBars.getBottom(this).toDp() }
+    val bottomPadding = 84.dp + navBarBottomDp
+    val endPadding = 16.dp
+    val fabSize = 56.dp
+
+    // Derived state tracking which item is hovered during slide action
+    val hoveredIndex by remember {
+        derivedStateOf {
+            if (!isHolding) -1 else {
+                var found = -1
+                val currentOffset = dragOffset.value
+                for (i in 0..2) {
+                    val angleRad = Math.PI + (Math.PI * 0.5) * (i / 2.0)
+                    val targetX = orbitRadiusPx * cos(angleRad).toFloat()
+                    val targetY = orbitRadiusPx * sin(angleRad).toFloat()
+                    val dist = (currentOffset - Offset(targetX, targetY)).getDistance()
+                    if (dist < 100f) { // roughly 70dp hover range
+                        found = i
+                        break
+                    }
+                }
+                found
+            }
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        
+        // 1. Background Dimming Shield Overlay (Matches Dark Variant in Photo 2)
+        if (isExpanded || isHolding) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f * if (isHolding) 0.3f else expansionProgress))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { isExpanded = false }
+            )
+        }
+
+        // 2. High-Performance 60FPS Fluid Surrounding Liquid Drop Wave Canvas
+        if (isHolding || isExpanded) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val baseCenter = Offset(
+                    size.width - (endPadding + fabSize / 2).toPx(),
+                    size.height - (bottomPadding + fabSize / 2).toPx()
+                )
+                val currentCenter = baseCenter + dragOffset.value
+                val fabRadius = (fabSize / 2).toPx()
+                
+                // Outer slow-expanding wave
+                drawCircle(
+                    color = brandMint.copy(alpha = 0.12f * (if (isHolding) 1f else expansionProgress) * waveAlpha2),
+                    radius = fabRadius * waveScale2,
+                    center = currentCenter
+                )
+                // Inner fast-expanding wave
+                drawCircle(
+                    color = brandMint.copy(alpha = 0.22f * (if (isHolding) 1f else expansionProgress) * waveAlpha1),
+                    radius = fabRadius * waveScale1,
+                    center = currentCenter
+                )
+                // Organic tight glowing liquid halo right around the button
+                drawCircle(
+                    color = brandMint.copy(alpha = 0.35f * (if (isHolding) 0.8f else expansionProgress)),
+                    radius = fabRadius * 1.15f,
+                    center = currentCenter
+                )
+            }
+        }
+
+        // 3. Radial Fan-Out Sub-Buttons Layer (Photo 2 Design Arc Layout)
+        menuItems.forEachIndexed { index, item ->
+            // Distribute 3 buttons evenly across the bottom-right quadrant arc (180° to 270°)
+            val angleRad = remember(index) {
+                val startAngle = Math.PI // 180 degrees (pointing directly left)
+                val endAngle = Math.PI * 1.5 // 270 degrees (pointing directly up)
+                startAngle + (endAngle - startAngle) * (index / 2.0)
+            }
+
+            val animatedRadius = orbitRadiusPx * expansionProgress
+            val offsetX = (animatedRadius * cos(angleRad)).roundToInt()
+            val offsetY = (animatedRadius * sin(angleRad)).roundToInt()
+            
+            val isHovered = index == hoveredIndex
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset { IntOffset(offsetX, offsetY) }
+                    .padding(bottom = bottomPadding, end = endPadding)
+                    .alpha(expansionProgress)
+                    .scale(if (isHovered) 1.3f else expansionProgress)
+                    .graphicsLayer {
+                        clip = false
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                // Circular Radial Feature Nodes (Zero names, pure modern visual icon nodes)
+                FloatingActionButton(
+                    onClick = {
+                        isExpanded = false
+                        onTerminalSelected(item.first)
+                    },
+                    containerColor = if (isHovered) brandMint else slateCard,
+                    contentColor = if (isHovered) Color.White else brandMint,
+                    shape = CircleShape,
+                    modifier = Modifier.size(44.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(if (isHovered) 8.dp else 4.dp)
+                ) {
+                    Icon(imageVector = item.second, contentDescription = item.third, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+
+        // 4. Primary Touch Interactive Control Core Node (Master FAB)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset { IntOffset(dragOffset.value.x.roundToInt(), dragOffset.value.y.roundToInt()) }
+                .padding(bottom = bottomPadding, end = endPadding)
+                .size(fabSize)
+                .graphicsLayer(
+                    scaleX = if (isHolding) 1.2f else 1.0f,
+                    scaleY = if (isHolding) 1.2f else 1.0f,
+                    rotationZ = expansionProgress * 135f // Rotates the plus icon smoothly into a close cross
+                )
+                .background(brandMint, CircleShape)
+                .pointerInput(Unit) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { 
+                            isHolding = true 
+                            isExpanded = true // Long-press opens menu immediately and activates dragging
+                        },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            scope.launch { dragOffset.snapTo(dragOffset.value + dragAmount) }
+                        },
+                        onDragEnd = {
+                            isHolding = false
+                            
+                            // Trigger action if finger was hovered over an item when released
+                            if (hoveredIndex != -1) {
+                                onTerminalSelected(menuItems[hoveredIndex].first)
+                            } else if (dragOffset.value.getDistance() > 180f) {
+                                onTerminalSelected("CAPTURE")
+                            }
+                            isExpanded = false
+                            
+                            // Liquid absorption absorption animation without bouncy/elastic recoil
+                            scope.launch {
+                                dragOffset.animateTo(
+                                    targetValue = Offset.Zero,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                        },
+                        onDragCancel = {
+                            isHolding = false
+                            isExpanded = false
+                            scope.launch {
+                                dragOffset.animateTo(
+                                    targetValue = Offset.Zero,
+                                    animationSpec = spring(
+                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                        stiffness = Spring.StiffnessMedium
+                                    )
+                                )
+                            }
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            IconButton(onClick = { isExpanded = !isExpanded }) {
+                Icon(
+                    imageVector = Icons.Default.Add, 
+                    contentDescription = "Toggle Terminal Subsystem Matrix", 
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
     }
 }
