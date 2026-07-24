@@ -14,6 +14,10 @@ import com.example.data.database.ShiftConfigEntity
 import com.example.data.database.TimeLogEntity
 import com.example.data.database.DossierDocumentEntity
 import com.example.data.repository.TimeTrackerRepository
+import com.example.data.backend.ScalableKtorClient
+import com.example.data.backend.NodeHealthStatus
+import com.example.ui.AppNotification
+import com.example.ui.NotificationPriority
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -119,6 +123,22 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     // Dynamic Liquid Glass Theme State
     var selectedTheme = mutableStateOf("Emerald Glass")
+
+    // --- CORPORATE BRANDING THEME STATES ---
+    var corporatePrimaryColor = mutableStateOf("#1D4ED8")
+    var corporateSecondaryColor = mutableStateOf("#0F172A")
+    var corporateLogoName = mutableStateOf("SHIFT HR")
+
+    fun saveCorporateBrandingTheme(primaryHex: String, secondaryHex: String, logo: String) {
+        corporatePrimaryColor.value = primaryHex
+        corporateSecondaryColor.value = secondaryHex
+        corporateLogoName.value = logo
+        addNotification(
+            title = "Corporate Branding Updated",
+            message = "Branding theme ($logo - $primaryHex) saved and applied to all generated PDF/Spreadsheet documents.",
+            isAlert = false
+        )
+    }
 
     // --- RANKING BOARD MANAGEMENT STATES ---
     var postedRankingPeriod = mutableStateOf("Monthly") // Monthly, Every 3 Months, Quarterly, Yearly
@@ -270,6 +290,15 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     // --- CYBER CLOCK SECURITY / TELEMETRY STATES ---
     var geofenceRadius = mutableStateOf(100f) // Allowed radius in meters
     var simulatedDistance = mutableStateOf(25f) // Simulated employee distance in meters
+    var officeLatitude = mutableStateOf(37.4220)
+    var officeLongitude = mutableStateOf(-122.0841)
+    var officeName = mutableStateOf("HQ - Silicon Valley Campus")
+    
+    var pendingRerouteLatitude = mutableStateOf<Double?>(null)
+    var pendingRerouteLongitude = mutableStateOf<Double?>(null)
+    var pendingRerouteName = mutableStateOf<String?>(null)
+    var pendingRerouteRequestedBy = mutableStateOf<String?>(null)
+
     var isFaceRecognitionEnabled = mutableStateOf(true)
     var isDeviceVerificationEnabled = mutableStateOf(true)
     var isLiveLocationTrackingActive = mutableStateOf(true)
@@ -688,20 +717,32 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             Message(
                 sender = "Sarah Jenkins",
                 recipient = "Marcus Aurelius (HR Intern)",
-                text = "Yes Marcus! Just finished logging. You can view it in the Ledger tab. It's completely synchronized.",
-                timestamp = "09:18 AM"
+                text = "Yes Marcus! Just finished logging. Here is the verified site photo and audit report.",
+                timestamp = "09:18 AM",
+                mediaUris = listOf("https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80"),
+                attachmentType = "IMAGE",
+                attachmentName = "indore_site_inspection.jpg",
+                attachmentSize = "1.8 MB"
             ),
             Message(
                 sender = "Robert Chen",
                 recipient = "Sarah Jenkins",
-                text = "Excellent compliance score this week, Sarah! Keep up the great cycle-to-work pace.",
-                timestamp = "10:30 AM"
+                text = "Excellent compliance score this week, Sarah! Check out the walkthrough video from PM desk.",
+                timestamp = "10:30 AM",
+                mediaUris = listOf("https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"),
+                attachmentType = "VIDEO",
+                attachmentName = "pm_shift_briefing.mp4",
+                attachmentSize = "12.4 MB"
             ),
             Message(
                 sender = "Aditya Joshi (Director)",
                 recipient = "All Employees",
                 text = "Reminder: Please verify your remote location settings before punching in. Indore geo-fencing rules are active.",
-                timestamp = "Yesterday"
+                timestamp = "Yesterday",
+                mediaUris = listOf("https://www.w3.org/W3C/DesignIssues/Overview.html"),
+                attachmentType = "FILE",
+                attachmentName = "Indore_Geofence_Policy_2026.pdf",
+                attachmentSize = "2.1 MB"
             ),
             Message(
                 sender = "Michael Vance",
@@ -722,15 +763,26 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         )
     }
 
-    fun sendMessage(recipient: String, text: String) {
-        if (text.isBlank()) return
+    fun sendMessage(
+        recipient: String,
+        text: String,
+        mediaUris: List<String> = emptyList(),
+        attachmentType: String = "",
+        attachmentName: String = "",
+        attachmentSize: String = ""
+    ) {
+        if (text.isBlank() && mediaUris.isEmpty()) return
         val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
         val timeStr = sdf.format(Date())
         val newMsg = Message(
             sender = currentUserName.value,
             recipient = recipient,
             text = text,
-            timestamp = timeStr
+            timestamp = timeStr,
+            mediaUris = mediaUris,
+            attachmentType = attachmentType,
+            attachmentName = attachmentName,
+            attachmentSize = attachmentSize
         )
         messagesList.value = messagesList.value + newMsg
     }
@@ -1381,6 +1433,75 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    var cyberNotifications = mutableStateOf<List<AppNotification>>(
+        listOf(
+            AppNotification(
+                id = "notif-1",
+                title = "URGENT SHIFT CANCELLATION",
+                message = "Marcus Aurelius canceled Shift #102 for Today.",
+                priority = NotificationPriority.URGENT,
+                timestampIso = "10 mins ago",
+                isRead = false,
+                targetRoute = "shift_calendar"
+            ),
+            AppNotification(
+                id = "notif-2",
+                title = "Audit Report Ready",
+                message = "Compliance AI completed monthly timesheet analysis.",
+                priority = NotificationPriority.PASSIVE,
+                timestampIso = "2 hours ago",
+                isRead = false,
+                targetRoute = "audit_log"
+            ),
+            AppNotification(
+                id = "notif-3",
+                title = "Quarterly Survey Reminder",
+                message = "Please complete the pending employee feedback survey.",
+                priority = NotificationPriority.PASSIVE,
+                timestampIso = "1 day ago",
+                isRead = true,
+                targetRoute = "self_service"
+            )
+        )
+    )
+    var activeUrgentNotification = mutableStateOf<AppNotification?>(null)
+
+    fun postCyberNotification(title: String, message: String, priority: NotificationPriority, targetRoute: String? = null) {
+        val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val notif = AppNotification(
+            id = UUID.randomUUID().toString(),
+            title = title,
+            message = message,
+            priority = priority,
+            timestampIso = sdf.format(Date()),
+            isRead = false,
+            targetRoute = targetRoute
+        )
+        cyberNotifications.value = listOf(notif) + cyberNotifications.value
+        if (priority == NotificationPriority.URGENT) {
+            activeUrgentNotification.value = notif
+        }
+    }
+
+    fun markNotificationAsRead(id: String) {
+        cyberNotifications.value = cyberNotifications.value.map {
+            if (it.id == id) it.copy(isRead = true) else it
+        }
+    }
+
+    fun markAllCyberNotificationsAsRead() {
+        cyberNotifications.value = cyberNotifications.value.map { it.copy(isRead = true) }
+    }
+
+    fun dismissUrgentNotification() {
+        activeUrgentNotification.value = null
+    }
+
+    fun clearAllCyberNotifications() {
+        cyberNotifications.value = emptyList()
+        activeUrgentNotification.value = null
+    }
+
     fun addNotification(title: String, message: String, isAlert: Boolean = false) {
         val newNotif = NotificationItem(
             id = UUID.randomUUID().toString(),
@@ -1390,6 +1511,9 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             isAlert = isAlert
         )
         notifications.value = listOf(newNotif) + notifications.value.take(19) // Keep last 20
+
+        val priority = if (isAlert) NotificationPriority.URGENT else NotificationPriority.PASSIVE
+        postCyberNotification(title, message, priority)
     }
 
     fun dismissNotification(id: String) {
@@ -1903,6 +2027,67 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
             activeCompletingSurvey.value = null
         }
     }
+
+    // =========================================================================
+    // ⚡ MULTI-TIER SCALABLE KTOR BACKEND ENGINE (1M+ ACTIVE USERS)
+    // =========================================================================
+    val scalableKtorClient = ScalableKtorClient()
+    var activeClusterNode = mutableStateOf("Ktor Node 1 (10.0.1.42)")
+    var clusterHealthStatus = mutableStateOf(NodeHealthStatus())
+    var scaledClusterLogText = mutableStateOf("Stateless HMAC-256 JWT Ready • PgBouncer Active • Redis WebSocket Sync Live")
+    var scaledClusterAttemptCount = mutableStateOf(1)
+    var isScalingSimulating = mutableStateOf(false)
+
+    init {
+        // Collect Redis WebSocket relay messages
+        viewModelScope.launch {
+            scalableKtorClient.webSocketRelayFlow.collect { logMsg ->
+                scaledClusterLogText.value = logMsg
+            }
+        }
+    }
+
+    fun pingClusterHealth() {
+        viewModelScope.launch {
+            val status = scalableKtorClient.checkClusterHealth()
+            clusterHealthStatus.value = status
+            activeClusterNode.value = status.nodeName
+            scaledClusterLogText.value = "[HEALTH CHECK OK] Pinged ${status.nodeName} in ${status.latencyMs}ms | PgBouncer: ${status.pgbouncerPoolUsage}"
+        }
+    }
+
+    fun triggerStatelessWriteSimulation(actionName: String = "REGISTER_PUNCH") {
+        viewModelScope.launch {
+            isScalingSimulating.value = true
+            scaledClusterLogText.value = "[1M LOAD BURST] Dispatching $actionName through ALB -> Stateless Ktor Node -> PgBouncer..."
+            
+            val payload = org.json.JSONObject().apply {
+                put("action", actionName)
+                put("employee", currentUserName.value)
+                put("timestamp", System.currentTimeMillis())
+            }
+
+            val response = scalableKtorClient.executeWriteRequest("/api/v1/punches", payload)
+            isScalingSimulating.value = false
+            scaledClusterAttemptCount.value = response.attemptsCount
+            activeClusterNode.value = response.routedNode
+
+            if (response.isSuccess) {
+                scaledClusterLogText.value = "[SUCCESS 200 OK] Routed to ${response.routedNode} (Attempts: ${response.attemptsCount})\n" +
+                        "Data: ${response.data}"
+            } else {
+                scaledClusterLogText.value = "[ERROR 503] ${response.errorMessage}"
+            }
+        }
+    }
+
+    fun triggerReadReplicaQuerySimulation() {
+        viewModelScope.launch {
+            scaledClusterLogText.value = "[READ/WRITE SPLIT] Offloading query to PostgreSQL Read Replica Cluster..."
+            val response = scalableKtorClient.executeReadRequest("/api/v1/historical-timesheets")
+            scaledClusterLogText.value = "[READ REPLICA OK] 80% DB load offloaded! Replica Node: ${response.routedNode} | Payload: ${response.data}"
+        }
+    }
 }
 
 
@@ -1932,7 +2117,11 @@ data class Message(
     val swapShiftName: String = "",
     val swapStatus: String = "", // "PENDING", "ACCEPTED", "APPROVED", "REJECTED"
     val swapRequester: String = "",
-    val swapCoverer: String = ""
+    val swapCoverer: String = "",
+    val mediaUris: List<String> = emptyList(),
+    val attachmentType: String = "", // "IMAGE", "VIDEO", "FILE"
+    val attachmentName: String = "",
+    val attachmentSize: String = ""
 )
 
 data class BirthdayInfo(

@@ -1,7 +1,10 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -1350,14 +1353,14 @@ fun LeaveFilingView(viewModel: TimeTrackerViewModel, context: Context) {
                     Text("${profile?.sickLeaveBalance ?: 10} d", color = sickColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 if (gender == "Female") {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Maternity (F)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.8f)) {
+                        Text("Maternity (Female)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("${profile?.maternityLeaveBalance ?: 105} d", color = maternityColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
                 } else {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.5f)) {
-                        Text("Paternity (M)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1.8f)) {
+                        Text("Paternity (Male)", color = textLabelColor, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("${profile?.paternityLeaveBalance ?: 7} d", color = paternityColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     }
@@ -2025,48 +2028,176 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
             var newKeyResult by remember { mutableStateOf("") }
             var newTargetValue by remember { mutableStateOf("") }
 
-            Text("Continuous OKRs & Performance Tracker", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-            Text("Quarterly goals and direct self-appraisal submissions.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
-            Spacer(modifier = Modifier.height(10.dp))
+            Text("Continuous OKRs & Performance Tracker", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Text("Quarterly goals, key metrics & self-appraisal submissions.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Filing a new OKR
+            val myOkrs = okrs.filter { it.employeeName.equals(currentEmployeeName, ignoreCase = true) }
+            val avgProgress = if (myOkrs.isNotEmpty()) myOkrs.map { it.progress }.average().toInt() else 0
+            val achievedCount = myOkrs.count { it.status == "ACHIEVED" || it.progress >= 100 }
+
+            // Summary Metrics Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Card 1: Active Objectives
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    color = CardGreyBg,
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Flag, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ACTIVE OKRs", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("${myOkrs.size}", color = com.example.ui.theme.AppTextColor, fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+
+                // Card 2: Avg Progress
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    color = CardGreyBg,
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("AVG PROGRESS", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("$avgProgress%", color = Color(0xFF38BDF8), fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+
+                // Card 3: Achieved Goals
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    color = CardGreyBg,
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF00FF88), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("ACHIEVED", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text("$achievedCount", color = Color(0xFF00FF88), fontSize = 18.sp, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Filing a new OKR Card
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2224)),
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = CardGreyBg),
                 border = BorderStroke(1.dp, BorderGrey)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Register New Quarterly OKR", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = CircleShape,
+                                color = NeonGreen.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.3f))
+                            ) {
+                                Icon(
+                                    Icons.Default.AddTask,
+                                    contentDescription = null,
+                                    tint = NeonGreen,
+                                    modifier = Modifier.padding(6.dp).size(16.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Register New Quarterly OKR", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = NeonGreen.copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.25f))
+                        ) {
+                            Text("Q3 2026", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     OutlinedTextField(
                         value = newObjective,
                         onValueChange = { newObjective = it },
                         label = { Text("Objective Title") },
+                        placeholder = { Text("e.g. Optimize shift dispatch efficiency by 25%") },
+                        leadingIcon = { Icon(Icons.Default.Adjust, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp)) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = NeonGreen,
+                            focusedLabelColor = NeonGreen,
+                            unfocusedBorderColor = BorderGrey,
+                            unfocusedLabelColor = getAdaptiveTextColor(0.6f)
+                        )
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedTextField(
                             value = newKeyResult,
                             onValueChange = { newKeyResult = it },
                             label = { Text("Key Result Metric") },
+                            placeholder = { Text("e.g. Reduce late log-ins") },
+                            leadingIcon = { Icon(Icons.Default.TrendingUp, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp)) },
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonGreen,
+                                focusedLabelColor = NeonGreen,
+                                unfocusedBorderColor = BorderGrey,
+                                unfocusedLabelColor = getAdaptiveTextColor(0.6f)
+                            )
                         )
                         OutlinedTextField(
                             value = newTargetValue,
                             onValueChange = { newTargetValue = it },
                             label = { Text("Target") },
-                            modifier = Modifier.weight(0.6f),
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                            placeholder = { Text("100%") },
+                            leadingIcon = { Icon(Icons.Default.FormatListNumbered, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp)) },
+                            modifier = Modifier.weight(0.7f),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = NeonGreen,
+                                focusedLabelColor = NeonGreen,
+                                unfocusedBorderColor = BorderGrey,
+                                unfocusedLabelColor = getAdaptiveTextColor(0.6f)
+                            )
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Button(
                         onClick = {
                             if (newObjective.isBlank() || newKeyResult.isBlank()) {
-                                Toast.makeText(context, "Fill Objective and Key Result.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Please enter an Objective and Key Result.", Toast.LENGTH_SHORT).show()
                             } else {
                                 viewModel.logOkr(newObjective, newKeyResult, newTargetValue, "0%", 0)
                                 newObjective = ""
@@ -2076,76 +2207,297 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                        modifier = Modifier.align(Alignment.End)
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.align(Alignment.End).height(38.dp)
                     ) {
-                        Text("Register Objective", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Flag, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Register Objective", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            val myOkrs = okrs.filter { it.employeeName.equals(currentEmployeeName, ignoreCase = true) }
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // LIST SECTION HEADER
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "MY QUARTERLY OBJECTIVES",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = NeonGreen,
+                    letterSpacing = 1.sp
+                )
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = NeonGreen.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.3f))
+                ) {
+                    Text(
+                        text = "${myOkrs.size} Logged",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NeonGreen,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             if (myOkrs.isEmpty()) {
-                Text("No active OKRs. Click above to register.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+                Surface(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = CardGreyBg,
+                    border = BorderStroke(1.dp, BorderGrey)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            "No active OKRs registered for $currentEmployeeName yet. Fill out the form above to submit your quarterly objective.",
+                            color = getAdaptiveTextColor(0.7f),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             } else {
                 myOkrs.forEach { okr ->
                     var activeSliderVal by remember { mutableStateOf(okr.progress.toFloat()) }
                     var selfNote by remember { mutableStateOf(okr.selfAppraisal) }
 
+                    val isAchieved = okr.status == "ACHIEVED" || activeSliderVal >= 100f
+                    val statusLabel = if (isAchieved) "ACHIEVED" else if (activeSliderVal > 0f) "IN PROGRESS" else "REGISTERED"
+                    val statusColor = if (isAchieved) Color(0xFF00FF88) else Color(0xFF38BDF8)
+
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.cardColors(containerColor = CardGreyBg),
                         border = BorderStroke(1.dp, BorderGrey)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // Header: Objective title & status pill
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(okr.objective, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                Box(
-                                    modifier = Modifier
-                                        .background(if (okr.status == "ACHIEVED") Color(0xFF00FF88).copy(alpha = 0.15f) else NeonGreen.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = okr.objective,
+                                        color = com.example.ui.theme.AppTextColor,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = statusColor.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.4f))
                                 ) {
-                                    Text(okr.status, color = if (okr.status == "ACHIEVED") Color(0xFF00FF88) else NeonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isAchieved) Icons.Default.CheckCircle else Icons.Default.TrendingUp,
+                                            contentDescription = null,
+                                            tint = statusColor,
+                                            modifier = Modifier.size(12.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = statusLabel,
+                                            color = statusColor,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
-                            Text("Key Result: ${okr.keyResult} (Target: ${okr.targetValue})", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp, modifier = Modifier.padding(vertical = 4.dp))
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Slider(
-                                    value = activeSliderVal,
-                                    onValueChange = { activeSliderVal = it },
-                                    valueRange = 0f..100f,
-                                    steps = 10,
-                                    colors = SliderDefaults.colors(thumbColor = NeonGreen, activeTrackColor = NeonGreen),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text("${activeSliderVal.toInt()}%", color = NeonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Key Result & Target Metric Banner
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = getAdaptiveColor(0.04f),
+                                border = BorderStroke(1.dp, BorderGrey.copy(alpha = 0.6f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Icon(Icons.Default.TrendingUp, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "KR: ${okr.keyResult}",
+                                            color = getAdaptiveTextColor(0.85f),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = NeonGreen.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "Target: ${okr.targetValue}",
+                                            color = NeonGreen,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
                             }
 
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Progress Slider Bar
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Progress Completion",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = getAdaptiveTextColor(0.6f)
+                                )
+                                Text(
+                                    text = "${activeSliderVal.toInt()}%",
+                                    color = if (isAchieved) Color(0xFF00FF88) else NeonGreen,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
+
+                            Slider(
+                                value = activeSliderVal,
+                                onValueChange = { activeSliderVal = it },
+                                valueRange = 0f..100f,
+                                steps = 10,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = NeonGreen,
+                                    activeTrackColor = NeonGreen,
+                                    inactiveTrackColor = BorderGrey
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            // Self Appraisal Input Field
                             OutlinedTextField(
                                 value = selfNote,
                                 onValueChange = { selfNote = it },
-                                label = { Text("Self-Appraisal & Progress Highlights") },
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                label = { Text("Self-Appraisal & Quarterly Highlights") },
+                                placeholder = { Text("Record achievements, blocker resolutions, or updates...") },
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NeonGreen,
+                                    focusedLabelColor = NeonGreen,
+                                    unfocusedBorderColor = BorderGrey,
+                                    unfocusedLabelColor = getAdaptiveTextColor(0.6f)
+                                )
                             )
 
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                if (okr.managerFeedback.isNotEmpty()) {
-                                    Text("Manager: ${okr.managerFeedback}", color = Color(0xFF00FF88), fontSize = 10.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                                } else {
-                                    Text("Awaiting Manager Appraisal Audit", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp, modifier = Modifier.weight(1f))
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Manager Feedback / Audit Status Callout
+                            if (okr.managerFeedback.isNotEmpty()) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = Color(0xFF062A20),
+                                    border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.RateReview,
+                                            contentDescription = null,
+                                            tint = Color(0xFF34D399),
+                                            modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "MANAGER AUDIT FEEDBACK",
+                                                color = Color(0xFF34D399),
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = okr.managerFeedback,
+                                                color = Color(0xFFD1FAE5),
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
+                                    }
                                 }
+                            } else {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = getAdaptiveColor(0.03f),
+                                    border = BorderStroke(1.dp, BorderGrey.copy(alpha = 0.5f))
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.HourglassEmpty,
+                                            contentDescription = null,
+                                            tint = getAdaptiveTextColor(0.5f),
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Awaiting Manager Audit & Quarterly Review",
+                                            color = getAdaptiveTextColor(0.5f),
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Save Progress Action
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
+                            ) {
                                 Button(
                                     onClick = {
                                         viewModel.updateOkrProgress(okr.id, "${activeSliderVal.toInt()}%", activeSliderVal.toInt(), selfNote)
                                         Toast.makeText(context, "OKR appraisal values updated!", Toast.LENGTH_SHORT).show()
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = NeonGreen),
-                                    modifier = Modifier.height(30.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.height(34.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 2.dp)
                                 ) {
-                                    Text("Save Progress", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Save Progress", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -2154,9 +2506,9 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
             }
         }
         "branding" -> {
-            var primaryColor by remember { mutableStateOf("#1D4ED8") }
-            var secondaryColor by remember { mutableStateOf("#0F172A") }
-            var logoName by remember { mutableStateOf("SHIFT HR") }
+            var primaryColor by remember { mutableStateOf(viewModel.corporatePrimaryColor.value) }
+            var secondaryColor by remember { mutableStateOf(viewModel.corporateSecondaryColor.value) }
+            var logoName by remember { mutableStateOf(viewModel.corporateLogoName.value) }
             var caseId by remember { mutableStateOf("701748f0851") }
             var caseTitle by remember { mutableStateOf("Audit Discrepancy Report: Sarah Jenkins") }
             val timelineEventsList = remember { mutableStateListOf(
@@ -2165,6 +2517,7 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                 "02:30 PM - Employee feedback and liveness verified"
             ) }
             var newEventText by remember { mutableStateOf("") }
+            val isHrAdmin = viewModel.currentUserRole.value in listOf("ADMIN_HR", "HR", "ADMIN", "SUPERVISOR", "MANAGER") || viewModel.isAdminMode.value || currentEmployeeName.contains("Admin", ignoreCase = true) || currentEmployeeName.contains("Anya", ignoreCase = true)
 
             Text("Corporate Branding & Custom Compliance PDF Compiler", color = com.example.ui.theme.AppTextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             Text("Design a corporate layout with CSS variables & compile directly to PDF binary stream.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
@@ -2271,6 +2624,31 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
                         )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Button(
+                            onClick = {
+                                if (isHrAdmin) {
+                                    viewModel.saveCorporateBrandingTheme(primaryColor, secondaryColor, logoName)
+                                    Toast.makeText(context, "Corporate Branding saved & applied to generated PDF / Spreadsheet files!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Access Denied: Only HR / Admin can choose and save branding themes.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isHrAdmin) NeonGreen else Color.Gray),
+                            modifier = Modifier.fillMaxWidth().height(42.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isHrAdmin) "SAVE BRANDING THEME (APPLY TO PDF / SPREADSHEETS)" else "SAVE BRANDING THEME (HR/ADMIN ONLY)",
+                                color = Color.Black,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
 
@@ -4648,71 +5026,30 @@ fun ProfileEditingView(viewModel: TimeTrackerViewModel, context: Context) {
                         }
                     }
 
-                    // --- APP PREFERENCES CARD ---
+                    // --- APP PREFERENCES SHORTCUT CARD ---
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.currentScreen.value = "settings" },
                         colors = CardDefaults.cardColors(containerColor = CardGreyBg),
                         border = BorderStroke(1.dp, BorderGrey)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Settings, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("⚙️ Portal App Preferences", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Push Reminders", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Remind me to clock out at shift completion", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Default.Settings, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Text("⚙️ Portal App Preferences", color = NeonGreen, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                                    Text("Configure Push Reminders, Dark Mode & Biometrics in Settings", color = getAdaptiveTextColor(0.6f), fontSize = 11.sp)
                                 }
-                                Switch(
-                                    checked = pushNotificationsEnabled,
-                                    onCheckedChange = { pushNotificationsEnabled = it },
-                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
-                                )
                             }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Dark Mode Override", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Force portal to stay in deep dark theme", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                                }
-                                Switch(
-                                    checked = darkModeOverride,
-                                    onCheckedChange = { darkModeOverride = it },
-                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text("Biometric Sign-In", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    Text("Permit FaceID or Fingerprint login bypass", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                                }
-                                Switch(
-                                    checked = biometricLoginEnabled,
-                                    onCheckedChange = { biometricLoginEnabled = it },
-                                    colors = SwitchDefaults.colors(checkedThumbColor = NeonGreen)
-                                )
-                            }
+                            Icon(Icons.Default.ChevronRight, contentDescription = "Go to Settings", tint = NeonGreen)
                         }
                     }
                 }
@@ -6081,51 +6418,140 @@ fun AdminApprovalsView(viewModel: TimeTrackerViewModel) {
                 }
             }
             "okrs_audit" -> {
-                Text("Manager OKRs Performance Appraisal Auditing", color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(6.dp))
+                Text("Manager OKRs Performance Appraisal Auditing", color = com.example.ui.theme.AppTextColor, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                Text("Review employee quarterly goals, verify self-appraisals, and record official performance feedback.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+                Spacer(modifier = Modifier.height(12.dp))
 
                 val okrs by viewModel.okrRecords
                 if (okrs.isEmpty()) {
-                    Text("No employee OKRs logged in this system.", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = CardGreyBg,
+                        border = BorderStroke(1.dp, BorderGrey)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = NeonGreen, modifier = Modifier.size(24.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("No employee OKRs logged in this system.", color = getAdaptiveTextColor(0.6f), fontSize = 12.sp)
+                        }
+                    }
                 } else {
                     okrs.forEach { okr ->
-                        var feedbackVal by remember { mutableStateOf("") }
+                        var feedbackVal by remember { mutableStateOf(okr.managerFeedback) }
                         Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = CardGreyBg),
                             border = BorderStroke(1.dp, BorderGrey)
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Employee: ${okr.employeeName}", color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                    Text("Progress: ${okr.progress}%", color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                // Header Row: Employee name & progress badge
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = NeonGreen.copy(alpha = 0.15f),
+                                            border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.3f))
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Person,
+                                                contentDescription = null,
+                                                tint = NeonGreen,
+                                                modifier = Modifier.padding(6.dp).size(16.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Employee: ${okr.employeeName}", color = NeonGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF38BDF8).copy(alpha = 0.15f),
+                                        border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f))
+                                    ) {
+                                        Text(
+                                            text = "Progress: ${okr.progress}%",
+                                            color = Color(0xFF38BDF8),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
                                 }
-                                Text("Objective: ${okr.objective}", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                Text("Key Result: ${okr.keyResult}", color = getAdaptiveTextColor(0.7f), fontSize = 11.sp)
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Objective & Key Result Details Card
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = getAdaptiveColor(0.04f),
+                                    border = BorderStroke(1.dp, BorderGrey.copy(alpha = 0.6f))
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text("Objective: ${okr.objective}", color = com.example.ui.theme.AppTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text("Key Result: ${okr.keyResult} (Target: ${okr.targetValue})", color = getAdaptiveTextColor(0.7f), fontSize = 11.sp)
+                                    }
+                                }
+
+                                // Employee Self-Appraisal Box
                                 if (okr.selfAppraisal.isNotEmpty()) {
-                                    Text("Employee's Appraisal: ${okr.selfAppraisal}", color = Color(0xFFFFCC00), fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Surface(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = Color(0xFF261E05),
+                                        border = BorderStroke(1.dp, Color(0xFFD97706).copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Text("EMPLOYEE SELF-APPRAISAL", color = Color(0xFFFBBF24), fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(okr.selfAppraisal, color = Color(0xFFFEF3C7), fontSize = 11.sp)
+                                        }
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
                                 OutlinedTextField(
                                     value = feedbackVal,
                                     onValueChange = { feedbackVal = it },
                                     label = { Text("Manager Feedback Audit Notes") },
+                                    placeholder = { Text("Enter performance appraisal feedback or audit notes...") },
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NeonGreen, focusedLabelColor = NeonGreen)
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = NeonGreen,
+                                        focusedLabelColor = NeonGreen,
+                                        unfocusedBorderColor = BorderGrey,
+                                        unfocusedLabelColor = getAdaptiveTextColor(0.6f)
+                                    )
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
                                 Button(
                                     onClick = {
                                         if (feedbackVal.isBlank()) {
-                                            Toast.makeText(context, "Please enter feedback.", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "Please enter feedback notes.", Toast.LENGTH_SHORT).show()
                                         } else {
                                             viewModel.submitManagerOkrFeedback(okr.id, feedbackVal)
                                             Toast.makeText(context, "OKR audit appraisal submitted!", Toast.LENGTH_SHORT).show()
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00FF88)),
-                                    modifier = Modifier.align(Alignment.End)
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.align(Alignment.End).height(36.dp)
                                 ) {
+                                    Icon(Icons.Default.FactCheck, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
                                     Text("Submit Feedback & Audit", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -10078,6 +10504,7 @@ fun RadialLiquidMenuWrapper(
 ) {
     val isDark = isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     // Cyber-compliance Palette System
     val brandMint = if (isDark) Color(0xFF34D399) else Color(0xFF059669)
@@ -10143,9 +10570,9 @@ fun RadialLiquidMenuWrapper(
     val orbitRadiusPx = 320f 
     val menuItems = remember {
         listOf(
-            Triple("CAPTURE", Icons.Default.CameraAlt, "Smart Capture"),
-            Triple("PAYSLIP", Icons.Default.Payments, "My Payslip"),
-            Triple("CALENDAR", Icons.Default.DateRange, "Team Shift Calendar")
+            Triple("CAPTURE", Icons.Default.CameraAlt, "Smart Capture Terminal"),
+            Triple("PAYSLIP", Icons.Default.Payments, "My Payslips"),
+            Triple("CALENDAR", Icons.Default.DateRange, "Supervisor Shift Desk")
         )
     }
 
@@ -10159,20 +10586,21 @@ fun RadialLiquidMenuWrapper(
     // Derived state tracking which item is hovered during slide action
     val hoveredIndex by remember {
         derivedStateOf {
-            if (!isHolding) -1 else {
-                var found = -1
+            if (!isHolding && !isExpanded) -1 else {
+                var bestIndex = -1
+                var minDistance = Float.MAX_VALUE
                 val currentOffset = dragOffset.value
                 for (i in 0..2) {
                     val angleRad = Math.PI + (Math.PI * 0.5) * (i / 2.0)
                     val targetX = orbitRadiusPx * cos(angleRad).toFloat()
                     val targetY = orbitRadiusPx * sin(angleRad).toFloat()
                     val dist = (currentOffset - Offset(targetX, targetY)).getDistance()
-                    if (dist < 100f) { // roughly 70dp hover range
-                        found = i
-                        break
+                    if (dist < minDistance) {
+                        minDistance = dist
+                        bestIndex = i
                     }
                 }
-                found
+                if (currentOffset.getDistance() > 50f && minDistance < 260f) bestIndex else -1
             }
         }
     }
@@ -10244,23 +10672,23 @@ fun RadialLiquidMenuWrapper(
                     .offset { IntOffset(offsetX, offsetY) }
                     .padding(bottom = bottomPadding, end = endPadding)
                     .alpha(expansionProgress)
-                    .scale(if (isHovered) 1.3f else expansionProgress)
+                    .scale(if (isHovered) 1.25f else expansionProgress)
                     .graphicsLayer {
                         clip = false
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // Circular Radial Feature Nodes (Zero names, pure modern visual icon nodes)
                 FloatingActionButton(
                     onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         isExpanded = false
                         onTerminalSelected(item.first)
                     },
                     containerColor = if (isHovered) brandMint else slateCard,
                     contentColor = if (isHovered) Color.White else brandMint,
                     shape = CircleShape,
-                    modifier = Modifier.size(44.dp),
-                    elevation = FloatingActionButtonDefaults.elevation(if (isHovered) 8.dp else 4.dp)
+                    modifier = Modifier.size(46.dp),
+                    elevation = FloatingActionButtonDefaults.elevation(if (isHovered) 10.dp else 4.dp)
                 ) {
                     Icon(imageVector = item.second, contentDescription = item.third, modifier = Modifier.size(20.dp))
                 }
@@ -10268,21 +10696,24 @@ fun RadialLiquidMenuWrapper(
         }
 
         // 4. Primary Touch Interactive Control Core Node (Master FAB)
+        // Decoupled touch area (stationary anchor Box) from visual moving FAB representation (inner Box)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .offset { IntOffset(dragOffset.value.x.roundToInt(), dragOffset.value.y.roundToInt()) }
                 .padding(bottom = bottomPadding, end = endPadding)
                 .size(fabSize)
-                .graphicsLayer(
-                    scaleX = if (isHolding) 1.2f else 1.0f,
-                    scaleY = if (isHolding) 1.2f else 1.0f,
-                    rotationZ = expansionProgress * 135f // Rotates the plus icon smoothly into a close cross
-                )
-                .background(brandMint, CircleShape)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            isExpanded = !isExpanded
+                        }
+                    )
+                }
                 .pointerInput(Unit) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = { 
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             isHolding = true 
                             isExpanded = true // Long-press opens menu immediately and activates dragging
                         },
@@ -10291,17 +10722,18 @@ fun RadialLiquidMenuWrapper(
                             scope.launch { dragOffset.snapTo(dragOffset.value + dragAmount) }
                         },
                         onDragEnd = {
+                            // Read target selection BEFORE setting isHolding = false!
+                            val targetIndex = hoveredIndex
+                            val selectedKey = if (targetIndex in menuItems.indices) menuItems[targetIndex].first else null
                             isHolding = false
-                            
-                            // Trigger action if finger was hovered over an item when released
-                            if (hoveredIndex != -1) {
-                                onTerminalSelected(menuItems[hoveredIndex].first)
-                            } else if (dragOffset.value.getDistance() > 180f) {
-                                onTerminalSelected("CAPTURE")
-                            }
                             isExpanded = false
                             
-                            // Liquid absorption absorption animation without bouncy/elastic recoil
+                            if (selectedKey != null) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onTerminalSelected(selectedKey)
+                            }
+                            
+                            // Liquid absorption animation without bouncy/elastic recoil
                             scope.launch {
                                 dragOffset.animateTo(
                                     targetValue = Offset.Zero,
@@ -10329,7 +10761,19 @@ fun RadialLiquidMenuWrapper(
                 },
             contentAlignment = Alignment.Center
         ) {
-            IconButton(onClick = { isExpanded = !isExpanded }) {
+            // This is the actual moving visual representation of the FAB!
+            Box(
+                modifier = Modifier
+                    .offset { IntOffset(dragOffset.value.x.roundToInt(), dragOffset.value.y.roundToInt()) }
+                    .fillMaxSize()
+                    .graphicsLayer(
+                        scaleX = if (isHolding) 1.25f else 1.0f,
+                        scaleY = if (isHolding) 1.25f else 1.0f,
+                        rotationZ = expansionProgress * 135f // Rotates the plus icon smoothly into a close cross
+                    )
+                    .background(brandMint, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     imageVector = Icons.Default.Add, 
                     contentDescription = "Toggle Terminal Subsystem Matrix", 

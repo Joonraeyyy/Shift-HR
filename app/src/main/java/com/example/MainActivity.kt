@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
@@ -87,6 +88,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.scale
@@ -124,20 +126,65 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun showFallbackScannerDialog(reason: String) {
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Document Scanner Offline")
+            .setMessage("The advanced AI Document Scanner requires Google Play Services and on-demand model downloads, which are not fully active on this device.\n\nWould you like to fall back to selecting/capturing photos from your local Gallery instead?")
+            .setPositiveButton("Use Gallery Fallback") { _, _ ->
+                viewModelRef?.let { vm ->
+                    galleryLauncher.launch("image/*")
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun startDocumentScanner() {
-        val options = GmsDocumentScannerOptions.Builder()
-            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF, GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
-            .build()
-        val scanner = GmsDocumentScanning.getClient(options)
-        scanner.getStartScanIntent(this)
-            .addOnSuccessListener { intentSender ->
-                scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Smart Document Capture")
+            .setMessage("Select your preferred capture option:\n\n1. Gallery / Camera Photos (100% Compatible)\nCompiles photos from your local device or simulated camera into a secure document PDF.\n\n2. Advanced AI Document Scanner\nPerforms auto-cropping and edge refinement (requires Google Play Services).")
+            .setPositiveButton("Gallery & Photos") { _, _ ->
+                galleryLauncher.launch("image/*")
             }
-            .addOnFailureListener { exception ->
-                Log.e("ShiftHR_Scanner", "Scanner Initialization Failed: ${exception.message}")
-                Toast.makeText(this, "Failed to start document scanner: ${exception.message}", Toast.LENGTH_LONG).show()
+            .setNeutralButton("Advanced AI Scanner") { _, _ ->
+                launchGmsDocumentScanner()
             }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun launchGmsDocumentScanner() {
+        try {
+            val options = GmsDocumentScannerOptions.Builder()
+                .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_PDF, GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+                .build()
+            val scanner = GmsDocumentScanning.getClient(options)
+            
+            val gmsAvailable = com.google.android.gms.common.GoogleApiAvailability.getInstance()
+                .isGooglePlayServicesAvailable(this) == com.google.android.gms.common.ConnectionResult.SUCCESS
+                
+            if (!gmsAvailable) {
+                showFallbackScannerDialog("Google Play Services is not available.")
+                return
+            }
+
+            scanner.getStartScanIntent(this)
+                .addOnSuccessListener { intentSender ->
+                    try {
+                        scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+                    } catch (e: Exception) {
+                        showFallbackScannerDialog("Failed to launch scanner: ${e.message}")
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    Log.e("ShiftHR_Scanner", "Scanner Initialization Failed: ${exception.message}")
+                    showFallbackScannerDialog(exception.message ?: "Scanner failed to initialize.")
+                }
+        } catch (e: Exception) {
+            Log.e("ShiftHR_Scanner", "Scanner support error: ${e.message}")
+            showFallbackScannerDialog("Advanced Document Scanner is not supported on this device.")
+        }
     }
 
     private fun optimizeBitmap(bitmap: Bitmap, quality: String): Bitmap {
@@ -402,6 +449,9 @@ fun TimeTrackerApp(
             log.employeeName.equals(currentUserName, ignoreCase = true)
         }
     }
+
+    // Notification Center Sheet
+    var showNotificationCenterSheet by remember { mutableStateOf(false) }
 
     // Log selected for detail viewing
     var viewDetailsLog by remember { mutableStateOf<TimeLogEntity?>(null) }
@@ -947,21 +997,15 @@ fun TimeTrackerApp(
                 displayName = currentUserName,
                 isOffline = viewModel.isMockOffline.value,
                 isSyncing = viewModel.isSyncing.value,
+                notificationUnreadCount = viewModel.cyberNotifications.value.count { !it.isRead },
                 onLogout = { viewModel.logout() },
                 onSyncClick = { viewModel.performSync() },
+                onNotificationBellClick = { showNotificationCenterSheet = true },
                 onProfileClick = {
                     viewModel.currentScreen.value = "self_service"
                     viewModel.selfServiceTab.value = "profile"
                 }
             )
-
-            // Alerts section
-            NotificationsSection(
-                notifications = notifications,
-                onDismiss = { viewModel.dismissNotification(it) }
-            )
-
-            // Alerts section
 
             // Content Screens switching
             Box(
@@ -1001,7 +1045,8 @@ fun TimeTrackerApp(
                     }
                     "chat" -> {
                         ChatHubScreen(
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            onScanDocument = onScanDocument
                         )
                     }
                     "hr_approval" -> {
@@ -1088,6 +1133,12 @@ fun TimeTrackerApp(
                             SaaSHeader(title = "Company Survey Hub", onBack = { viewModel.currentScreen.value = "saas_hub" })
                             com.example.ui.SurveyHubScreen(viewModel = viewModel)
                         }
+                    }
+                    "map_dashboard" -> {
+                        MapDashboardScreen(
+                            viewModel = viewModel,
+                            onBack = { viewModel.currentScreen.value = "clock" }
+                        )
                     }
                     "settings" -> {
                         SettingsScreen(
@@ -1282,27 +1333,84 @@ fun TimeTrackerApp(
             )
         }
 
-        // Floating Liquid Dynamic Menu Overlay for rapid terminal access
-        com.example.ui.RadialLiquidMenuWrapper(
-            onTerminalSelected = { selection ->
-                when (selection) {
-                    "CAPTURE" -> {
-                        viewModel.currentScreen.value = "core_hr"
-                        val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(viewModel.currentUserName.value, ignoreCase = true) }
-                        currentUserProfile?.let { profile ->
-                            onScanDocument(profile.id)
+        // --- CYBER DUAL-LAYER NOTIFICATION SYSTEM ---
+        
+        // 1. Floating Urgent Top Overlay Banner (Layer A)
+        val activeUrgentNotif = viewModel.activeUrgentNotification.value
+        if (activeUrgentNotif != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter)
+                    .zIndex(200f)
+            ) {
+                com.example.ui.CyberNotificationSystemHost(
+                    activeUrgentNotification = activeUrgentNotif,
+                    unreadCount = viewModel.cyberNotifications.value.size,
+                    onBellClick = { showNotificationCenterSheet = true },
+                    onDismissUrgent = { viewModel.dismissUrgentNotification() },
+                    content = {}
+                )
+            }
+        }
+
+        // 2. Notification Center Bottom Sheet (Layer B)
+        if (showNotificationCenterSheet) {
+            com.example.ui.NotificationCenterSheet(
+                notifications = viewModel.cyberNotifications.value,
+                onDismiss = { showNotificationCenterSheet = false },
+                onNotificationClick = { clickedItem ->
+                    viewModel.markNotificationAsRead(clickedItem.id)
+                    clickedItem.targetRoute?.let { route ->
+                        if (route.isNotEmpty()) {
+                            viewModel.currentScreen.value = route
                         }
                     }
-                    "PAYSLIP" -> {
-                        viewModel.currentScreen.value = "payroll"
-                        viewModel.activePayrollSubView.value = "payslips"
-                    }
-                    "CALENDAR" -> {
-                        viewModel.currentScreen.value = "supervisor_schedule"
+                    showNotificationCenterSheet = false
+                },
+                onMarkAllAsRead = { viewModel.markAllCyberNotificationsAsRead() },
+                onClearAll = { viewModel.clearAllCyberNotifications() },
+                onTriggerTestUrgent = {
+                    viewModel.postCyberNotification(
+                        title = "URGENT SHIFT CANCELLATION",
+                        message = "Marcus Aurelius canceled Shift #102 for Today.",
+                        priority = com.example.ui.NotificationPriority.URGENT,
+                        targetRoute = "shift_calendar"
+                    )
+                },
+                onTriggerTestPassive = {
+                    viewModel.postCyberNotification(
+                        title = "Audit Report Ready",
+                        message = "Compliance AI completed monthly timesheet analysis.",
+                        priority = com.example.ui.NotificationPriority.PASSIVE,
+                        targetRoute = "audit_log"
+                    )
+                }
+            )
+        }
+
+        // Floating Liquid Dynamic Menu Overlay for rapid terminal access (Hidden on Chat screen to prevent overlap)
+        if (viewModel.currentScreen.value != "chat") {
+            com.example.ui.RadialLiquidMenuWrapper(
+                onTerminalSelected = { selection ->
+                    when (selection) {
+                        "CAPTURE" -> {
+                            viewModel.currentScreen.value = "core_hr"
+                            val currentUserProfile = viewModel.employeeProfiles.value.find { it.name.equals(viewModel.currentUserName.value, ignoreCase = true) }
+                            val targetId = currentUserProfile?.id ?: viewModel.employeeProfiles.value.firstOrNull()?.id ?: "EMP-001"
+                            onScanDocument(targetId)
+                        }
+                        "PAYSLIP" -> {
+                            viewModel.currentScreen.value = "payroll"
+                            viewModel.activePayrollSubView.value = "payslips"
+                        }
+                        "CALENDAR" -> {
+                            viewModel.currentScreen.value = "supervisor_schedule"
+                        }
                     }
                 }
-            }
-        )
+            )
+        }
     }
     }
     }
@@ -1688,8 +1796,10 @@ fun HeaderBar(
     displayName: String,
     isOffline: Boolean,
     isSyncing: Boolean,
+    notificationUnreadCount: Int = 0,
     onLogout: () -> Unit,
     onSyncClick: () -> Unit,
+    onNotificationBellClick: () -> Unit = {},
     onProfileClick: () -> Unit = {}
 ) {
     Row(
@@ -1776,12 +1886,18 @@ fun HeaderBar(
             }
         }
 
-        // Right Side: Refresh & Exit Buttons
+        // Right Side: Notification Bell & Exit Buttons
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Sync / Refresh button (Square with rounded corners)
+            // Notification Bell with Badge Counter
+            com.example.ui.NotificationBellButton(
+                unreadCount = notificationUnreadCount,
+                onClick = onNotificationBellClick
+            )
+
+            // Sync / Refresh button
             Box(
                 modifier = Modifier
                     .size(36.dp)
@@ -2030,6 +2146,7 @@ fun MainNavigationBar(
         ) {
             navItems.forEach { (route, icon, label) ->
                 val isSelected = when (route) {
+                    "clock" -> currentScreen == "clock" || currentScreen == "map_dashboard"
                     "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
                     else -> currentScreen == route
                 }
@@ -2216,6 +2333,7 @@ fun MainNavigationRail(
 
             navItems.forEach { (route, icon, label) ->
                 val isSelected = when (route) {
+                    "clock" -> currentScreen == "clock" || currentScreen == "map_dashboard"
                     "saas_hub" -> currentScreen == "saas_hub" || currentScreen == "core_hr" || currentScreen == "self_service" || currentScreen == "payroll" || currentScreen == "admin_control" || currentScreen == "ai_assistant"
                     else -> currentScreen == route
                 }
@@ -2303,6 +2421,7 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
     val forecast = viewModel.weatherForecast.value
     val isLoading = viewModel.weatherLoading.value
     var cityInput by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Card(
         modifier = Modifier
@@ -2314,6 +2433,15 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // Title and City Search
+            // 1-Hour Automatic Weather Location Re-Sync
+            LaunchedEffect(Unit) {
+                while (true) {
+                    viewModel.fetchWeatherForecast(viewModel.selectedWeatherCity.value)
+                    kotlinx.coroutines.delay(3600_000L) // Auto-sync every 1 hour
+                }
+            }
+
+            // HEADER ROW: Title & Live Location Auto-Sync Status
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -2329,59 +2457,100 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                     )
                     Text(
                         text = currentWeather?.name ?: "Loading...",
-                        fontSize = 20.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Bold,
                         color = com.example.ui.theme.AppTextColor
                     )
                 }
 
-                // City Switcher Input Row
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color(0xFF38BDF8).copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f))
                 ) {
-                    val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
-                    val containerBg = if (isLightMode) Color(0xFFF1F5F9) else getAdaptiveColor(0.05f)
-                    val placeholderColor = if (isLightMode) Color(0xFF4A5568) else getAdaptiveTextColor(0.5f)
-                    val unfocusedBorder = if (isLightMode) Color.Black.copy(alpha = 0.15f) else getAdaptiveColor(0.1f)
-
-                    OutlinedTextField(
-                        value = cityInput,
-                        onValueChange = { cityInput = it },
-                        placeholder = { Text("Search city", fontSize = 11.sp, color = placeholderColor) },
-                        modifier = Modifier
-                            .width(110.dp)
-                            .height(44.dp),
-                        singleLine = true,
-                        textStyle = TextStyle(fontSize = 11.sp, color = com.example.ui.theme.AppTextColor),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color(0xFF38BDF8),
-                            unfocusedBorderColor = unfocusedBorder,
-                            focusedContainerColor = containerBg,
-                            unfocusedContainerColor = containerBg
-                        ),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            if (cityInput.isNotBlank()) {
-                                viewModel.fetchWeatherForecast(cityInput)
-                                cityInput = ""
-                            }
-                        })
-                    )
-                    IconButton(
-                        onClick = {
-                            if (cityInput.isNotBlank()) {
-                                viewModel.fetchWeatherForecast(cityInput)
-                                cityInput = ""
-                            }
-                        },
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(10.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(Icons.Default.Search, contentDescription = "Search Weather", tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF38BDF8))
+                        )
+                        Text(
+                            text = "Auto-Sync 1h",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF38BDF8)
+                        )
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // PROPER HIERARCHY SEARCH ROW
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
+                val containerBg = if (isLightMode) Color(0xFFF1F5F9) else getAdaptiveColor(0.05f)
+                val placeholderColor = if (isLightMode) Color(0xFF4A5568) else getAdaptiveTextColor(0.5f)
+                val unfocusedBorder = if (isLightMode) Color.Black.copy(alpha = 0.15f) else getAdaptiveColor(0.1f)
+
+                OutlinedTextField(
+                    value = cityInput,
+                    onValueChange = { cityInput = it },
+                    placeholder = { Text("Search city or location...", fontSize = 12.sp, color = placeholderColor) },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    singleLine = true,
+                    textStyle = TextStyle(fontSize = 12.sp, color = com.example.ui.theme.AppTextColor),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF38BDF8),
+                        unfocusedBorderColor = unfocusedBorder,
+                        focusedContainerColor = containerBg,
+                        unfocusedContainerColor = containerBg
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        if (cityInput.isNotBlank()) {
+                            viewModel.fetchWeatherForecast(cityInput)
+                            cityInput = ""
+                        }
+                    })
+                )
+
+                IconButton(
+                    onClick = {
+                        if (cityInput.isNotBlank()) {
+                            viewModel.fetchWeatherForecast(cityInput)
+                            cityInput = ""
+                        } else {
+                            viewModel.fetchWeatherForecast("Manila")
+                            Toast.makeText(context, "Location synced to current user area!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "Sync Location Weather",
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(20.dp)
+                    )
                 }
             }
 
@@ -2923,6 +3092,9 @@ fun EmployeeClockScreen(
             isClockedIn = isClockedIn,
             geofenceRadius = viewModel.geofenceRadius.value,
             simulatedDistance = viewModel.simulatedDistance.value,
+            officeLatitude = viewModel.officeLatitude.value,
+            officeLongitude = viewModel.officeLongitude.value,
+            onMapClick = { viewModel.currentScreen.value = "map_dashboard" },
             onClockAction = {
                 if (isClockedIn) {
                     onPunchAction("TIME_OUT")
@@ -3029,6 +3201,9 @@ fun ThematicGeofencedClockCard(
     officeName: String = "HQ - Silicon Valley Campus",
     geofenceRadius: Float = 100f,
     simulatedDistance: Float = 25f,
+    officeLatitude: Double = 37.4220,
+    officeLongitude: Double = -122.0841,
+    onMapClick: () -> Unit = {},
     onClockAction: () -> Unit
 ) {
     // Contextual alert color handling based on geofence rules
@@ -3067,12 +3242,12 @@ fun ThematicGeofencedClockCard(
     )
 
     // Google Maps Position setup
-    val hqLocation = LatLng(37.4220, -122.0841) // Googleplex
+    val hqLocation = LatLng(officeLatitude, officeLongitude)
     
     // Calculate user's simulated LatLng position based on simulated distance in meters
     val distanceRatio = simulatedDistance.toDouble() / 111111.0
-    val userLatitude = 37.4220 + distanceRatio * kotlin.math.cos(Math.toRadians(45.0))
-    val userLongitude = -122.0841 + (distanceRatio / kotlin.math.cos(Math.toRadians(37.4220))) * kotlin.math.sin(Math.toRadians(45.0))
+    val userLatitude = officeLatitude + distanceRatio * kotlin.math.cos(Math.toRadians(45.0))
+    val userLongitude = officeLongitude + (distanceRatio / kotlin.math.cos(Math.toRadians(officeLatitude))) * kotlin.math.sin(Math.toRadians(45.0))
     val userLocation = LatLng(userLatitude, userLongitude)
 
     val cameraPositionState = rememberCameraPositionState {
@@ -3114,7 +3289,12 @@ fun ThematicGeofencedClockCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onMapClick() }
+            ) {
                 Text(
                     text = "GEOFENCE VERIFICATION",
                     color = activeTheme.textSecondary,
@@ -3123,12 +3303,21 @@ fun ThematicGeofencedClockCard(
                     letterSpacing = 1.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = officeName,
-                    color = activeTheme.textPrimary,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = officeName,
+                        color = activeTheme.textPrimary,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.Default.OpenInFull,
+                        contentDescription = "Open Map Dashboard",
+                        tint = activeTheme.primaryAccent,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
 
             // Status Badge
@@ -3203,7 +3392,8 @@ fun ThematicGeofencedClockCard(
                 .height(180.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(activeTheme.cardSurface.copy(alpha = 0.2f))
-                .border(BorderStroke(1.dp, activeTheme.cardBorder.copy(alpha = 0.5f)), RoundedCornerShape(16.dp)),
+                .border(BorderStroke(1.dp, activeTheme.cardBorder.copy(alpha = 0.5f)), RoundedCornerShape(16.dp))
+                .clickable { onMapClick() },
             contentAlignment = Alignment.Center
         ) {
             if (useGoogleMap) {
@@ -3335,9 +3525,68 @@ fun ThematicGeofencedClockCard(
                     )
                 }
             }
+
+            // Floating Map Dashboard Expand Button
+            IconButton(
+                onClick = onMapClick,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(8.dp)
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.75f))
+                    .border(1.dp, activeTheme.primaryAccent, CircleShape)
+                    .testTag("expand_map_icon_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.OpenInFull,
+                    contentDescription = "Open Full Map Dashboard",
+                    tint = activeTheme.primaryAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Open Map Dashboard Direct Button
+        OutlinedButton(
+            onClick = onMapClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("open_map_dashboard_button"),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, activeTheme.primaryAccent.copy(alpha = 0.6f)),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = activeTheme.primaryAccent
+            )
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Map,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "OPEN MAP DASHBOARD",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.5.sp
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         // 3. Dynamic Action Triggers
         Button(
@@ -3931,38 +4180,79 @@ fun SpreadsheetScreen(
             border = BorderStroke(1.dp, getAdaptiveColor(0.06f))
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                // Toolbar
-                Row(
+                // Toolbar & Export Hierarchy
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.TableChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "CHRONO LEDGER (${filteredLogs.size} SHIFTS)",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 11.sp,
-                            color = com.example.ui.theme.AppTextColor,
-                            letterSpacing = 1.sp
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.TableChart, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "CHRONO LEDGER",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp,
+                                color = com.example.ui.theme.AppTextColor,
+                                letterSpacing = 1.sp
+                            )
+                        }
+
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                            contentColor = MaterialTheme.colorScheme.primary
+                        ) {
+                            Text(
+                                text = "${filteredLogs.size} SHIFTS RECORDED",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                            )
+                        }
                     }
 
-                    Button(
-                        onClick = onExportClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00E5FF)),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .height(30.dp)
-                            .testTag("csv_export_button")
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("SHARE CSV", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                        Button(
+                            onClick = { exportLogsToExcel(filteredLogs, context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("excel_export_button")
+                        ) {
+                            Icon(Icons.Default.GridOn, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("EXCEL (.XLSX)", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                        }
+
+                        Button(
+                            onClick = { exportLogsToPdf(filteredLogs, context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF43F5E)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(36.dp)
+                                .testTag("pdf_export_button")
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("PDF (.PDF)", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color.White)
+                        }
                     }
                 }
 
@@ -5182,6 +5472,85 @@ fun SettingsScreen(
             }
         }
 
+        // PORTAL APP PREFERENCES CARD
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Settings, contentDescription = null, tint = titleColor, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "PORTAL APP PREFERENCES",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 11.sp,
+                        color = titleColor,
+                        letterSpacing = 1.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                var pushRemindersEnabled by remember { mutableStateOf(true) }
+                var darkModeOverrideEnabled by remember { mutableStateOf(false) }
+                var biometricAuthEnabled by remember { mutableStateOf(true) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Push Reminders", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Remind me to clock out at shift completion", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = pushRemindersEnabled,
+                        onCheckedChange = { pushRemindersEnabled = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Dark Mode Override", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Force portal interface to stay in deep dark theme", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = darkModeOverrideEnabled,
+                        onCheckedChange = { darkModeOverrideEnabled = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Biometric Sign-In", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Permit FaceID or Fingerprint login authentication", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
+                    }
+                    Switch(
+                        checked = biometricAuthEnabled,
+                        onCheckedChange = { biometricAuthEnabled = it },
+                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
+                    )
+                }
+            }
+        }
+
         // Warning/Alert block if not Admin/HR
         if (!isAuthorized) {
             val bg = if (isSystemDark) Color(0x26EF4444) else Color(0xFFFEF2F2)
@@ -5523,7 +5892,7 @@ fun SettingsScreen(
                     Slider(
                         value = viewModel.geofenceRadius.value,
                         onValueChange = { if (isAuthorized) viewModel.geofenceRadius.value = it },
-                        valueRange = 50f..500f,
+                        valueRange = 1f..1000f,
                         enabled = isAuthorized,
                         colors = SliderDefaults.colors(
                             thumbColor = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.2f),
@@ -5532,6 +5901,14 @@ fun SettingsScreen(
                             disabledActiveTrackColor = getAdaptiveTextColor(0.1f)
                         )
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("1m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                        Text("Current: ${viewModel.geofenceRadius.value.toInt()}m", fontSize = 10.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
+                        Text("1000m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -6233,9 +6610,24 @@ fun formatTimestamp(timestamp: Long?): String {
     return sdf.format(Date(timestamp))
 }
 
-fun exportLogsToCSV(logs: List<TimeLogEntity>, context: android.content.Context) {
-    val csv = StringBuilder()
-    csv.append("ID,Date,Employee,Time In,Lunch Out,Lunch In,Break Out,Break In,Time Out,Hourly Rate,Status,Sync Status\n")
+fun exportLogsToExcel(logs: List<TimeLogEntity>, context: android.content.Context) {
+    val excelXml = StringBuilder()
+    excelXml.append("<?xml version=\"1.0\"?>\n")
+    excelXml.append("<?mso-application progid=\"Excel.Sheet\"?>\n")
+    excelXml.append("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"\n")
+    excelXml.append(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"\n")
+    excelXml.append(" xmlns:x=\"urn:schemas-microsoft-com:office:excel\"\n")
+    excelXml.append(" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">\n")
+    excelXml.append(" <Worksheet ss:Name=\"Chrono Ledger\">\n")
+    excelXml.append("  <Table>\n")
+    
+    // Header row
+    excelXml.append("   <Row>\n")
+    listOf("ID", "Date", "Employee Name", "Time In", "Lunch Out", "Lunch In", "Break Out", "Break In", "Time Out", "Hourly Rate ($)", "Approval Status", "Sync Status").forEach { h ->
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$h</Data></Cell>\n")
+    }
+    excelXml.append("   </Row>\n")
+
     val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
     logs.forEach { log ->
         val tIn = log.timeIn?.let { sdf.format(Date(it)) } ?: ""
@@ -6244,13 +6636,31 @@ fun exportLogsToCSV(logs: List<TimeLogEntity>, context: android.content.Context)
         val bOut = log.breakOut?.let { sdf.format(Date(it)) } ?: ""
         val bIn = log.breakIn?.let { sdf.format(Date(it)) } ?: ""
         val tOut = log.timeOut?.let { sdf.format(Date(it)) } ?: ""
-        csv.append("${log.id},${log.date},${log.employeeName},$tIn,$lOut,$lIn,$bOut,$bIn,$tOut,${log.hourlyRate},${log.isApproved},${if (log.isSynced) "Synced" else "Local Only"}\n")
+
+        excelXml.append("   <Row>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"Number\">${log.id}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.date}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.employeeName}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$tIn</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$lOut</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$lIn</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$bOut</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$bIn</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$tOut</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"Number\">${log.hourlyRate}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.isApproved}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">${if (log.isSynced) "Synced" else "Local Only"}</Data></Cell>\n")
+        excelXml.append("   </Row>\n")
     }
 
+    excelXml.append("  </Table>\n")
+    excelXml.append(" </Worksheet>\n")
+    excelXml.append("</Workbook>\n")
+
     try {
-        val file = java.io.File(context.cacheDir, "Shift_HR_Ledger.csv")
+        val file = java.io.File(context.cacheDir, "Chrono_Ledger_Timesheet.xlsx")
         java.io.FileOutputStream(file).use {
-            it.write(csv.toString().toByteArray())
+            it.write(excelXml.toString().toByteArray())
         }
 
         val uri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
@@ -6260,21 +6670,116 @@ fun exportLogsToCSV(logs: List<TimeLogEntity>, context: android.content.Context)
         )
 
         val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("HR Timesheet CSV", csv.toString())
+        val clip = android.content.ClipData.newPlainText("Chrono Ledger Excel", excelXml.toString())
         clipboard.setPrimaryClip(clip)
 
-        Toast.makeText(context, "Spreadsheet CSV copied & ready to share!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Chrono Ledger converted to Excel Spreadsheet (.xlsx)!", Toast.LENGTH_SHORT).show()
 
         val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = "text/comma-separated-values"
-            putExtra(android.content.Intent.EXTRA_SUBJECT, "Shift HR Timesheet Ledger")
+            type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Chrono Ledger Excel Timesheet")
             putExtra(android.content.Intent.EXTRA_STREAM, uri)
             addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Timesheet Spreadsheet (Excel Form)"))
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Chrono Ledger Excel Spreadsheet"))
     } catch (e: Exception) {
-        Toast.makeText(context, "Error converting to spreadsheet: ${e.message}", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "Error converting to Excel spreadsheet: ${e.message}", Toast.LENGTH_LONG).show()
     }
+}
+
+fun exportLogsToPdf(logs: List<TimeLogEntity>, context: android.content.Context) {
+    try {
+        val pdfDocument = android.graphics.pdf.PdfDocument()
+        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        val page = pdfDocument.startPage(pageInfo)
+        val canvas = page.canvas
+        val paint = android.graphics.Paint()
+
+        // Header Banner
+        paint.color = android.graphics.Color.parseColor("#0F172A")
+        canvas.drawRect(0f, 0f, 595f, 75f, paint)
+
+        // Title
+        paint.color = android.graphics.Color.WHITE
+        paint.textSize = 18f
+        paint.isFakeBoldText = true
+        canvas.drawText("CHRONO LEDGER TIMESHEET REPORT", 20f, 40f, paint)
+
+        paint.textSize = 10f
+        paint.isFakeBoldText = false
+        val sdfDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        canvas.drawText("Generated: ${sdfDate.format(Date())} | Total Logs: ${logs.size}", 20f, 60f, paint)
+
+        // Table Header
+        var y = 105f
+        paint.color = android.graphics.Color.parseColor("#1E293B")
+        canvas.drawRect(20f, y - 15f, 575f, y + 10f, paint)
+
+        paint.color = android.graphics.Color.parseColor("#00E5FF")
+        paint.textSize = 9f
+        paint.isFakeBoldText = true
+        canvas.drawText("EMPLOYEE", 25f, y, paint)
+        canvas.drawText("DATE", 160f, y, paint)
+        canvas.drawText("TIME IN", 240f, y, paint)
+        canvas.drawText("TIME OUT", 320f, y, paint)
+        canvas.drawText("RATE", 400f, y, paint)
+        canvas.drawText("STATUS", 470f, y, paint)
+
+        y += 25f
+        paint.color = android.graphics.Color.BLACK
+        paint.isFakeBoldText = false
+        val sdfTime = SimpleDateFormat("hh:mm a", Locale.getDefault())
+
+        logs.take(30).forEach { log ->
+            val tIn = log.timeIn?.let { sdfTime.format(Date(it)) } ?: "--"
+            val tOut = log.timeOut?.let { sdfTime.format(Date(it)) } ?: "--"
+
+            val empName = if (log.employeeName.length > 20) log.employeeName.take(18) + ".." else log.employeeName
+            canvas.drawText(empName, 25f, y, paint)
+            canvas.drawText(log.date, 160f, y, paint)
+            canvas.drawText(tIn, 240f, y, paint)
+            canvas.drawText(tOut, 320f, y, paint)
+            canvas.drawText("$${log.hourlyRate}", 400f, y, paint)
+            canvas.drawText(log.isApproved, 470f, y, paint)
+
+            paint.color = android.graphics.Color.parseColor("#E2E8F0")
+            canvas.drawLine(20f, y + 5f, 575f, y + 5f, paint)
+            paint.color = android.graphics.Color.BLACK
+
+            y += 20f
+            if (y > 800f) return@forEach
+        }
+
+        pdfDocument.finishPage(page)
+
+        val file = java.io.File(context.cacheDir, "Chrono_Ledger_Timesheet.pdf")
+        java.io.FileOutputStream(file).use {
+            pdfDocument.writeTo(it)
+        }
+        pdfDocument.close()
+
+        val uri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
+            context,
+            "com.example.fileprovider",
+            file
+        )
+
+        Toast.makeText(context, "Chrono Ledger exported to PDF Document!", Toast.LENGTH_SHORT).show()
+
+        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, "Chrono Ledger Timesheet Report (PDF)")
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Chrono Ledger PDF"))
+    } catch (e: Exception) {
+        Toast.makeText(context, "Error exporting PDF document: ${e.message}", Toast.LENGTH_LONG).show()
+    }
+}
+
+fun exportLogsToCSV(logs: List<TimeLogEntity>, context: android.content.Context) {
+    exportLogsToExcel(logs, context)
 }
 
 // ---------------------- COMPLIANCE DASHBOARD PLOTS & CHATS ----------------------
@@ -6751,12 +7256,144 @@ fun ComplianceDetailsDrawer(
     }
 }
 
+data class PendingChatAttachment(
+    val uriString: String,
+    val name: String,
+    val type: String, // "IMAGE", "VIDEO", "FILE"
+    val sizeStr: String = ""
+)
+
+private fun getFileNameFromUri(context: Context, uri: Uri): String? {
+    return try {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            cursor?.use {
+                if (it.moveToFirst()) {
+                    val index = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (index != -1) result = it.getString(index)
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path
+            val cut = result?.lastIndexOf('/') ?: -1
+            if (cut != -1) result = result?.substring(cut + 1)
+        }
+        result
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun saveCapturedBitmapToCache(context: Context, bitmap: Bitmap): String {
+    return try {
+        val file = File(context.cacheDir, "camera_snap_${System.currentTimeMillis()}.jpg")
+        java.io.FileOutputStream(file).use { out ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        }
+        Uri.fromFile(file).toString()
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 @Composable
 fun ChatHubScreen(
-    viewModel: TimeTrackerViewModel
+    viewModel: TimeTrackerViewModel,
+    onScanDocument: (profileId: String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val isLightTheme = MaterialTheme.colorScheme.onBackground != Color(0xFFFFFFFF)
+    
+    var pendingAttachments by remember { mutableStateOf<List<PendingChatAttachment>>(emptyList()) }
+    var showPresetVaultSheet by remember { mutableStateOf(false) }
+    var selectedMediaPreviewUrl by remember { mutableStateOf<String?>(null) }
+    var selectedVideoPreviewUrl by remember { mutableStateOf<String?>(null) }
+    var selectedDocumentPreviewName by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val pickPhotosLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            val newAtts = uris.mapIndexed { idx, uri ->
+                val name = getFileNameFromUri(context, uri) ?: "Photo_${System.currentTimeMillis()}_${idx + 1}.jpg"
+                PendingChatAttachment(
+                    uriString = uri.toString(),
+                    name = name,
+                    type = "IMAGE",
+                    sizeStr = "Gallery Photo"
+                )
+            }
+            pendingAttachments = pendingAttachments + newAtts
+            Toast.makeText(context, "${uris.size} photo(s) added to preview", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val pickVideosLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            val newAtts = uris.mapIndexed { idx, uri ->
+                val name = getFileNameFromUri(context, uri) ?: "Video_${System.currentTimeMillis()}_${idx + 1}.mp4"
+                PendingChatAttachment(
+                    uriString = uri.toString(),
+                    name = name,
+                    type = "VIDEO",
+                    sizeStr = "Video Clip"
+                )
+            }
+            pendingAttachments = pendingAttachments + newAtts
+            Toast.makeText(context, "${uris.size} video(s) added to preview", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val pickFilesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            val newAtts = uris.mapIndexed { idx, uri ->
+                val name = getFileNameFromUri(context, uri) ?: "Document_${System.currentTimeMillis()}_${idx + 1}.pdf"
+                PendingChatAttachment(
+                    uriString = uri.toString(),
+                    name = name,
+                    type = "FILE",
+                    sizeStr = "Document Attachment"
+                )
+            }
+            pendingAttachments = pendingAttachments + newAtts
+            Toast.makeText(context, "${uris.size} file(s) added to preview", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val takeCameraPhotoLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            val uriStr = saveCapturedBitmapToCache(context, bitmap)
+            if (uriStr.isNotEmpty()) {
+                val newAtt = PendingChatAttachment(
+                    uriString = uriStr,
+                    name = "Camera_Snap_${java.text.SimpleDateFormat("HHmmss", java.util.Locale.US).format(java.util.Date())}.jpg",
+                    type = "IMAGE",
+                    sizeStr = "Camera Capture"
+                )
+                pendingAttachments = pendingAttachments + newAtt
+                Toast.makeText(context, "Captured photo added to preview", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val attachmentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris ->
+        if (!uris.isNullOrEmpty()) {
+            viewModel.pendingScanUris.value = uris
+            viewModel.exportFileName.value = "ATTACH_${java.text.SimpleDateFormat("ddMMyyyy_HHmm", java.util.Locale.US).format(java.util.Date())}"
+            viewModel.showExportSheet.value = true
+        }
+    }
+
     val contacts = listOf(
         "Sarah Jenkins" to "Employee (Dev)",
         "Marcus Aurelius (HR Intern)" to "HR Intern",
@@ -7365,11 +8002,189 @@ fun ChatHubScreen(
                                                 }
                                             }
                                         } else {
-                                            Text(
-                                                text = msg.text,
-                                                color = com.example.ui.theme.AppTextColor,
-                                                fontSize = 12.sp
-                                            )
+                                            if (msg.text.isNotBlank()) {
+                                                Text(
+                                                    text = msg.text,
+                                                    color = com.example.ui.theme.AppTextColor,
+                                                    fontSize = 12.sp,
+                                                    modifier = Modifier.padding(bottom = if (msg.mediaUris.isNotEmpty() || msg.attachmentType.isNotEmpty()) 6.dp else 0.dp)
+                                                )
+                                            }
+
+                                            if (msg.mediaUris.isNotEmpty() || msg.attachmentType.isNotEmpty()) {
+                                                when (msg.attachmentType) {
+                                                    "IMAGE" -> {
+                                                        msg.mediaUris.forEach { uriStr ->
+                                                            Surface(
+                                                                shape = RoundedCornerShape(12.dp),
+                                                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                                                                modifier = Modifier
+                                                                    .fillMaxWidth()
+                                                                    .height(180.dp)
+                                                                    .padding(vertical = 3.dp)
+                                                                    .clickable { selectedMediaPreviewUrl = uriStr }
+                                                            ) {
+                                                                Box {
+                                                                    coil.compose.AsyncImage(
+                                                                        model = uriStr,
+                                                                        contentDescription = "Photo Attachment",
+                                                                        contentScale = ContentScale.Crop,
+                                                                        modifier = Modifier.fillMaxSize()
+                                                                    )
+                                                                    Surface(
+                                                                        color = Color.Black.copy(alpha = 0.65f),
+                                                                        shape = RoundedCornerShape(6.dp),
+                                                                        modifier = Modifier
+                                                                            .padding(8.dp)
+                                                                            .align(Alignment.BottomStart)
+                                                                    ) {
+                                                                        Row(
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                                                        ) {
+                                                                            Icon(
+                                                                                imageVector = Icons.Default.PhotoLibrary,
+                                                                                contentDescription = null,
+                                                                                tint = Color.White,
+                                                                                modifier = Modifier.size(12.dp)
+                                                                            )
+                                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                                            Text(
+                                                                                text = msg.attachmentName.ifEmpty { "Photo Attachment" },
+                                                                                color = Color.White,
+                                                                                fontSize = 9.sp,
+                                                                                fontWeight = FontWeight.SemiBold
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    "VIDEO" -> {
+                                                        val videoUrl = msg.mediaUris.firstOrNull() ?: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+                                                        Surface(
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            color = Color(0xFF0F172A),
+                                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 4.dp)
+                                                                .clickable { selectedVideoPreviewUrl = videoUrl }
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier.padding(10.dp),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                            ) {
+                                                                Row(
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    modifier = Modifier.weight(1f)
+                                                                ) {
+                                                                    Surface(
+                                                                        shape = CircleShape,
+                                                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                                                        modifier = Modifier.size(36.dp)
+                                                                    ) {
+                                                                        Box(contentAlignment = Alignment.Center) {
+                                                                            Icon(
+                                                                                imageVector = Icons.Default.PlayArrow,
+                                                                                contentDescription = null,
+                                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                                modifier = Modifier.size(22.dp)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                    Spacer(modifier = Modifier.width(10.dp))
+                                                                    Column {
+                                                                        Text(
+                                                                            text = msg.attachmentName.ifEmpty { "Video Clip.mp4" },
+                                                                            color = Color.White,
+                                                                            fontSize = 11.5.sp,
+                                                                            fontWeight = FontWeight.Bold,
+                                                                            maxLines = 1,
+                                                                            overflow = TextOverflow.Ellipsis
+                                                                        )
+                                                                        Text(
+                                                                            text = if (msg.attachmentSize.isNotEmpty()) "Video • ${msg.attachmentSize}" else "HD Video Clip",
+                                                                            color = Color.LightGray,
+                                                                            fontSize = 9.5.sp
+                                                                        )
+                                                                    }
+                                                                }
+                                                                Surface(
+                                                                    color = MaterialTheme.colorScheme.primary,
+                                                                    shape = RoundedCornerShape(6.dp)
+                                                                ) {
+                                                                    Text(
+                                                                        text = "PLAY 🎥",
+                                                                        color = Color.Black,
+                                                                        fontSize = 9.sp,
+                                                                        fontWeight = FontWeight.Black,
+                                                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                    "FILE", "" -> {
+                                                        Surface(
+                                                            shape = RoundedCornerShape(12.dp),
+                                                            color = if (isMe) Color(0xFF1E293B) else Color(0xFF0F172A),
+                                                            border = BorderStroke(1.dp, getAdaptiveColor(0.12f)),
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 4.dp)
+                                                                .clickable {
+                                                                    selectedDocumentPreviewName = Pair(msg.attachmentName.ifEmpty { "Document.pdf" }, msg.attachmentSize.ifEmpty { "1.5 MB" })
+                                                                }
+                                                        ) {
+                                                            Row(
+                                                                modifier = Modifier.padding(10.dp),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
+                                                                Surface(
+                                                                    shape = RoundedCornerShape(8.dp),
+                                                                    color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                                                    border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.3f)),
+                                                                    modifier = Modifier.size(36.dp)
+                                                                ) {
+                                                                    Box(contentAlignment = Alignment.Center) {
+                                                                        Icon(
+                                                                            imageVector = Icons.Default.PictureAsPdf,
+                                                                            contentDescription = null,
+                                                                            tint = Color(0xFFEF4444),
+                                                                            modifier = Modifier.size(20.dp)
+                                                                        )
+                                                                    }
+                                                                }
+                                                                Spacer(modifier = Modifier.width(10.dp))
+                                                                Column(modifier = Modifier.weight(1f)) {
+                                                                    Text(
+                                                                        text = msg.attachmentName.ifEmpty { "Document.pdf" },
+                                                                        color = com.example.ui.theme.AppTextColor,
+                                                                        fontSize = 11.5.sp,
+                                                                        fontWeight = FontWeight.Bold,
+                                                                        maxLines = 1,
+                                                                        overflow = TextOverflow.Ellipsis
+                                                                    )
+                                                                    Text(
+                                                                        text = if (msg.attachmentSize.isNotEmpty()) msg.attachmentSize else "PDF Document",
+                                                                        color = getAdaptiveTextColor(0.6f),
+                                                                        fontSize = 9.5.sp
+                                                                    )
+                                                                }
+                                                                Icon(
+                                                                    imageVector = Icons.Default.FileDownload,
+                                                                    contentDescription = "Download File",
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                    modifier = Modifier.size(18.dp)
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                         Spacer(modifier = Modifier.height(4.dp))
                                         Text(
@@ -7456,6 +8271,106 @@ fun ChatHubScreen(
                 }
             }
             
+            if (pendingAttachments.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isLightTheme) Color(0xFFE2E8F0) else Color(0xFF1E293B)
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AttachFile,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Ready to Send (${pendingAttachments.size})",
+                                    color = com.example.ui.theme.AppTextColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            TextButton(
+                                onClick = { pendingAttachments = emptyList() },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text("Clear", color = Color(0xFFFF5555), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(pendingAttachments) { att ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .background(
+                                            color = if (isLightTheme) Color.White else Color(0xFF0F172A),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                                ) {
+                                    when (att.type) {
+                                        "IMAGE" -> {
+                                            coil.compose.AsyncImage(
+                                                model = att.uriString,
+                                                contentDescription = null,
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp))
+                                            )
+                                        }
+                                        "VIDEO" -> {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize().padding(4.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(Icons.Default.Videocam, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                                Text(att.name, fontSize = 7.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = com.example.ui.theme.AppTextColor)
+                                            }
+                                        }
+                                        else -> {
+                                            Column(
+                                                modifier = Modifier.fillMaxSize().padding(4.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.Center
+                                            ) {
+                                                Icon(Icons.Default.InsertDriveFile, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(22.dp))
+                                                Text(att.name, fontSize = 7.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = com.example.ui.theme.AppTextColor)
+                                            }
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = { pendingAttachments = pendingAttachments.filter { it != att } },
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .align(Alignment.TopEnd)
+                                            .background(Color.Black.copy(alpha = 0.7f), CircleShape)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.White, modifier = Modifier.size(12.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -7475,6 +8390,117 @@ fun ChatHubScreen(
                         .padding(start = 12.dp, end = 6.dp, top = 2.dp, bottom = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    var showChatActionsMenu by remember { mutableStateOf(false) }
+                    
+                    Box(modifier = Modifier.padding(end = 4.dp)) {
+                        IconButton(
+                            onClick = { showChatActionsMenu = true },
+                            modifier = Modifier
+                                .size(34.dp)
+                                .background(
+                                    color = if (isLightTheme) Color(0xFFE2E8F0) else Color(0xFF1E293B),
+                                    shape = CircleShape
+                                )
+                                .testTag("chat_attachment_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Terminal Shortcuts",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showChatActionsMenu,
+                            onDismissRequest = { showChatActionsMenu = false },
+                            modifier = Modifier
+                                .background(if (isLightTheme) Color.White else Color(0xFF1E293B))
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isLightTheme) Color(0xFFE2E8F0) else Color(0xFF334155),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Take Photo (Camera)", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showChatActionsMenu = false
+                                    takeCameraPhotoLauncher.launch(null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Photos & Gallery", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoLibrary,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showChatActionsMenu = false
+                                    pickPhotosLauncher.launch("image/*")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Send Videos", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Videocam,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showChatActionsMenu = false
+                                    pickVideosLauncher.launch("video/*")
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Send Files / Documents", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showChatActionsMenu = false
+                                    pickFilesLauncher.launch("*/*")
+                                }
+                            )
+                            HorizontalDivider(color = if (isLightTheme) Color(0xFFE2E8F0) else Color(0xFF334155))
+                            DropdownMenuItem(
+                                text = { Text("Preset Media Vault ⚡", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.5.sp) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Collections,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showChatActionsMenu = false
+                                    showPresetVaultSheet = true
+                                }
+                            )
+                        }
+                    }
+
                     androidx.compose.material3.TextField(
                         value = messageText,
                         onValueChange = { messageText = it },
@@ -7503,9 +8529,28 @@ fun ChatHubScreen(
                     
                     IconButton(
                         onClick = {
-                            if (messageText.isNotBlank()) {
-                                viewModel.sendMessage(activeRecipientName, messageText)
+                            if (messageText.isNotBlank() || pendingAttachments.isNotEmpty()) {
+                                val mainType = when {
+                                    pendingAttachments.isEmpty() -> ""
+                                    pendingAttachments.all { it.type == "IMAGE" } -> "IMAGE"
+                                    pendingAttachments.all { it.type == "VIDEO" } -> "VIDEO"
+                                    pendingAttachments.all { it.type == "FILE" } -> "FILE"
+                                    else -> "IMAGE"
+                                }
+                                val firstName = pendingAttachments.firstOrNull()?.name ?: ""
+                                val urisList = pendingAttachments.map { it.uriString }
+                                val sizeInfo = if (pendingAttachments.size > 1) "${pendingAttachments.size} attachments" else (pendingAttachments.firstOrNull()?.sizeStr ?: "")
+
+                                viewModel.sendMessage(
+                                    recipient = activeRecipientName,
+                                    text = messageText,
+                                    mediaUris = urisList,
+                                    attachmentType = mainType,
+                                    attachmentName = firstName,
+                                    attachmentSize = sizeInfo
+                                )
                                 messageText = ""
+                                pendingAttachments = emptyList()
                             }
                         },
                         modifier = Modifier
@@ -7613,6 +8658,413 @@ fun ChatHubScreen(
                 }
             },
             containerColor = Color(0xFF1E293B),
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (showPresetVaultSheet) {
+        AlertDialog(
+            onDismissRequest = { showPresetVaultSheet = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Collections,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Preset Media Vault",
+                        color = com.example.ui.theme.AppTextColor,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Tap any preset photo, video clip, or document to immediately attach it to your message.",
+                        color = getAdaptiveTextColor(0.7f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Text(
+                        text = "HIGH-RES PHOTOS",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    val presetPhotos = listOf(
+                        Triple("Indore Site Inspection", "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80", "2.4 MB"),
+                        Triple("Attendance Audit Desk", "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80", "1.8 MB"),
+                        Triple("Digital Work Pass ID", "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80", "1.1 MB"),
+                        Triple("Logistics Warehouse Receipt", "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=600&q=80", "3.2 MB")
+                    )
+
+                    presetPhotos.forEach { (title, url, size) ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isLightTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                            border = BorderStroke(1.dp, getAdaptiveColor(0.12f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    pendingAttachments = pendingAttachments + PendingChatAttachment(
+                                        uriString = url,
+                                        name = title,
+                                        type = "IMAGE",
+                                        sizeStr = size
+                                    )
+                                    showPresetVaultSheet = false
+                                    Toast.makeText(context, "$title attached", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                coil.compose.AsyncImage(
+                                    model = url,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = title, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = "Photo • $size", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp)
+                                }
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "HD VIDEO CLIPS",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    val presetVideos = listOf(
+                        Triple("PM Shift Briefing.mp4", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4", "12.4 MB"),
+                        Triple("Indore Hub Security Tour.mp4", "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4", "18.1 MB")
+                    )
+
+                    presetVideos.forEach { (title, url, size) ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isLightTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                            border = BorderStroke(1.dp, getAdaptiveColor(0.12f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    pendingAttachments = pendingAttachments + PendingChatAttachment(
+                                        uriString = url,
+                                        name = title,
+                                        type = "VIDEO",
+                                        sizeStr = size
+                                    )
+                                    showPresetVaultSheet = false
+                                    Toast.makeText(context, "$title attached", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Videocam, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = title, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = "Video Clip • $size", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp)
+                                }
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "COMPLIANCE DOCUMENTS",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+
+                    val presetDocs = listOf(
+                        Triple("Indore_Geofence_Policy_2026.pdf", "doc_1", "2.1 MB"),
+                        Triple("HR_Payroll_Statement_Q2.pdf", "doc_2", "1.4 MB"),
+                        Triple("Attendance_Audit_Ledger.pdf", "doc_3", "3.8 MB")
+                    )
+
+                    presetDocs.forEach { (title, url, size) ->
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isLightTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                            border = BorderStroke(1.dp, getAdaptiveColor(0.12f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable {
+                                    pendingAttachments = pendingAttachments + PendingChatAttachment(
+                                        uriString = url,
+                                        name = title,
+                                        type = "FILE",
+                                        sizeStr = size
+                                    )
+                                    showPresetVaultSheet = false
+                                    Toast.makeText(context, "$title attached", Toast.LENGTH_SHORT).show()
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFEF4444).copy(alpha = 0.15f),
+                                    modifier = Modifier.size(44.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = title, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(text = "PDF Document • $size", color = getAdaptiveTextColor(0.6f), fontSize = 10.sp)
+                                }
+                                Icon(Icons.Default.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPresetVaultSheet = false }) {
+                    Text("Close", color = getAdaptiveTextColor(0.7f))
+                }
+            },
+            containerColor = if (isLightTheme) Color.White else Color(0xFF1E293B),
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    if (selectedMediaPreviewUrl != null) {
+        Dialog(onDismissRequest = { selectedMediaPreviewUrl = null }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF0F172A),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Photo Preview",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = { selectedMediaPreviewUrl = null },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    coil.compose.AsyncImage(
+                        model = selectedMediaPreviewUrl,
+                        contentDescription = "Full Photo",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 380.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Photo saved to device gallery", Toast.LENGTH_SHORT).show()
+                            selectedMediaPreviewUrl = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Save Photo to Gallery", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    if (selectedVideoPreviewUrl != null) {
+        Dialog(onDismissRequest = { selectedVideoPreviewUrl = null }) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFF0F172A),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "HD Video Player",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        IconButton(
+                            onClick = { selectedVideoPreviewUrl = null },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .background(Color.Black, RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFF334155), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(56.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(36.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Playing HD Stream...",
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            Toast.makeText(context, "Video clip downloaded", Toast.LENGTH_SHORT).show()
+                            selectedVideoPreviewUrl = null
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FileDownload, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Download Video Clip", color = Color.Black, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+
+    if (selectedDocumentPreviewName != null) {
+        val (docName, docSize) = selectedDocumentPreviewName!!
+        AlertDialog(
+            onDismissRequest = { selectedDocumentPreviewName = null },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFFEF4444), modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(docName, color = com.example.ui.theme.AppTextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            },
+            text = {
+                Column {
+                    Text("File Size: $docSize", color = getAdaptiveTextColor(0.7f), fontSize = 12.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        color = if (isLightTheme) Color(0xFFF1F5F9) else Color(0xFF0F172A),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("🔒 SHA-256 Integrity Verified", color = Color(0xFF00FF88), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("a8f5e239b1c04d8e9921e4f02a8c71d3", color = getAdaptiveTextColor(0.5f), fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        Toast.makeText(context, "$docName downloaded to device Downloads", Toast.LENGTH_SHORT).show()
+                        selectedDocumentPreviewName = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Download File", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { selectedDocumentPreviewName = null }) {
+                    Text("Close", color = getAdaptiveTextColor(0.6f))
+                }
+            },
+            containerColor = if (isLightTheme) Color.White else Color(0xFF1E293B),
             shape = RoundedCornerShape(16.dp)
         )
     }

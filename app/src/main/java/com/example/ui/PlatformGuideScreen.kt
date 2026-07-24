@@ -167,7 +167,7 @@ fun PlatformGuideScreen(viewModel: TimeTrackerViewModel) {
         ) { targetTab ->
             when (targetTab) {
                 "stepper" -> StepperGuideSection(viewModel, context)
-                "diagram" -> InteractiveDiagramSection(context)
+                "diagram" -> InteractiveDiagramSection(context, viewModel)
                 "gooey" -> GooeySandboxSection(viewModel, context)
             }
         }
@@ -904,7 +904,7 @@ fun TryOutSpreadsheetSimulator(viewModel: TimeTrackerViewModel, context: Context
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
-fun InteractiveDiagramSection(context: Context) {
+fun InteractiveDiagramSection(context: Context, viewModel: TimeTrackerViewModel) {
     var selectedNode by remember { mutableStateOf<String?>(null) }
     var selectedSubTab by remember { mutableStateOf("flowchart") } // "flowchart", "system", "database", "apis", "ui", "files"
 
@@ -942,6 +942,7 @@ fun InteractiveDiagramSection(context: Context) {
             val tabs = listOf(
                 "flowchart" to "🔗 Flow",
                 "system" to "🌐 System",
+                "scaling" to "⚡ 1M Scaling",
                 "database" to "🗄️ Database",
                 "apis" to "🔌 APIs",
                 "ui" to "🎨 UI Flow",
@@ -1148,6 +1149,9 @@ fun InteractiveDiagramSection(context: Context) {
                             }
                         }
                     }
+                }
+                "scaling" -> {
+                    ScalingArchitectureSection(context, viewModel)
                 }
                 "database" -> {
                     Column(
@@ -1987,3 +1991,640 @@ fun GooeySandboxSection(viewModel: TimeTrackerViewModel, context: Context) {
         }
     }
 }
+
+// =========================================================================
+// ⚡ MULTI-TIERED SCALABLE BACKEND ARCHITECTURE SECTION (1M+ USERS)
+// =========================================================================
+
+@Composable
+fun ScalingArchitectureSection(context: Context, viewModel: TimeTrackerViewModel) {
+    var selectedDiagramNode by remember { mutableStateOf<String?>("alb") }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Speed,
+                    contentDescription = null,
+                    tint = NeonGreen,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "🏗️ SCALABLE ARCHITECTURE FOR YOUR APP",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    color = NeonGreen,
+                    letterSpacing = 1.sp
+                )
+            }
+            Text(
+                text = "Stateless Ktor Cluster, Redis Pub/Sub Sync, PgBouncer DB Proxy & Ktor Mobile Resilience (1M+ Active Users)",
+                fontSize = 10.5.sp,
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                modifier = Modifier.padding(top = 2.dp)
+            )
+        }
+
+        // =========================================================================
+        // VISUAL DIAGRAM CARD (Faithful to "The Scalable Architecture for Your App")
+        // =========================================================================
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF090D16)),
+            border = BorderStroke(1.dp, NeonGreen.copy(alpha = 0.4f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🏗️ Multi-Tier Scaling Topology",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Surface(
+                        color = NeonGreen.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(4.dp),
+                        border = BorderStroke(1.dp, NeonGreen)
+                    ) {
+                        Text(
+                            text = "LIVE CLUSTER",
+                            color = NeonGreen,
+                            fontSize = 8.5.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Tap any node box to inspect layer protocol specs and zero-downtime routing details.",
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.5f),
+                    fontSize = 9.5.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Layer 1: Android App Clients
+                ArchitectureDiagramNodeBox(
+                    title = "[ Android App Clients ]",
+                    subtitle = "Jetpack Compose + Ktor Client + Retry Policies",
+                    nodeKey = "client",
+                    isSelected = selectedDiagramNode == "client",
+                    accentColor = Color(0xFF38BDF8),
+                    onClick = { selectedDiagramNode = "client" }
+                )
+
+                DiagramVerticalConnector()
+
+                // Layer 2: Cloudflare / AWS Route 53
+                ArchitectureDiagramNodeBox(
+                    title = "[ Cloudflare / AWS Route 53 ]",
+                    subtitle = "DNS Routing + Anycast + DDoS Shield",
+                    nodeKey = "dns",
+                    isSelected = selectedDiagramNode == "dns",
+                    accentColor = Color(0xFFF59E0B),
+                    onClick = { selectedDiagramNode = "dns" }
+                )
+
+                DiagramVerticalConnector()
+
+                // Layer 3: AWS Application Load Balancer
+                ArchitectureDiagramNodeBox(
+                    title = "[ AWS Application Load Balancer ]",
+                    subtitle = "ALB / Traefik Gateway (Stateless Round-Robin)",
+                    nodeKey = "alb",
+                    isSelected = selectedDiagramNode == "alb",
+                    accentColor = Color(0xFFA855F7),
+                    onClick = { selectedDiagramNode = "alb" }
+                )
+
+                DiagramSplitConnector()
+
+                // Layer 4: Ktor Auto-Scaled Container Nodes (2 Parallel Columns)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        ArchitectureDiagramNodeBox(
+                            title = "Ktor Node 1",
+                            subtitle = "Stateless App Node",
+                            nodeKey = "node1",
+                            isSelected = selectedDiagramNode == "node1",
+                            accentColor = NeonGreen,
+                            onClick = { selectedDiagramNode = "node1" }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ArchitectureDiagramNodeBox(
+                            title = "Ktor Node 2",
+                            subtitle = "Auto-Scaled Container",
+                            nodeKey = "node2",
+                            isSelected = selectedDiagramNode == "node2",
+                            accentColor = NeonGreen,
+                            onClick = { selectedDiagramNode = "node2" }
+                        )
+                    }
+                }
+
+                DiagramMergeConnector()
+
+                // Layer 5: Backend Sub-Systems (Redis, PgBouncer, Postgres Read Replicas)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        ArchitectureDiagramNodeBox(
+                            title = "Redis Pub/Sub",
+                            subtitle = "WebSocket Sync",
+                            nodeKey = "redis",
+                            isSelected = selectedDiagramNode == "redis",
+                            accentColor = Color(0xFFEF4444),
+                            onClick = { selectedDiagramNode = "redis" }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ArchitectureDiagramNodeBox(
+                            title = "PgBouncer Pool",
+                            subtitle = "DB Proxy",
+                            nodeKey = "pgbouncer",
+                            isSelected = selectedDiagramNode == "pgbouncer",
+                            accentColor = Color(0xFF10B981),
+                            onClick = { selectedDiagramNode = "pgbouncer" }
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ArchitectureDiagramNodeBox(
+                            title = "PostgreSQL Replicas",
+                            subtitle = "Read Replica Cluster",
+                            nodeKey = "replicas",
+                            isSelected = selectedDiagramNode == "replicas",
+                            accentColor = Color(0xFF3B82F6),
+                            onClick = { selectedDiagramNode = "replicas" }
+                        )
+                    }
+                }
+
+                DiagramVerticalConnector()
+
+                // Layer 6: PostgreSQL Main
+                ArchitectureDiagramNodeBox(
+                    title = "[ PostgreSQL Main ]",
+                    subtitle = "Primary ACID Write Master Database",
+                    nodeKey = "postgres_main",
+                    isSelected = selectedDiagramNode == "postgres_main",
+                    accentColor = Color(0xFF6366F1),
+                    onClick = { selectedDiagramNode = "postgres_main" }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Node Detailed Modal/Card
+                if (selectedDiagramNode != null) {
+                    val (nodeName, nodeDesc, nodeTech) = when (selectedDiagramNode) {
+                        "client" -> Triple(
+                            "Android Mobile Client (Jetpack Compose)",
+                            "Mobile clients connect via HTTPS and WebSockets. Built with Ktor Client featuring automated exponential retry policies, token refresh handlers, and offline Room DB caching during network handoffs.",
+                            "Protocol: WSS / TLS 1.3 | Retry Strategy: Exponential Backoff (1s, 2s, 4s, 8s)"
+                        )
+                        "dns" -> Triple(
+                            "Cloudflare / AWS Route 53 DNS & DDoS Shield",
+                            "Provides Anycast DNS resolution, TLS termination, Web Application Firewall (WAF) rate limiting, and DDoS mitigation before traffic reaches backend servers.",
+                            "Edge Nodes: 300+ Locations | Protection: Anycast Layer 7 WAF"
+                        )
+                        "alb" -> Triple(
+                            "AWS Application Load Balancer (ALB / Traefik)",
+                            "Distributes inbound HTTP/WebSocket connections statelessly across 50+ auto-scaled Ktor nodes using round-robin and active liveness/readiness health probes.",
+                            "Health Target: GET /health | Port: 443 -> 8080 | Sticky Session: Disabled"
+                        )
+                        "node1", "node2" -> Triple(
+                            "Ktor Server Container Instance (Auto-Scaled)",
+                            "Stateless Kotlin Ktor microservice container. Uses JWT for authentication and does not store session state in memory. Handles chat, clock punching, and biometrics validation.",
+                            "Runtime: Ktor Netty | Auth: Stateless HMAC-256 JWT | Memory: 512MB per container"
+                        )
+                        "redis" -> Triple(
+                            "Redis Pub/Sub WebSocket Message Relay Cluster",
+                            "Enables instant WebSocket synchronization between Ktor nodes. When User A posts a chat message or punch on Node 1, Redis Pub/Sub immediately broadcasts it to Node 2.",
+                            "Pub/Sub Adapter: io.lettuce.core | Latency: <2ms | Channel: chat_{id}"
+                        )
+                        "pgbouncer" -> Triple(
+                            "PgBouncer Database Connection Proxy Pool",
+                            "Pools 1,000+ HikariCP connections down to 50 active PostgreSQL server connections. Prevents PostgreSQL process memory crashes during traffic surges.",
+                            "Mode: Transaction Pooling | Listen Port: 6432 | Max Client Conn: 10,000"
+                        )
+                        "replicas" -> Triple(
+                            "PostgreSQL Read Replica Cluster",
+                            "Handles all read-heavy queries (e.g. historical shift reports, attendance ledgers, profile audits), freeing the primary database to process writes exclusively.",
+                            "Replication: Streaming Asynchronous | Query Load: 80% Read Traffic"
+                        )
+                        "postgres_main" -> Triple(
+                            "PostgreSQL Main Master Database",
+                            "Primary transactional database that processes strictly INSERT and UPDATE operations (clock punches, employee leave updates, payroll adjustments) with full ACID safety.",
+                            "Storage: Managed SSD NVMe | Write Target: Primary Node"
+                        )
+                        else -> Triple("", "", "")
+                    }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        border = BorderStroke(1.dp, NeonGreen)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = nodeName, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(text = nodeDesc, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp, lineHeight = 16.sp)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(text = "SPEC: $nodeTech", color = Color(0xFF38BDF8), fontSize = 9.5.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // STEP-BY-STEP IMPLEMENTATION CARDS (KTOR SERVER & CLIENT)
+        // =========================================================================
+
+        Text(
+            text = "⚡ STEP-BY-STEP IMPLEMENTATION CODE",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Black,
+            color = NeonGreen,
+            letterSpacing = 1.sp
+        )
+
+        // Step 1 Card: Stateless JWT Auth
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Step 1: Enforce Stateless Authentication in Ktor",
+                    color = NeonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Removing in-memory sessions allows any load balancer to route requests to any Ktor instance randomly without sticky sessions.",
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                Surface(
+                    color = Color(0xFF030712),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "// Ktor Server Setup (Application.kt)\n" +
+                               "install(Authentication) {\n" +
+                               "    jwt(\"auth-jwt\") {\n" +
+                               "        realm = \"shift-hr-compliance\"\n" +
+                               "        verifier(\n" +
+                               "            JWT.require(Algorithm.HMAC256(\"YOUR_SECRET_KEY\"))\n" +
+                               "                .withIssuer(\"https://api.shifthr.com\")\n" +
+                               "                .build()\n" +
+                               "        )\n" +
+                               "        validate { credential ->\n" +
+                               "            if (credential.payload.getClaim(\"userId\").asString() != \"\") {\n" +
+                               "                JWTPrincipal(credential.payload)\n" +
+                               "            } else null\n" +
+                               "        }\n" +
+                               "    }\n" +
+                               "}",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF34D399),
+                        lineHeight = 13.sp,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+        }
+
+        // Step 2 Card: Health Check Endpoint
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Step 2: Implement a Health Check Endpoint",
+                    color = NeonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Load balancers (ALB/Kubernetes) continuously ping this endpoint. If a node crashes, it is automatically removed from rotation.",
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                Surface(
+                    color = Color(0xFF030712),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "routing {\n" +
+                               "    // Health Check for ALB / NGINX / Kubernetes\n" +
+                               "    get(\"/health\") {\n" +
+                               "        // You can verify DB connectivity here if needed\n" +
+                               "        call.respond(HttpStatusCode.OK, mapOf(\"status\" to \"HEALTHY\", \"service\" to \"ktor-core\"))\n" +
+                               "    }\n" +
+                               "}",
+                        fontSize = 9.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF34D399),
+                        lineHeight = 13.sp,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+        }
+
+        // Step 3 Card: Redis Pub/Sub WebSocket Sync
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Step 3: Enable WebSocket Synchronization across Nodes (Redis Pub/Sub)",
+                    color = NeonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "When User A connects to Node 1 and User B connects to Node 2, Redis Pub/Sub acts as the central message relay broker.",
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                    fontSize = 10.5.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                Surface(
+                    color = Color(0xFF030712),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "import io.lettuce.core.RedisClient\n" +
+                               "import kotlinx.coroutines.flow.collect\n\n" +
+                               "class ChatRelayService(redisUrl: String) {\n" +
+                               "    private val redisClient = RedisClient.create(redisUrl)\n" +
+                               "    private val pubSubConnection = redisClient.connectPubSub()\n\n" +
+                               "    fun publishChatMessage(channelId: String, messageJson: String) {\n" +
+                               "        pubSubConnection.async().publish(\"chat_\$channelId\", messageJson)\n" +
+                               "    }\n\n" +
+                               "    fun subscribeToChannel(channelId: String, onMessageReceived: (String) -> Unit) {\n" +
+                               "        pubSubConnection.addListener(object : RedisPubSubAdapter<String, String>() {\n" +
+                               "            override fun message(channel: String?, message: String?) {\n" +
+                               "                if (channel == \"chat_\$channelId\" && message != null) {\n" +
+                               "                    onMessageReceived(message)\n" +
+                               "                }\n" +
+                               "            }\n" +
+                               "        })\n" +
+                               "        pubSubConnection.async().subscribe(\"chat_\$channelId\")\n" +
+                               "    }\n" +
+                               "}",
+                        fontSize = 8.5.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = Color(0xFF34D399),
+                        lineHeight = 12.sp,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+        }
+
+        // Step 4 Card: Database Pooling & Read/Write Splitting
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Step 4: Database Connection Pooling & Read/Write Split",
+                    color = NeonGreen,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "50+ Ktor instances running HikariCP (20 conns each) will crash PostgreSQL with 1,000+ open connections. PgBouncer pools connections, while Read Replicas offload heavy report queries.",
+                    color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f),
+                    fontSize = 10.5.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("🛡️ PgBouncer Proxy", color = NeonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Pools 1,000+ client connections down to 50 active DB sockets safely.", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 9.sp)
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.weight(1f),
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text("🔀 Read/Write Split", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Writes -> Primary DB Master\nReads -> Replicas (80% load reduction)", color = com.example.ui.theme.AppTextColor.copy(alpha = 0.7f), fontSize = 9.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // SUMMARY CHECKLIST MATRIX TABLE (1M USERS)
+        // =========================================================================
+
+        Text(
+            text = "📊 SUMMARY CHECKLIST TO HIT 1M USERS",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Black,
+            color = NeonGreen,
+            letterSpacing = 1.sp
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1E293B), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Layer", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("Standard Setup (Fails ❌)", color = Color(0xFFEF4444), fontSize = 9.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.2f))
+                    Text("Millions-Ready Setup (✅)", color = NeonGreen, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.4f))
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+
+                val rows = listOf(
+                    Triple("Traffic Router", "Single Public Server IP", "AWS ALB / NGINX + Cloudflare Anycast DNS"),
+                    Triple("Ktor App Server", "Single EC2 / VPS Instance", "Docker + AWS ECS / EKS with Auto-Scaling"),
+                    Triple("WebSockets / State", "Local JVM In-Memory State", "Redis Pub/Sub Cluster"),
+                    Triple("Database", "Single Monolithic PostgreSQL", "PgBouncer + Postgres Read Replicas"),
+                    Triple("Android Client", "Single HTTP Request", "Ktor Client with Exponential Retry & Keep-Alive")
+                )
+
+                rows.forEach { (layer, bad, good) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp, horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(layer, color = com.example.ui.theme.AppTextColor, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text(bad, color = Color.LightGray.copy(alpha = 0.6f), fontSize = 8.5.sp, modifier = Modifier.weight(1.2f))
+                        Text(good, color = NeonGreen, fontSize = 8.5.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1.4f))
+                    }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.04f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArchitectureDiagramNodeBox(
+    title: String,
+    subtitle: String,
+    nodeKey: String,
+    isSelected: Boolean,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) accentColor.copy(alpha = 0.2f) else Color(0xFF0F172A),
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else Color.White.copy(alpha = 0.15f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = title,
+                color = if (isSelected) accentColor else Color.White,
+                fontSize = 10.5.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = subtitle,
+                color = com.example.ui.theme.AppTextColor.copy(alpha = 0.6f),
+                fontSize = 8.5.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun DiagramVerticalConnector() {
+    Box(
+        modifier = Modifier
+            .height(14.dp)
+            .width(2.dp)
+            .background(NeonGreen.copy(alpha = 0.6f))
+    )
+}
+
+@Composable
+private fun DiagramSplitConnector() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .height(10.dp)
+                .width(2.dp)
+                .background(NeonGreen.copy(alpha = 0.6f))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(2.dp)
+                .background(NeonGreen.copy(alpha = 0.6f))
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(modifier = Modifier.size(width = 2.dp, height = 8.dp).background(NeonGreen.copy(alpha = 0.6f)))
+            Box(modifier = Modifier.size(width = 2.dp, height = 8.dp).background(NeonGreen.copy(alpha = 0.6f)))
+        }
+    }
+}
+
+@Composable
+private fun DiagramMergeConnector() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Box(modifier = Modifier.size(width = 2.dp, height = 8.dp).background(NeonGreen.copy(alpha = 0.6f)))
+            Box(modifier = Modifier.size(width = 2.dp, height = 8.dp).background(NeonGreen.copy(alpha = 0.6f)))
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .height(2.dp)
+                .background(NeonGreen.copy(alpha = 0.6f))
+        )
+        Box(
+            modifier = Modifier
+                .height(10.dp)
+                .width(2.dp)
+                .background(NeonGreen.copy(alpha = 0.6f))
+        )
+    }
+}
+
