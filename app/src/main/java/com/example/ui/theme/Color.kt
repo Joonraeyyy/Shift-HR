@@ -17,6 +17,7 @@ val CyberBg = Color(0xFF090D16)      // Sleek Dark Charcoal/Navy Slate
 val CyberSurface = Color(0xFF111723) // High-end Slate Card Surface
 val CyberSurfaceVariant = Color(0xFF1A2234) // Lighter Slate Accent Surface
 val CyberPrimary = Color(0xFF00D19C) // ClauseOS Mint Green (Compliance & Status Accent)
+val NeonGreen = Color(0xFF34D399)    // Neon Cyber Green Accent
 val CyberSecondary = Color(0xFF6366F1) // ClauseOS Electric Royal Indigo Accent
 val CyberTertiary = Color(0xFF38BDF8)  // ClauseOS Tech Cyan Accent
 

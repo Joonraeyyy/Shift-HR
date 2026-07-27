@@ -207,10 +207,10 @@ fun AdminSurveyDashboard(viewModel: TimeTrackerViewModel) {
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
                         }
-                        Switch(
+                        OvershootSwitch(
                             checked = isMandatory,
                             onCheckedChange = { isMandatory = it },
-                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary),
+                            activeColor = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.testTag("survey_mandatory_switch")
                         )
                     }

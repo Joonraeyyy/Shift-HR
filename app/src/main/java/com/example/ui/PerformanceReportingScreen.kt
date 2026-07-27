@@ -2340,23 +2340,17 @@ fun generateCompanySummaryPdf(
     }
 }
 
-// Helper function to open or print PDF file in standard Android view/share sheets
+// Helper function to open, download, or share PDF file with interactive option choices
 fun openPdfFile(context: Context, file: File) {
     try {
-        val uri: Uri = FileProvider.getUriForFile(context, "com.example.fileprovider", file)
-        
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        
-        // Wrap in chooser to let them save, print, drive, or open with PDF viewer
-        val chooserIntent = Intent.createChooser(intent, "Open or Print Performance PDF Dossier")
-        chooserIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        context.startActivity(chooserIntent)
+        com.example.data.backend.CompliancePdfGeneratorService().showPdfActionDialog(
+            context = context,
+            pdfFile = file,
+            documentTitle = "Performance Review PDF Options"
+        )
     } catch (e: Exception) {
         e.printStackTrace()
-        Toast.makeText(context, "No PDF viewer available. File was printed securely to cache directory.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "File saved in cache: ${file.name}", Toast.LENGTH_LONG).show()
     }
 }
 

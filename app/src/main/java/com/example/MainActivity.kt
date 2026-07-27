@@ -18,6 +18,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
+import com.example.data.backend.*
 
 import android.app.Application
 import android.os.Bundle
@@ -92,6 +93,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.animation.core.*
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.rotate
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.maps.android.compose.*
@@ -1128,6 +1130,12 @@ fun TimeTrackerApp(
                             Top5DashboardScreen(viewModel = viewModel)
                         }
                     }
+                    "org_mapping" -> {
+                        Column {
+                            SaaSHeader(title = "Interactive Org Mapping Dashboard", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            com.example.ui.AdminOrgMappingDashboard(viewModel = viewModel)
+                        }
+                    }
                     "survey_hub" -> {
                         Column {
                             SaaSHeader(title = "Company Survey Hub", onBack = { viewModel.currentScreen.value = "saas_hub" })
@@ -1389,8 +1397,8 @@ fun TimeTrackerApp(
             )
         }
 
-        // Floating Liquid Dynamic Menu Overlay for rapid terminal access (Hidden on Chat screen to prevent overlap)
-        if (viewModel.currentScreen.value != "chat") {
+        // Floating Liquid Dynamic Menu Overlay for rapid terminal access (Hidden on Chat screen & SaaS Hub to prevent overlap)
+        if (viewModel.currentScreen.value != "chat" && viewModel.currentScreen.value != "saas_hub") {
             com.example.ui.RadialLiquidMenuWrapper(
                 onTerminalSelected = { selection ->
                     when (selection) {
@@ -1812,12 +1820,14 @@ fun HeaderBar(
         // Left Side: Avatar & Name/Badge Row
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { onProfileClick() }
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .clickable { onProfileClick() }
         ) {
             // Glowing Avatar Circle with 'S'
             Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .size(40.dp)
                     .background(
                         brush = Brush.linearGradient(
                             colors = listOf(Color(0xFF00FF88), Color(0xFF00E5FF))
@@ -1832,17 +1842,17 @@ fun HeaderBar(
                     text = if (displayName.isNotEmpty()) displayName.take(1).uppercase() else "S",
                     color = Color(0xFF00E5FF),
                     fontWeight = FontWeight.Black,
-                    fontSize = 18.sp
+                    fontSize = 17.sp
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            Column {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
                 Text(
                     text = displayName,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
+                    fontSize = 15.sp,
                     color = com.example.ui.theme.AppTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -1860,13 +1870,14 @@ fun HeaderBar(
                                 shape = RoundedCornerShape(6.dp)
                             )
                             .border(1.dp, Color(0xFF00FF88), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = roleName.uppercase(),
                             color = Color(0xFF00FF88),
                             fontWeight = FontWeight.Black,
-                            fontSize = 9.sp
+                            fontSize = 9.sp,
+                            maxLines = 1
                         )
                     }
 
@@ -1886,6 +1897,8 @@ fun HeaderBar(
             }
         }
 
+        Spacer(modifier = Modifier.width(8.dp))
+
         // Right Side: Notification Bell & Exit Buttons
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1897,30 +1910,6 @@ fun HeaderBar(
                 onClick = onNotificationBellClick
             )
 
-            // Sync / Refresh button
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(getAdaptiveColor(0.05f), RoundedCornerShape(10.dp))
-                    .clickable(enabled = !isOffline, onClick = onSyncClick),
-                contentAlignment = Alignment.Center
-            ) {
-                if (isSyncing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = Color(0xFF00FF88),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = Icons.Default.Sync,
-                        contentDescription = "Sync",
-                        tint = if (isOffline) getAdaptiveColor(0.2f) else Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-
             // Exit button (Red capsule)
             Row(
                 modifier = Modifier
@@ -1928,7 +1917,7 @@ fun HeaderBar(
                     .background(Color(0xFFEF4444).copy(alpha = 0.12f), RoundedCornerShape(10.dp))
                     .border(1.dp, Color(0xFFEF4444).copy(alpha = 0.35f), RoundedCornerShape(10.dp))
                     .clickable(onClick = onLogout)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
@@ -1938,12 +1927,14 @@ fun HeaderBar(
                     tint = Color(0xFFEF4444),
                     modifier = Modifier.size(14.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "Exit",
                     color = Color(0xFFEF4444),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -5325,6 +5316,170 @@ fun LocalHolidayCalendarScreen(
     }
 }
 
+// ---------------------- SETTINGS ACCORDION COMPONENT ----------------------
+@Composable
+fun SettingsAccordionCard(
+    title: String,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
+    badgeText: String? = null,
+    badgeColor: Color = MaterialTheme.colorScheme.primary,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    // Chevron rotation spring curve using cubic-bezier(0.34,1.56,0.64,1)
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(
+            durationMillis = 420,
+            easing = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1.0f)
+        ),
+        label = "accordion_chevron_rotation"
+    )
+
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+    val cardBg = if (isSystemDark) Color(0x660F172A) else Color(0x73FFFFFF)
+    val borderCol = if (isSystemDark) Color(0x1AFFFFFF) else Color(0x1A000000)
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = cardBg),
+        border = BorderStroke(1.dp, borderCol)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onToggle() }
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (icon != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(iconTint.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = null,
+                                tint = iconTint,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = title,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.5.sp,
+                                color = iconTint,
+                                letterSpacing = 1.sp
+                            )
+                            if (badgeText != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    color = badgeColor.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.3f))
+                                ) {
+                                    Text(
+                                        text = badgeText,
+                                        color = badgeColor,
+                                        fontSize = 8.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        if (!subtitle.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = subtitle,
+                                fontSize = 11.sp,
+                                color = getAdaptiveTextColor(0.6f),
+                                maxLines = if (expanded) 2 else 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(iconTint.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (expanded) "Collapse section" else "Expand section",
+                        tint = iconTint,
+                        modifier = Modifier
+                            .rotate(chevronRotation)
+                            .size(20.dp)
+                    )
+                }
+            }
+
+            // Expandable content animation using cubic-bezier(0.16,1,0.3,1)
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = CubicBezierEasing(0.16f, 1.0f, 0.3f, 1.0f)
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = LinearEasing
+                    )
+                ),
+                exit = shrinkVertically(
+                    animationSpec = tween(
+                        durationMillis = 350,
+                        easing = CubicBezierEasing(0.16f, 1.0f, 0.3f, 1.0f)
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 200
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                ) {
+                    HorizontalDivider(
+                        color = getAdaptiveTextColor(0.08f),
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    content()
+                }
+            }
+        }
+    }
+}
+
 // ---------------------- SCREEN 5: SETTINGS / CONFIGS ----------------------
 @Composable
 fun SettingsScreen(
@@ -5346,6 +5501,18 @@ fun SettingsScreen(
     var isWipeConfirmOpen by remember { mutableStateOf(false) }
 
     val isAuthorized = userRole == "ADMIN_HR"
+
+    val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
+    val titleColor = if (isSystemDark) Color(0xFF34D399) else Color(0xFF1D4ED8)
+
+    // Accordion expanded panel state
+    val allKeys = remember { setOf("theme_studio", "app_prefs", "profile", "shift_rules", "schedule", "currency", "telemetry") }
+    var expandedPanels by remember { mutableStateOf(setOf("theme_studio", "app_prefs")) }
+
+    fun isExpanded(key: String) = expandedPanels.contains(key)
+    fun togglePanel(key: String) {
+        expandedPanels = if (expandedPanels.contains(key)) expandedPanels - key else expandedPanels + key
+    }
 
     if (isWipeConfirmOpen) {
         AlertDialog(
@@ -5380,174 +5547,181 @@ fun SettingsScreen(
     ) {
         Spacer(modifier = Modifier.height(10.dp))
 
-        // LIQUID GLASS THEME STUDIO (Comfort-optimized Apple Glass UI Editor)
-        val isSystemDark = androidx.compose.foundation.isSystemInDarkTheme() || com.example.ui.theme.AppTextColor == Color(0xFFFFFFFF)
-        val studioBg = if (isSystemDark) Color(0x660F172A) else Color(0x73FFFFFF)
-        val studioBorder = if (isSystemDark) Color(0x1AFFFFFF) else Color(0x333B82F6)
-        val titleColor = if (isSystemDark) Color(0xFF34D399) else Color(0xFF1D4ED8)
-        val bodyColor = if (isSystemDark) Color(0xFF94A3B8) else Color(0xFF475569)
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = studioBg),
-            border = BorderStroke(1.dp, studioBorder)
+        // ACCORDION TABS HEADER BAR
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = titleColor,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "LIQUID GLASS THEME STUDIO",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    text = "SETTINGS ACCORDION TABS",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
                     color = titleColor,
                     letterSpacing = 1.sp
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Transform your Shift HR interface with Apple-inspired fluid glass aesthetics.",
-                    fontSize = 12.sp,
-                    color = bodyColor
-                )
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Scrollable row of Apple Glass Themes
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(
+                    onClick = { expandedPanels = allKeys },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                 ) {
-                    com.example.ui.theme.LiquidThemeRegistry.allThemes.forEach { theme ->
-                        val isSelected = theme.name == viewModel.selectedTheme.value
-                        
-                        val selectionBorder = if (isSelected) {
-                            BorderStroke(2.dp, if (isSystemDark) Color(0xFF34D399) else Color(0xFF2563EB))
-                        } else {
-                            BorderStroke(1.dp, if (isSystemDark) Color(0x1AFFFFFF) else Color(0x1A000000))
+                    Text("Expand All", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = titleColor)
+                }
+                TextButton(
+                    onClick = { expandedPanels = emptySet() },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text("Collapse All", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.5f))
+                }
+            }
+        }
+
+        // ACCORDION TAB 1: LIQUID GLASS THEME STUDIO
+        SettingsAccordionCard(
+            title = "LIQUID GLASS THEME STUDIO",
+            subtitle = "Transform your Shift HR interface with Apple-inspired fluid glass aesthetics.",
+            icon = Icons.Default.Palette,
+            iconTint = titleColor,
+            badgeText = "THEMES",
+            badgeColor = titleColor,
+            expanded = isExpanded("theme_studio"),
+            onToggle = { togglePanel("theme_studio") }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                com.example.ui.theme.LiquidThemeRegistry.allThemes.forEach { theme ->
+                    val isSelected = theme.name == viewModel.selectedTheme.value
+                    
+                    val selectionBorder = if (isSelected) {
+                        BorderStroke(2.dp, if (isSystemDark) Color(0xFF34D399) else Color(0xFF2563EB))
+                    } else {
+                        BorderStroke(1.dp, if (isSystemDark) Color(0x1AFFFFFF) else Color(0x1A000000))
+                    }
+
+                    val previewBg = if (theme.isLightTheme) Color(0xFFF8FAFC) else Color(0xFF15171C)
+                    val previewText = if (theme.isLightTheme) Color(0xFF0F172A) else Color(0xFFE2E8F0)
+                    val dotColor = theme.primaryAccent
+                    val secondaryDotColor = theme.secondaryAccent
+
+                    Column(
+                        modifier = Modifier
+                            .width(110.dp)
+                            .height(110.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(previewBg)
+                            .border(selectionBorder, RoundedCornerShape(12.dp))
+                            .clickable {
+                                viewModel.selectedTheme.value = theme.name
+                            }
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(dotColor))
+                            Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(secondaryDotColor))
                         }
 
-                        val previewBg = if (theme.isLightTheme) Color(0xFFF8FAFC) else Color(0xFF15171C)
-                        val previewText = if (theme.isLightTheme) Color(0xFF0F172A) else Color(0xFFE2E8F0)
-                        val dotColor = theme.primaryAccent
-                        val secondaryDotColor = theme.secondaryAccent
-
-                        Column(
-                            modifier = Modifier
-                                .width(110.dp)
-                                .height(110.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(previewBg)
-                                .border(selectionBorder, RoundedCornerShape(12.dp))
-                                .clickable {
-                                    viewModel.selectedTheme.value = theme.name
-                                }
-                                .padding(10.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            // Accent Preview Dots
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(dotColor))
-                                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(secondaryDotColor))
-                            }
-
-                            // Metadata Text
-                            Column {
-                                Text(
-                                    text = theme.name,
-                                    color = previewText,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (isSelected) "ACTIVE" else "SELECT",
-                                    color = if (isSelected) dotColor else previewText.copy(alpha = 0.6f),
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
+                        Column {
+                            Text(
+                                text = theme.name,
+                                color = previewText,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (isSelected) "ACTIVE" else "SELECT",
+                                color = if (isSelected) dotColor else previewText.copy(alpha = 0.6f),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
                 }
             }
         }
 
-        // PORTAL APP PREFERENCES CARD
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
+        // ACCORDION TAB 2: PORTAL APP PREFERENCES
+        SettingsAccordionCard(
+            title = "PORTAL APP PREFERENCES",
+            subtitle = "Push reminders, dark mode override, and biometric sign-in authentication.",
+            icon = Icons.Default.Settings,
+            iconTint = titleColor,
+            badgeText = "PREFERENCES",
+            badgeColor = titleColor,
+            expanded = isExpanded("app_prefs"),
+            onToggle = { togglePanel("app_prefs") }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Settings, contentDescription = null, tint = titleColor, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "PORTAL APP PREFERENCES",
-                        fontWeight = FontWeight.Black,
-                        fontSize = 11.sp,
-                        color = titleColor,
-                        letterSpacing = 1.sp
-                    )
+            var pushRemindersEnabled by remember { mutableStateOf(true) }
+            var darkModeOverrideEnabled by remember { mutableStateOf(false) }
+            var biometricAuthEnabled by remember { mutableStateOf(true) }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Push Reminders", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Remind me to clock out at shift completion", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                 }
-                Spacer(modifier = Modifier.height(12.dp))
+                OvershootSwitch(
+                    checked = pushRemindersEnabled,
+                    onCheckedChange = { pushRemindersEnabled = it },
+                    activeColor = titleColor
+                )
+            }
 
-                var pushRemindersEnabled by remember { mutableStateOf(true) }
-                var darkModeOverrideEnabled by remember { mutableStateOf(false) }
-                var biometricAuthEnabled by remember { mutableStateOf(true) }
+            Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Push Reminders", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Remind me to clock out at shift completion", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    }
-                    Switch(
-                        checked = pushRemindersEnabled,
-                        onCheckedChange = { pushRemindersEnabled = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Dark Mode Override", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Force portal interface to stay in deep dark theme", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                 }
+                OvershootSwitch(
+                    checked = darkModeOverrideEnabled,
+                    onCheckedChange = { darkModeOverrideEnabled = it },
+                    activeColor = titleColor
+                )
+            }
 
-                Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Dark Mode Override", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Force portal interface to stay in deep dark theme", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    }
-                    Switch(
-                        checked = darkModeOverrideEnabled,
-                        onCheckedChange = { darkModeOverrideEnabled = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
-                    )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Biometric Sign-In", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("Permit FaceID or Fingerprint login authentication", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
                 }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Biometric Sign-In", color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Permit FaceID or Fingerprint login authentication", color = getAdaptiveTextColor(0.5f), fontSize = 10.sp)
-                    }
-                    Switch(
-                        checked = biometricAuthEnabled,
-                        onCheckedChange = { biometricAuthEnabled = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = titleColor)
-                    )
-                }
+                OvershootSwitch(
+                    checked = biometricAuthEnabled,
+                    onCheckedChange = { biometricAuthEnabled = it },
+                    activeColor = titleColor
+                )
             }
         }
 
@@ -5560,7 +5734,7 @@ fun SettingsScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 4.dp)
                     .clip(RoundedCornerShape(12.dp))
                     .background(bg)
                     .border(BorderStroke(1.dp, border), RoundedCornerShape(12.dp))
@@ -5583,57 +5757,54 @@ fun SettingsScreen(
             }
         }
 
-        // Profile Identity block
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
+        // ACCORDION TAB 3: EMPLOYEE PROFILE IDENTITY
+        SettingsAccordionCard(
+            title = "EMPLOYEE PROFILE IDENTITY",
+            subtitle = "Target full name used for attendance logs in administrative testing environment.",
+            icon = Icons.Default.Person,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = if (isAuthorized) "AUTHORIZED" else "READ-ONLY",
+            badgeColor = if (isAuthorized) Color(0xFF10B981) else Color(0xFFF43F5E),
+            expanded = isExpanded("profile"),
+            onToggle = { togglePanel("profile") }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("EMPLOYEE PROFILE IDENTITY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
-                Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "This sets the target name used for attendance logs in this administrative testing environment. Logged-in regular employees are automatically synced with their own names.",
+                fontSize = 11.sp,
+                color = getAdaptiveTextColor(0.6f)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = employeeName,
+                onValueChange = { employeeName = it },
+                label = { Text("Full Name") },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth().testTag("profile_name_input"),
+                enabled = isAuthorized,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = getAdaptiveTextColor(0.12f)
+                )
+            )
+        }
+
+        // ACCORDION TAB 4: SHIFT RULE THRESHOLDS
+        SettingsAccordionCard(
+            title = "SHIFT RULE THRESHOLDS",
+            subtitle = "Operational guardrails for attendance compliance, working hours & wages.",
+            icon = Icons.Default.Timer,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = "RULES",
+            badgeColor = MaterialTheme.colorScheme.primary,
+            expanded = isExpanded("shift_rules"),
+            onToggle = { togglePanel("shift_rules") }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    text = "This sets the target name used for attendance logs in this administrative testing environment. Logged-in regular employees are automatically synced with their own names.",
+                    text = "Operational guardrails used to evaluate attendance compliance, validate active working hours, trigger lunch/break alarms, and calculate base wages.",
                     fontSize = 11.sp,
                     color = getAdaptiveTextColor(0.6f)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = employeeName,
-                    onValueChange = { employeeName = it },
-                    label = { Text("Full Name") },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().testTag("profile_name_input"),
-                    enabled = isAuthorized,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = getAdaptiveTextColor(0.12f)
-                    )
-                )
-            }
-        }
-
-        // Config block
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column {
-                    Text("SHIFT RULE THRESHOLDS", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Operational guardrails used to evaluate attendance compliance, validate active working hours, trigger lunch/break alarms, and calculate base wages.",
-                        fontSize = 11.sp,
-                        color = getAdaptiveTextColor(0.6f)
-                    )
-                }
 
                 OutlinedTextField(
                     value = shiftHours,
@@ -5693,406 +5864,394 @@ fun SettingsScreen(
             }
         }
 
-        // DAILY SCHEDULE CONFIGURATION (Only Supervisor & Department Manager can adjust)
+        // ACCORDION TAB 5: DAILY SCHEDULE RECURRENCE
         val isScheduleAuthorized = userRole == "SUPERVISOR" || userRole == "MANAGER"
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
+        SettingsAccordionCard(
+            title = "DAILY SCHEDULE RECURRENCE",
+            subtitle = "Configure work schedule cycle limits (Weekly, 15 Days, or Monthly).",
+            icon = Icons.Default.CalendarToday,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = userRole,
+            badgeColor = MaterialTheme.colorScheme.primary,
+            expanded = isExpanded("schedule"),
+            onToggle = { togglePanel("schedule") }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "DAILY SCHEDULE RECURRENCE",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Configure work schedule cycle limits (Weekly, 15 Days, or Monthly). Available to Supervisors and Department Managers only.",
-                    fontSize = 11.sp,
-                    color = getAdaptiveTextColor(0.6f)
-                )
-                Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = "Configure work schedule cycle limits (Weekly, 15 Days, or Monthly). Available to Supervisors and Department Managers only.",
+                fontSize = 11.sp,
+                color = getAdaptiveTextColor(0.6f)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("Weekly", "15 Days", "Monthly").forEach { option ->
-                        val isSelected = viewModel.currentScheduleType.value == option
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else getAdaptiveTextColor(0.04f))
-                                .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.08f), RoundedCornerShape(10.dp))
-                                .clickable {
-                                    if (isScheduleAuthorized) {
-                                        viewModel.currentScheduleType.value = option
-                                        viewModel.addAuditLog(viewModel.currentUserName.value, "Adjusted daily schedule recurrence to $option")
-                                        viewModel.addNotification("Schedule Update", "Daily schedule cycle set to $option successfully.", isAlert = false)
-                                    } else {
-                                        viewModel.addNotification("Unauthorized", "Only Supervisor and Department Manager can adjust Daily Schedule.", isAlert = true)
-                                    }
-                                }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = option,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.6f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                if (!isScheduleAuthorized) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "🔒 Locked: Log in as a Supervisor or Department Manager to edit.",
-                        color = Color(0xFFF43F5E),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                } else {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "⚡ Authorized: You are adjusting the ${userRole.lowercase()} schedule.",
-                        color = Color(0xFF10B981),
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        // REGIONAL CURRENCY PREFERENCE (Add Philippines Peso not only Dollar)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "REGIONAL CURRENCY",
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.sp
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Toggle currency preferences between US Dollar ($) and Philippines Peso (₱) for payroll, wage calculations, and claims.",
-                    fontSize = 11.sp,
-                    color = getAdaptiveTextColor(0.6f)
-                )
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    listOf("USD" to "US Dollar ($)", "PHP" to "Philippines Peso (₱)").forEach { (code, label) ->
-                        val isSelected = viewModel.selectedCurrency.value == code
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else getAdaptiveTextColor(0.04f))
-                                .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.08f), RoundedCornerShape(10.dp))
-                                .clickable {
-                                    viewModel.selectedCurrency.value = code
-                                    viewModel.addNotification("Currency Changed", "Currency display set to $code.", isAlert = false)
-                                }
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = label,
-                                color = if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.6f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            border = BorderStroke(1.dp, getAdaptiveTextColor(0.08f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text("SIMULATION & HARDWARE TELEMETRY", fontWeight = FontWeight.Black, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, letterSpacing = 1.sp)
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Simulated Offline Mode", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Lose server connection; caches punches to local room database.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = isOffline,
-                        onCheckedChange = onOfflineToggle,
-                        modifier = Modifier.testTag("sim_offline_switch"),
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Mock GPS Co-Working Verifications", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Record simulated mock coordinates to verify virtual presence.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = remoteGps,
-                        onCheckedChange = { if (isAuthorized) remoteGps = it },
-                        modifier = Modifier.testTag("remote_gps_switch"),
-                        enabled = isAuthorized,
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // --- GEOFENCE ADJUSTMENTS ---
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else getAdaptiveTextColor(0.5f))
-                        Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.5f), fontWeight = FontWeight.Bold)
-                    }
-                    Text(if (isAuthorized) "Defines boundary around authorized coordinate hubs." else "Defines boundary around authorized coordinate hubs (Only Admin/HR can adjust).", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Slider(
-                        value = viewModel.geofenceRadius.value,
-                        onValueChange = { if (isAuthorized) viewModel.geofenceRadius.value = it },
-                        valueRange = 1f..1000f,
-                        enabled = isAuthorized,
-                        colors = SliderDefaults.colors(
-                            thumbColor = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.2f),
-                            activeTrackColor = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.2f),
-                            disabledThumbColor = getAdaptiveTextColor(0.2f),
-                            disabledActiveTrackColor = getAdaptiveTextColor(0.1f)
-                        )
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("1m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
-                        Text("Current: ${viewModel.geofenceRadius.value.toInt()}m", fontSize = 10.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
-                        Text("1000m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Column {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else getAdaptiveTextColor(0.5f))
-                        Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (!isAuthorized) getAdaptiveTextColor(0.5f) else if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
-                    }
-                    Text(if (isAuthorized) "Drag outward to test Geofence Out-Of-Bounds error logic." else "Drag outward to test Geofence Out-Of-Bounds error logic (Only Admin/HR can adjust).", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Slider(
-                        value = viewModel.simulatedDistance.value,
-                        onValueChange = { if (isAuthorized) viewModel.simulatedDistance.value = it },
-                        valueRange = 0f..400f,
-                        enabled = isAuthorized,
-                        colors = SliderDefaults.colors(
-                            thumbColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
-                            activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
-                            disabledThumbColor = getAdaptiveTextColor(0.2f),
-                            disabledActiveTrackColor = getAdaptiveTextColor(0.1f)
-                        )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // --- ONE REGISTERED DEVICE LOCK ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("One Registered Device Matcher", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Authorized ID: ${viewModel.registeredDeviceId.value}", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = viewModel.isDeviceVerificationEnabled.value,
-                        onCheckedChange = { viewModel.isDeviceVerificationEnabled.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
-                }
-
-                if (viewModel.isDeviceVerificationEnabled.value) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                listOf("Weekly", "15 Days", "Monthly").forEach { option ->
+                    val isSelected = viewModel.currentScheduleType.value == option
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .background(getAdaptiveTextColor(0.03f), RoundedCornerShape(8.dp))
-                            .border(1.dp, getAdaptiveTextColor(0.06f), RoundedCornerShape(8.dp))
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Current Terminal hardware identity", fontSize = 10.sp, color = getAdaptiveTextColor(0.5f))
-                            Text(viewModel.currentSimulatedDevice.value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) Color(0xFF10B981) else Color(0xFFF43F5E))
-                        }
-                        Button(
-                            onClick = {
-                                if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) {
-                                    viewModel.currentSimulatedDevice.value = "UNAPPROVED_MOCK_HARDWARE_88X"
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else getAdaptiveTextColor(0.04f))
+                            .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.08f), RoundedCornerShape(10.dp))
+                            .clickable {
+                                if (isScheduleAuthorized) {
+                                    viewModel.currentScheduleType.value = option
+                                    viewModel.addAuditLog(viewModel.currentUserName.value, "Adjusted daily schedule recurrence to $option")
+                                    viewModel.addNotification("Schedule Update", "Daily schedule cycle set to $option successfully.", isAlert = false)
                                 } else {
-                                    viewModel.currentSimulatedDevice.value = viewModel.registeredDeviceId.value
+                                    viewModel.addNotification("Unauthorized", "Only Supervisor and Department Manager can adjust Daily Schedule.", isAlert = true)
                                 }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveTextColor(0.1f)),
-                            modifier = Modifier.height(30.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
-                        ) {
-                            Text(if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) "Simulate Spoof" else "Reset to Match", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor)
-                        }
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = option,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.6f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
+            if (!isScheduleAuthorized) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "🔒 Locked: Log in as a Supervisor or Department Manager to edit.",
+                    color = Color(0xFFF43F5E),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            } else {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "⚡ Authorized: You are adjusting the ${userRole.lowercase()} schedule.",
+                    color = Color(0xFF10B981),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
 
-                // --- FACE RECOGNITION BIOMETRICS ---
+        // ACCORDION TAB 6: REGIONAL CURRENCY
+        SettingsAccordionCard(
+            title = "REGIONAL CURRENCY",
+            subtitle = "Toggle currency preferences between US Dollar ($) and Philippines Peso (₱).",
+            icon = Icons.Default.Payments,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = viewModel.selectedCurrency.value,
+            badgeColor = MaterialTheme.colorScheme.primary,
+            expanded = isExpanded("currency"),
+            onToggle = { togglePanel("currency") }
+        ) {
+            Text(
+                text = "Toggle currency preferences between US Dollar ($) and Philippines Peso (₱) for payroll, wage calculations, and claims.",
+                fontSize = 11.sp,
+                color = getAdaptiveTextColor(0.6f)
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                listOf("USD" to "US Dollar ($)", "PHP" to "Philippines Peso (₱)").forEach { (code, label) ->
+                    val isSelected = viewModel.selectedCurrency.value == code
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else getAdaptiveTextColor(0.04f))
+                            .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.08f), RoundedCornerShape(10.dp))
+                            .clickable {
+                                viewModel.selectedCurrency.value = code
+                                viewModel.addNotification("Currency Changed", "Currency display set to $code.", isAlert = false)
+                            }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.6f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+
+        // ACCORDION TAB 7: SIMULATION & HARDWARE TELEMETRY
+        SettingsAccordionCard(
+            title = "SIMULATION & HARDWARE TELEMETRY",
+            subtitle = "Simulated offline mode, mock GPS, geofencing radius, device binding & detectors.",
+            icon = Icons.Default.Phonelink,
+            iconTint = MaterialTheme.colorScheme.primary,
+            badgeText = "TELEMETRY",
+            badgeColor = Color(0xFFF43F5E),
+            expanded = isExpanded("telemetry"),
+            onToggle = { togglePanel("telemetry") }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Simulated Offline Mode", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Lose server connection; caches punches to local room database.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = isOffline,
+                    onCheckedChange = onOfflineToggle,
+                    modifier = Modifier.testTag("sim_offline_switch"),
+                    activeColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mock GPS Co-Working Verifications", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Record simulated mock coordinates to verify virtual presence.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = remoteGps,
+                    onCheckedChange = { if (isAuthorized) remoteGps = it },
+                    modifier = Modifier.testTag("remote_gps_switch"),
+                    enabled = isAuthorized,
+                    activeColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // GEOFENCE ADJUSTMENTS
+            Column {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Secure Face Recognition Biometrics", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Verify vector points before completing clocks.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = viewModel.isFaceRecognitionEnabled.value,
-                        onCheckedChange = { viewModel.isFaceRecognitionEnabled.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
+                    Text("Geofence Security Radius", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else getAdaptiveTextColor(0.5f))
+                    Text("${viewModel.geofenceRadius.value.toInt()} meters", fontSize = 12.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.5f), fontWeight = FontWeight.Bold)
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // --- LIVE FIELD TRACKING ---
+                Text(if (isAuthorized) "Defines boundary around authorized coordinate hubs." else "Defines boundary around authorized coordinate hubs (Only Admin/HR can adjust).", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                Spacer(modifier = Modifier.height(4.dp))
+                Slider(
+                    value = viewModel.geofenceRadius.value,
+                    onValueChange = { if (isAuthorized) viewModel.geofenceRadius.value = it },
+                    valueRange = 1f..1000f,
+                    enabled = isAuthorized,
+                    colors = SliderDefaults.colors(
+                        thumbColor = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.2f),
+                        activeTrackColor = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.2f),
+                        disabledThumbColor = getAdaptiveTextColor(0.2f),
+                        disabledActiveTrackColor = getAdaptiveTextColor(0.1f)
+                    )
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Live Field Location Tracking", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Push continuous field coords (lat: ${String.format("%.4f", viewModel.liveFieldLat.value)}, lng: ${String.format("%.4f", viewModel.liveFieldLng.value)})", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = viewModel.isLiveLocationTrackingActive.value,
-                        onCheckedChange = { viewModel.isLiveLocationTrackingActive.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
-                    )
+                    Text("1m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                    Text("Current: ${viewModel.geofenceRadius.value.toInt()}m", fontSize = 10.sp, color = if (isAuthorized) MaterialTheme.colorScheme.primary else getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
+                    Text("1000m", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = getAdaptiveTextColor(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                // --- SUSPICIOUS ATTENDANCE SCANS ---
-                Text("SUSPICIOUS ATTENDANCE INTEGRITY DETECTORS", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFFF43F5E), letterSpacing = 1.sp)
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Simulated Employee Distance", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (isAuthorized) com.example.ui.theme.AppTextColor else getAdaptiveTextColor(0.5f))
+                    Text("${viewModel.simulatedDistance.value.toInt()} meters from hub", fontSize = 12.sp, color = if (!isAuthorized) getAdaptiveTextColor(0.5f) else if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981), fontWeight = FontWeight.Bold)
+                }
+                Text(if (isAuthorized) "Drag outward to test Geofence Out-Of-Bounds error logic." else "Drag outward to test Geofence Out-Of-Bounds error logic (Only Admin/HR can adjust).", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                Spacer(modifier = Modifier.height(4.dp))
+                Slider(
+                    value = viewModel.simulatedDistance.value,
+                    onValueChange = { if (isAuthorized) viewModel.simulatedDistance.value = it },
+                    valueRange = 0f..400f,
+                    enabled = isAuthorized,
+                    colors = SliderDefaults.colors(
+                        thumbColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                        activeTrackColor = if (viewModel.simulatedDistance.value > viewModel.geofenceRadius.value) Color(0xFFF43F5E) else Color(0xFF10B981),
+                        disabledThumbColor = getAdaptiveTextColor(0.2f),
+                        disabledActiveTrackColor = getAdaptiveTextColor(0.1f)
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ONE REGISTERED DEVICE LOCK
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("One Registered Device Matcher", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Authorized ID: ${viewModel.registeredDeviceId.value}", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = viewModel.isDeviceVerificationEnabled.value,
+                    onCheckedChange = { viewModel.isDeviceVerificationEnabled.value = it },
+                    activeColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            if (viewModel.isDeviceVerificationEnabled.value) {
                 Spacer(modifier = Modifier.height(8.dp))
-
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(getAdaptiveTextColor(0.03f), RoundedCornerShape(8.dp))
+                        .border(1.dp, getAdaptiveTextColor(0.06f), RoundedCornerShape(8.dp))
+                        .padding(8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Mock GPS Provider Detection", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Raise alarm for software-based location spoofing.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                        Text("Current Terminal hardware identity", fontSize = 10.sp, color = getAdaptiveTextColor(0.5f))
+                        Text(viewModel.currentSimulatedDevice.value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) Color(0xFF10B981) else Color(0xFFF43F5E))
                     }
-                    Switch(
-                        checked = viewModel.isMockGpsActive.value,
-                        onCheckedChange = { viewModel.isMockGpsActive.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Root / Jailbreak Shield Integrity", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Fail check entirely if custom binary partitions detected.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                    Button(
+                        onClick = {
+                            if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) {
+                                viewModel.currentSimulatedDevice.value = "UNAPPROVED_MOCK_HARDWARE_88X"
+                            } else {
+                                viewModel.currentSimulatedDevice.value = viewModel.registeredDeviceId.value
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveTextColor(0.1f)),
+                        modifier = Modifier.height(30.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp)
+                    ) {
+                        Text(if (viewModel.currentSimulatedDevice.value == viewModel.registeredDeviceId.value) "Simulate Spoof" else "Reset to Match", fontSize = 9.sp, color = com.example.ui.theme.AppTextColor)
                     }
-                    Switch(
-                        checked = viewModel.isRootedActive.value,
-                        onCheckedChange = { viewModel.isRootedActive.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
-                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Impossible Travel Time Window", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
-                        Text("Flag logs occurring across 2 remote hubs instantly.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
-                    }
-                    Switch(
-                        checked = viewModel.isImpossibleTravelTriggered.value,
-                        onCheckedChange = { viewModel.isImpossibleTravelTriggered.value = it },
-                        colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFFF43F5E))
-                    )
+            // FACE RECOGNITION BIOMETRICS
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Secure Face Recognition Biometrics", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Verify vector points before completing clocks.", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
                 }
+                OvershootSwitch(
+                    checked = viewModel.isFaceRecognitionEnabled.value,
+                    onCheckedChange = { viewModel.isFaceRecognitionEnabled.value = it },
+                    activeColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // LIVE FIELD TRACKING
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Live Field Location Tracking", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Push continuous field coords (lat: ${String.format("%.4f", viewModel.liveFieldLat.value)}, lng: ${String.format("%.4f", viewModel.liveFieldLng.value)})", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = viewModel.isLiveLocationTrackingActive.value,
+                    onCheckedChange = { viewModel.isLiveLocationTrackingActive.value = it },
+                    activeColor = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.08f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // SUSPICIOUS ATTENDANCE SCANS
+            Text("SUSPICIOUS ATTENDANCE INTEGRITY DETECTORS", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFFF43F5E), letterSpacing = 1.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Mock GPS Provider Detection", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Raise alarm for software-based location spoofing.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = viewModel.isMockGpsActive.value,
+                    onCheckedChange = { viewModel.isMockGpsActive.value = it },
+                    activeColor = Color(0xFFF43F5E)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Root / Jailbreak Shield Integrity", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Fail check entirely if custom binary partitions detected.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = viewModel.isRootedActive.value,
+                    onCheckedChange = { viewModel.isRootedActive.value = it },
+                    activeColor = Color(0xFFF43F5E)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Impossible Travel Time Window", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = com.example.ui.theme.AppTextColor)
+                    Text("Flag logs occurring across 2 remote hubs instantly.", fontSize = 10.sp, color = getAdaptiveTextColor(0.4f))
+                }
+                OvershootSwitch(
+                    checked = viewModel.isImpossibleTravelTriggered.value,
+                    onCheckedChange = { viewModel.isImpossibleTravelTriggered.value = it },
+                    activeColor = Color(0xFFF43F5E)
+                )
             }
         }
 
@@ -6689,90 +6848,39 @@ fun exportLogsToExcel(logs: List<TimeLogEntity>, context: android.content.Contex
 
 fun exportLogsToPdf(logs: List<TimeLogEntity>, context: android.content.Context) {
     try {
-        val pdfDocument = android.graphics.pdf.PdfDocument()
-        val pageInfo = android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
-        val page = pdfDocument.startPage(pageInfo)
-        val canvas = page.canvas
-        val paint = android.graphics.Paint()
+        val pdfService = CompliancePdfGeneratorService()
+        val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
 
-        // Header Banner
-        paint.color = android.graphics.Color.parseColor("#0F172A")
-        canvas.drawRect(0f, 0f, 595f, 75f, paint)
-
-        // Title
-        paint.color = android.graphics.Color.WHITE
-        paint.textSize = 18f
-        paint.isFakeBoldText = true
-        canvas.drawText("CHRONO LEDGER TIMESHEET REPORT", 20f, 40f, paint)
-
-        paint.textSize = 10f
-        paint.isFakeBoldText = false
-        val sdfDate = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        canvas.drawText("Generated: ${sdfDate.format(Date())} | Total Logs: ${logs.size}", 20f, 60f, paint)
-
-        // Table Header
-        var y = 105f
-        paint.color = android.graphics.Color.parseColor("#1E293B")
-        canvas.drawRect(20f, y - 15f, 575f, y + 10f, paint)
-
-        paint.color = android.graphics.Color.parseColor("#00E5FF")
-        paint.textSize = 9f
-        paint.isFakeBoldText = true
-        canvas.drawText("EMPLOYEE", 25f, y, paint)
-        canvas.drawText("DATE", 160f, y, paint)
-        canvas.drawText("TIME IN", 240f, y, paint)
-        canvas.drawText("TIME OUT", 320f, y, paint)
-        canvas.drawText("RATE", 400f, y, paint)
-        canvas.drawText("STATUS", 470f, y, paint)
-
-        y += 25f
-        paint.color = android.graphics.Color.BLACK
-        paint.isFakeBoldText = false
-        val sdfTime = SimpleDateFormat("hh:mm a", Locale.getDefault())
-
-        logs.take(30).forEach { log ->
-            val tIn = log.timeIn?.let { sdfTime.format(Date(it)) } ?: "--"
-            val tOut = log.timeOut?.let { sdfTime.format(Date(it)) } ?: "--"
-
-            val empName = if (log.employeeName.length > 20) log.employeeName.take(18) + ".." else log.employeeName
-            canvas.drawText(empName, 25f, y, paint)
-            canvas.drawText(log.date, 160f, y, paint)
-            canvas.drawText(tIn, 240f, y, paint)
-            canvas.drawText(tOut, 320f, y, paint)
-            canvas.drawText("$${log.hourlyRate}", 400f, y, paint)
-            canvas.drawText(log.isApproved, 470f, y, paint)
-
-            paint.color = android.graphics.Color.parseColor("#E2E8F0")
-            canvas.drawLine(20f, y + 5f, 575f, y + 5f, paint)
-            paint.color = android.graphics.Color.BLACK
-
-            y += 20f
-            if (y > 800f) return@forEach
+        val shiftItems = logs.map { log ->
+            val tInStr = log.timeIn?.let { timeFormat.format(java.util.Date(it)) } ?: "--"
+            val tOutStr = log.timeOut?.let { timeFormat.format(java.util.Date(it)) } ?: "--"
+            val hrs = if (log.timeIn != null && log.timeOut != null) {
+                ((log.timeOut - log.timeIn).toDouble() / 3600000.0).coerceAtLeast(0.5)
+            } else {
+                8.0
+            }
+            ShiftItemData(
+                date = log.date,
+                timeIn = tInStr,
+                timeOut = tOutStr,
+                durationHours = hrs,
+                location = log.gpsLocationName ?: "HQ Operational Hub",
+                status = log.isApproved,
+                hourlyRate = log.hourlyRate,
+                earned = hrs * log.hourlyRate
+            )
         }
 
-        pdfDocument.finishPage(page)
-
-        val file = java.io.File(context.cacheDir, "Chrono_Ledger_Timesheet.pdf")
-        java.io.FileOutputStream(file).use {
-            pdfDocument.writeTo(it)
-        }
-        pdfDocument.close()
-
-        val uri: android.net.Uri = androidx.core.content.FileProvider.getUriForFile(
-            context,
-            "com.example.fileprovider",
-            file
+        val pdfBytes = pdfService.generateShiftReportPdf(
+            reportTitle = "Chrono Ledger Timesheet Audit Report",
+            payPeriod = "Current Audit Period (${logs.size} entries)",
+            shifts = shiftItems,
+            theme = PdfThemeConfig(primaryColorHex = "#059669", secondaryColorHex = "#0F172A")
         )
 
-        Toast.makeText(context, "Chrono Ledger exported to PDF Document!", Toast.LENGTH_SHORT).show()
-
-        val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(android.content.Intent.EXTRA_SUBJECT, "Chrono Ledger Timesheet Report (PDF)")
-            putExtra(android.content.Intent.EXTRA_STREAM, uri)
-            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Chrono Ledger PDF"))
+        val file = pdfService.savePdfToCache(context, pdfBytes, "Chrono_Ledger_Timesheet.pdf")
+        Toast.makeText(context, "Chrono Ledger exported via OpenHTMLtoPDF!", Toast.LENGTH_SHORT).show()
+        pdfService.openOrSharePdf(context, file, "Share Chrono Ledger PDF")
     } catch (e: Exception) {
         Toast.makeText(context, "Error exporting PDF document: ${e.message}", Toast.LENGTH_LONG).show()
     }
@@ -7381,6 +7489,20 @@ fun ChatHubScreen(
                 pendingAttachments = pendingAttachments + newAtt
                 Toast.makeText(context, "Captured photo added to preview", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            try {
+                takeCameraPhotoLauncher.launch(null)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Unable to launch camera: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            Toast.makeText(context, "Camera permission is required to capture photos.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -8423,7 +8545,7 @@ fun ChatHubScreen(
                                 )
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Take Photo (Camera)", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                text = { Text("Camera", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.PhotoCamera,
@@ -8434,11 +8556,24 @@ fun ChatHubScreen(
                                 },
                                 onClick = {
                                     showChatActionsMenu = false
-                                    takeCameraPhotoLauncher.launch(null)
+                                    val hasCamPermission = androidx.core.content.ContextCompat.checkSelfPermission(
+                                        context,
+                                        android.Manifest.permission.CAMERA
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                                    if (hasCamPermission) {
+                                        try {
+                                            takeCameraPhotoLauncher.launch(null)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Camera launch error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                                    }
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Photos & Gallery", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                text = { Text("Send Photos", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.PhotoLibrary,
@@ -8453,7 +8588,7 @@ fun ChatHubScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Send Videos", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                text = { Text("Send Video", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Videocam,
@@ -8468,7 +8603,7 @@ fun ChatHubScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Send Files / Documents", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
+                                text = { Text("Send Files", color = if (isLightTheme) Color.Black else Color.White, fontWeight = FontWeight.SemiBold, fontSize = 12.5.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.FolderOpen,
@@ -8484,7 +8619,7 @@ fun ChatHubScreen(
                             )
                             HorizontalDivider(color = if (isLightTheme) Color(0xFFE2E8F0) else Color(0xFF334155))
                             DropdownMenuItem(
-                                text = { Text("Preset Media Vault ⚡", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.5.sp) },
+                                text = { Text("Preset Media Vault", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, fontSize = 12.5.sp) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = Icons.Default.Collections,
@@ -9114,6 +9249,14 @@ private fun getAdaptiveTextColor(alpha: Float): Color {
         }
         com.example.ui.theme.AppTextColor.copy(alpha = lightAlpha)
     } else {
-        com.example.ui.theme.AppTextColor.copy(alpha = alpha)
+        val darkAlpha = when {
+            alpha <= 0.1f  -> 0.45f
+            alpha <= 0.2f  -> 0.60f
+            alpha <= 0.4f  -> 0.75f
+            alpha <= 0.5f  -> 0.82f
+            alpha <= 0.6f  -> 0.90f
+            else -> alpha
+        }
+        com.example.ui.theme.AppTextColor.copy(alpha = darkAlpha)
     }
 }

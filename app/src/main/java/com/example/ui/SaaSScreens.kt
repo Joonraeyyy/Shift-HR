@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.data.database.TimeLogEntity
+import com.example.data.backend.*
 import com.example.ui.viewmodel.*
 import com.google.accompanist.permissions.*
 import kotlinx.coroutines.delay
@@ -2795,20 +2796,20 @@ fun ComplianceTabView(viewModel: TimeTrackerViewModel, context: Context) {
                 ) {
                     Button(
                         onClick = {
-                            val pdfFile = generateAndroidNativePdf(
-                                context = context,
-                                caseTitle = caseTitle,
-                                caseId = caseId,
-                                timelineEvents = timelineEventsList.toList(),
-                                primaryColorHex = primaryColor,
-                                secondaryColorHex = secondaryColor,
-                                logoText = logoName
-                            )
-                            if (pdfFile != null) {
-                                Toast.makeText(context, "Branded PDF compiled successfully!", Toast.LENGTH_SHORT).show()
-                                openPdfFile(context, pdfFile)
-                            } else {
-                                Toast.makeText(context, "Error compiling branding PDF.", Toast.LENGTH_SHORT).show()
+                            try {
+                                val pdfService = CompliancePdfGeneratorService()
+                                val themeConfig = PdfThemeConfig(primaryColorHex = primaryColor, secondaryColorHex = secondaryColor)
+                                val pdfBytes = pdfService.generateCustomizedReport(
+                                    caseTitle = caseTitle,
+                                    caseId = caseId,
+                                    timelineEvents = timelineEventsList.toList(),
+                                    theme = themeConfig
+                                )
+                                val pdfFile = pdfService.savePdfToCache(context, pdfBytes, "Branded_Compliance_Report_$caseId.pdf")
+                                Toast.makeText(context, "OpenHTMLtoPDF Branded PDF compiled successfully!", Toast.LENGTH_SHORT).show()
+                                pdfService.openOrSharePdf(context, pdfFile, "Open or Share Branded PDF")
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Error compiling PDF: ${e.message}", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -5582,8 +5583,12 @@ fun SalaryCalculatorView(viewModel: TimeTrackerViewModel, context: Context) {
 @Composable
 fun PayslipsHistoryView(viewModel: TimeTrackerViewModel, context: Context) {
     val allLogs by viewModel.allTimeLogs.collectAsState()
-    val userLogs = allLogs.filter { it.employeeName == viewModel.currentUserName.value && it.isApproved == "APPROVED" }
-    
+    val currentUserName = viewModel.currentUserName.value
+    val userLogs = allLogs.filter { it.employeeName == currentUserName && it.isApproved == "APPROVED" }
+    val currencySym = viewModel.getCurrencySymbol()
+
+    val pdfService = remember { CompliancePdfGeneratorService() }
+
     // Simulate multiple historical cycles
     val cycles = listOf(
         "May 2026 PayCycle" to 540.00,
@@ -5610,11 +5615,59 @@ fun PayslipsHistoryView(viewModel: TimeTrackerViewModel, context: Context) {
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(cycle, color = com.example.ui.theme.AppTextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text("Total Net Amount: ${viewModel.getCurrencySymbol()}${String.format("%.2f", amount)}", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
+                    Text("Total Net Amount: $currencySym${String.format("%.2f", amount)}", color = getAdaptiveTextColor(0.5f), fontSize = 11.sp)
                 }
                 Button(
                     onClick = {
-                        Toast.makeText(context, "Downloading PDF Payslip for $cycle...", Toast.LENGTH_SHORT).show()
+                        try {
+                            val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+                            val shiftsList = userLogs.map { log ->
+                                val tInStr = log.timeIn?.let { timeFormat.format(java.util.Date(it)) } ?: "09:00"
+                                val tOutStr = log.timeOut?.let { timeFormat.format(java.util.Date(it)) } ?: "17:00"
+                                val hrs = if (log.timeIn != null && log.timeOut != null) {
+                                    ((log.timeOut - log.timeIn).toDouble() / 3600000.0).coerceAtLeast(0.5)
+                                } else {
+                                    8.0
+                                }
+                                ShiftItemData(
+                                    date = log.date,
+                                    timeIn = tInStr,
+                                    timeOut = tOutStr,
+                                    durationHours = hrs,
+                                    location = log.gpsLocationName ?: "HQ Operational Hub",
+                                    status = log.isApproved,
+                                    hourlyRate = log.hourlyRate,
+                                    earned = hrs * log.hourlyRate
+                                )
+                            }.ifEmpty {
+                                listOf(
+                                    ShiftItemData("2026-05-02", "09:00", "17:00", 8.0, "HQ Operational Hub", "VERIFIED", 25.0, 200.0),
+                                    ShiftItemData("2026-05-03", "09:00", "17:30", 8.5, "HQ Operational Hub", "VERIFIED", 25.0, 212.5),
+                                    ShiftItemData("2026-05-04", "08:45", "17:00", 8.25, "Field Client Site", "VERIFIED", 25.0, 206.25)
+                                )
+                            }
+
+                            val summary = PayrollSummaryData(
+                                employeeName = currentUserName.ifEmpty { "Sarah Jenkins" },
+                                payPeriod = cycle,
+                                currencySymbol = currencySym,
+                                regularHours = shiftsList.sumOf { it.durationHours },
+                                overtimeHours = 2.5,
+                                hourlyRate = shiftsList.firstOrNull()?.hourlyRate ?: 25.00,
+                                shiftLogs = shiftsList
+                            )
+
+                            val pdfBytes = pdfService.generatePayrollSummaryPdf(
+                                payroll = summary,
+                                theme = PdfThemeConfig(primaryColorHex = "#059669", secondaryColorHex = "#0F172A")
+                            )
+
+                            val pdfFile = pdfService.savePdfToCache(context, pdfBytes, "Payslip_${cycle.replace(" ", "_")}.pdf")
+                            Toast.makeText(context, "OpenHTMLtoPDF Payslip generated!", Toast.LENGTH_SHORT).show()
+                            pdfService.openOrSharePdf(context, pdfFile, "Open or Share $cycle Payslip")
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error compiling PDF: ${e.message}", Toast.LENGTH_LONG).show()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = getAdaptiveColor(0.08f)),
                     shape = RoundedCornerShape(8.dp),
@@ -7022,21 +7075,28 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = viewModel.companyName.value.uppercase(),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = NeonGreen,
-                    letterSpacing = 2.sp
+                    letterSpacing = 2.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "Welcome back, ${viewModel.currentUserName.value}!",
-                    fontSize = 18.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
-                    color = com.example.ui.theme.AppTextColor
+                    color = com.example.ui.theme.AppTextColor,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .background(NeonGreen.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
@@ -7046,7 +7106,9 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
                     text = userRole,
                     color = NeonGreen,
                     fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }
@@ -7271,39 +7333,50 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        Row(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
             // Top 5 Dashboards Tile
             SaaSTileLauncher(
-                title = "Top 5 Employee Dashboards",
-                subtitle = "Workforce performance, engagement, retention stability & continuous learning charts",
+                title = "Top 5 Dashboards",
+                subtitle = "Workforce performance, engagement & learning charts",
                 icon = Icons.Default.Leaderboard,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 onClick = { viewModel.currentScreen.value = "top5_dashboard" }
             )
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(modifier = Modifier.fillMaxWidth()) {
             // Company Survey Hub Tile
             SaaSTileLauncher(
-                title = "Quarterly Company Survey Hub",
-                subtitle = "Build dynamic surveys, gather honest feedback, track team engagement & mitigate burnout",
+                title = "Company Survey Hub",
+                subtitle = "Build surveys, track team feedback & mitigate burnout",
                 icon = Icons.Default.Poll,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 onClick = { viewModel.currentScreen.value = "survey_hub" }
             )
         }
 
         if (isStaff) {
             Spacer(modifier = Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Interactive Org Mapper Tile
+                SaaSTileLauncher(
+                    title = "Interactive Org Mapper",
+                    subtitle = "Drag & drop node graph, shift cascade & geofence heatmap",
+                    icon = Icons.Default.AccountTree,
+                    modifier = Modifier.weight(1f),
+                    onClick = { viewModel.currentScreen.value = "org_mapping" }
+                )
+
                 // Admin Control Room Tile
                 SaaSTileLauncher(
                     title = "Admin Control Room",
                     subtitle = "Approve requests, assign tasks & post bulletins",
                     icon = Icons.Default.AdminPanelSettings,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                     onClick = { viewModel.currentScreen.value = "admin_control" }
                 )
             }

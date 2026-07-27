@@ -225,6 +225,7 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
             val mainTabs = if (isHrAdmin) {
                 listOf(
                     "realtime_insights" to "Workforce Insights",
+                    "org_mapping" to "Org Canvas",
                     "standings" to "Performance Top 5"
                 )
             } else {
@@ -248,7 +249,11 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Icon(
-                            imageVector = if (key == "realtime_insights") Icons.Default.Analytics else Icons.Default.Leaderboard,
+                            imageVector = when (key) {
+                                "realtime_insights" -> Icons.Default.Analytics
+                                "org_mapping" -> Icons.Default.AccountTree
+                                else -> Icons.Default.Leaderboard
+                            },
                             contentDescription = label,
                             tint = if (isSelected) Color.Black else themeColors.textSecondary,
                             modifier = Modifier.size(16.dp)
@@ -257,7 +262,7 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
                         Text(
                             text = label,
                             color = if (isSelected) Color.Black else themeColors.textPrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -265,7 +270,9 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
             }
         }
 
-        if (activeMainTab == "realtime_insights" && isHrAdmin) {
+        if (activeMainTab == "org_mapping" && isHrAdmin) {
+            AdminOrgMappingDashboard(viewModel = viewModel)
+        } else if (activeMainTab == "realtime_insights" && isHrAdmin) {
             RealtimeInsightsDashboard(viewModel = viewModel, themeColors = themeColors, employees = employees)
         } else {
         // Ranking Posted Notification Banner (shows for both HR and employees if active)
@@ -2990,16 +2997,13 @@ fun generateWorkforceInsightsPdf(context: Context, employees: List<Top5Employee>
 
 fun openWorkforcePdfFile(context: Context, file: File) {
     try {
-        val uri: Uri = FileProvider.getUriForFile(context, "com.example.fileprovider", file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        val chooserIntent = Intent.createChooser(intent, "Open or Share Workforce Insights Report")
-        chooserIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        context.startActivity(chooserIntent)
+        com.example.data.backend.CompliancePdfGeneratorService().showPdfActionDialog(
+            context = context,
+            pdfFile = file,
+            documentTitle = "Workforce Insights PDF Options"
+        )
     } catch (e: Exception) {
         e.printStackTrace()
-        Toast.makeText(context, "No PDF viewer available. File saved in cache.", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "File saved in cache: ${file.name}", Toast.LENGTH_LONG).show()
     }
 }
