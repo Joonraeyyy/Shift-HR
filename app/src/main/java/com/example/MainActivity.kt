@@ -1397,8 +1397,8 @@ fun TimeTrackerApp(
             )
         }
 
-        // Floating Liquid Dynamic Menu Overlay for rapid terminal access (Hidden on Chat screen & SaaS Hub to prevent overlap)
-        if (viewModel.currentScreen.value != "chat" && viewModel.currentScreen.value != "saas_hub") {
+        // Floating Liquid Dynamic Menu Overlay for rapid terminal access (Hidden on Chat screen, SaaS Hub, & Org Mapping screen to prevent overlap)
+        if (viewModel.currentScreen.value != "chat" && viewModel.currentScreen.value != "saas_hub" && viewModel.currentScreen.value != "org_mapping") {
             com.example.ui.RadialLiquidMenuWrapper(
                 onTerminalSelected = { selection ->
                     when (selection) {

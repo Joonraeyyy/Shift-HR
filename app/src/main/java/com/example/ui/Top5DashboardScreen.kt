@@ -225,7 +225,6 @@ fun Top5DashboardScreen(viewModel: TimeTrackerViewModel) {
             val mainTabs = if (isHrAdmin) {
                 listOf(
                     "realtime_insights" to "Workforce Insights",
-                    "org_mapping" to "Org Canvas",
                     "standings" to "Performance Top 5"
                 )
             } else {
