@@ -50,7 +50,7 @@ fun SurveyHubScreen(viewModel: TimeTrackerViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 6.dp)
     ) {
         // Module Header
         Row(
@@ -94,12 +94,18 @@ fun SurveyHubScreen(viewModel: TimeTrackerViewModel) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("HR BUILDER & ANALYTICS", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                    text = { Text("HR BUILDER", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
                     icon = { Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
+                    text = { Text("ANALYTICS", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.Assessment, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
                     text = { Text("SURVEYS FEED", fontWeight = FontWeight.Bold, fontSize = 11.sp) },
                     icon = { Icon(Icons.Default.RateReview, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 )
@@ -109,6 +115,8 @@ fun SurveyHubScreen(viewModel: TimeTrackerViewModel) {
         // Screen Routing
         if (isAdmin && selectedTab == 0) {
             AdminSurveyDashboard(viewModel = viewModel)
+        } else if (isAdmin && selectedTab == 1) {
+            HRSurveyAnalyticsScreen()
         } else {
             EmployeeSurveyFeed(viewModel = viewModel)
         }

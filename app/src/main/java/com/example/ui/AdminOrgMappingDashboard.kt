@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -1124,6 +1125,112 @@ fun applyPerDepartmentArchitectures(
     return updatedList
 }
 
+/**
+ * AI AUTOMATIC HIERARCHY REROUTE SYSTEM PER DEPARTMENT
+ * Intelligently analyzes roles, departments, manager statuses, and span-of-control
+ * to fix broken, orphan, or mismatched parentId links and reroute the reporting hierarchy.
+ */
+fun applyAiDepartmentHierarchyReroute(
+    currentNodes: List<OrgNode>,
+    targetDept: String? = null,
+    strategy: String = "STRICT_ROLE"
+): Pair<List<OrgNode>, String> {
+    if (currentNodes.isEmpty()) return Pair(currentNodes, "No nodes available to reroute.")
+
+    val updatedNodes = currentNodes.toMutableList()
+    var reroutedLinks = 0
+    var orphanCount = 0
+
+    // Top Executive (e.g. GM / CEO)
+    val topExec = updatedNodes.find { it.role == "GENERAL_MANAGER" || it.id == "NODE-GM-01" }
+        ?: updatedNodes.find { it.parentId == null }
+        ?: updatedNodes.first()
+
+    // Determine target departments
+    val departments = if (!targetDept.isNullOrEmpty() && targetDept != "ALL") {
+        listOf(targetDept)
+    } else {
+        updatedNodes.map { it.department }.filter { it != "Executive Ops" }.distinct()
+    }
+
+    departments.forEach { deptName ->
+        val deptNodes = updatedNodes.filter { it.department == deptName }
+        if (deptNodes.isNotEmpty()) {
+            // Find Department Director / Head
+            val director = deptNodes.find { it.isManager && (it.role == "DIRECTOR" || it.id.contains("DIR") || it.role == "GENERAL_MANAGER") }
+                ?: deptNodes.find { it.role == "SUPERVISOR" && it.isManager }
+                ?: deptNodes.first()
+
+            // 1. Director reports to Top Executive
+            if (director.id != topExec.id && director.parentId != topExec.id) {
+                val idx = updatedNodes.indexOfFirst { it.id == director.id }
+                if (idx != -1) {
+                    if (updatedNodes[idx].parentId == null || updatedNodes.none { n -> n.id == updatedNodes[idx].parentId }) {
+                        orphanCount++
+                    }
+                    updatedNodes[idx] = updatedNodes[idx].copy(parentId = topExec.id)
+                    reroutedLinks++
+                }
+            }
+
+            // 2. Department Supervisors report to Department Director
+            val supervisors = deptNodes.filter { it.role == "SUPERVISOR" && it.id != director.id }
+            supervisors.forEach { sup ->
+                if (sup.parentId != director.id) {
+                    val idx = updatedNodes.indexOfFirst { it.id == sup.id }
+                    if (idx != -1) {
+                        if (updatedNodes[idx].parentId == null || updatedNodes.none { n -> n.id == updatedNodes[idx].parentId }) {
+                            orphanCount++
+                        }
+                        updatedNodes[idx] = updatedNodes[idx].copy(parentId = director.id)
+                        reroutedLinks++
+                    }
+                }
+            }
+
+            // 3. Department Employees report to Department Supervisors
+            val employees = deptNodes.filter { it.role == "EMPLOYEE" && it.id != director.id }
+            val activeSupervisors = (supervisors + if (director.role == "SUPERVISOR" || director.isManager) listOf(director) else emptyList()).distinctBy { it.id }
+
+            if (activeSupervisors.isNotEmpty()) {
+                employees.forEachIndexed { empIdx, emp ->
+                    val targetSup = when (strategy) {
+                        "SPAN_CONTROL" -> activeSupervisors[empIdx % activeSupervisors.size]
+                        "CLEAN_ORPHANS" -> {
+                            activeSupervisors.find { it.id == emp.parentId } ?: activeSupervisors[empIdx % activeSupervisors.size]
+                        }
+                        else -> { // "STRICT_ROLE"
+                            activeSupervisors.find { it.id == emp.parentId } ?: activeSupervisors[empIdx % activeSupervisors.size]
+                        }
+                    }
+
+                    if (emp.parentId != targetSup.id) {
+                        val idx = updatedNodes.indexOfFirst { it.id == emp.id }
+                        if (idx != -1) {
+                            if (emp.parentId == null || updatedNodes.none { n -> n.id == emp.parentId }) {
+                                orphanCount++
+                            }
+                            updatedNodes[idx] = updatedNodes[idx].copy(parentId = targetSup.id)
+                            reroutedLinks++
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Recalculate spatial layout coordinates to reflect updated reporting tree
+    val reassembledNodes = applyPerDepartmentArchitectures(updatedNodes)
+
+    val summary = if (targetDept != null && targetDept != "ALL") {
+        "AI Auto-Rerouted $reroutedLinks hierarchy link(s) in $targetDept ($orphanCount orphan(s) re-connected)!"
+    } else {
+        "AI Auto-Rerouted $reroutedLinks total hierarchy link(s) across ${departments.size} departments!"
+    }
+
+    return Pair(reassembledNodes, summary)
+}
+
 // Enum for Hierarchy Layout Templates
 enum class HierarchyTemplate(val label: String, val icon: ImageVector) {
     DEPT_ARCHITECTURES("Per-Dept Architectures", Icons.Default.Domain),
@@ -1212,6 +1319,19 @@ fun DragAndDropCanvasView(
     onEmergencyCoverTriggered: (OrgNode) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val db = remember { com.example.data.database.AppDatabase.getDatabase(context) }
+    val orgRepository = remember { com.example.data.repository.OrgRepository(db.orgNodeDao()) }
+
+    // Seed Room DB with initial hierarchy if empty
+    LaunchedEffect(Unit) {
+        orgRepository.seedInitialDataIfEmpty()
+    }
+
+    // Collect Room DB org nodes flow
+    val roomOrgNodes by orgRepository.allOrgNodesFlow.collectAsState(initial = emptyList())
+    var showRoomTreeDialog by remember { mutableStateOf(false) }
+
     val density = LocalDensity.current
     val cardWidthDp = 150.dp
     val cardWidthPx = with(density) { cardWidthDp.toPx() }
@@ -1259,6 +1379,9 @@ fun DragAndDropCanvasView(
     var lassoCurrentOffset by remember { mutableStateOf<Offset?>(null) }
     var showAddEmployeeDialog by remember { mutableStateOf(false) }
     var showSaveExportDialog by remember { mutableStateOf(false) }
+    var showAiRerouteDialog by remember { mutableStateOf(false) }
+    var aiRerouteSelectedDept by remember { mutableStateOf("ALL") }
+    var aiRerouteStrategy by remember { mutableStateOf("STRICT_ROLE") }
     var selectedExportFormat by remember { mutableStateOf("PNG") } // PNG, JPEG, PDF, SVG
     var customExportFileName by remember { mutableStateOf("All_Departments_${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())}") }
 
@@ -1393,85 +1516,113 @@ fun DragAndDropCanvasView(
                         }
                     }
 
-                    // Right: Tool controls in FullScreen mode vs Clean Member Count in normal mode
-                    if (isFullScreenMode) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            // Light / Dark Theme Switch
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isLightMode) Color(0xFFFEF3C7) else Color(0xFF1F2937))
-                                    .clickable {
-                                        isLightMode = !isLightMode
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        Toast.makeText(context, if (isLightMode) "Switched to Light Mode" else "Switched to Dark Mode", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = if (isLightMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                        contentDescription = "Theme",
-                                        tint = if (isLightMode) Color(0xFFD97706) else Color(0xFFFBBF24),
-                                        modifier = Modifier.size(12.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = if (isLightMode) "Light" else "Dark",
-                                        color = if (isLightMode) Color(0xFF92400E) else Color(0xFFF3F4F6),
-                                        fontSize = 9.5.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                    // Right: Custom Pill Switch (Light/Dark mode) & Fullscreen controls
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Room DB Tree View Quick Button
+                        Box(
+                            modifier = Modifier
+                                .height(32.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isLightMode) Color(0xFFD1FAE5) else Color(0xFF064E3B).copy(alpha = 0.7f))
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isLightMode) Color(0xFFA7F3D0) else NeonGreen.copy(alpha = 0.4f),
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .clickable {
+                                    showRoomTreeDialog = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
+                                .padding(horizontal = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountTree,
+                                    contentDescription = "Tree View",
+                                    tint = if (isLightMode) Color(0xFF047857) else NeonGreen,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(5.dp))
+                                Text(
+                                    text = "Tree View",
+                                    color = if (isLightMode) Color(0xFF065F46) else Color(0xFFA7F3D0),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
+                        }
 
+                        CustomThemePillSwitch(
+                            isLightMode = isLightMode,
+                            onToggle = { newMode ->
+                                isLightMode = newMode
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                Toast.makeText(context, if (newMode) "Light Mode Enabled" else "Dark Mode Enabled", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        if (isFullScreenMode) {
                             // Freeze Canvas Toggle
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isFrozen) Color(0xFFFEE2E2) else (if (isLightMode) Color(0xFFCBD5E1) else Color(0xFF1E293B)))
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isFrozen) Color(0xFFFEE2E2) else (if (isLightMode) Color(0xFFE2E8F0) else Color(0xFF1E293B).copy(alpha = 0.8f)))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isFrozen) Color(0xFFFCA5A5) else (if (isLightMode) Color(0xFFCBD5E1) else Color(0xFF334155)),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
                                     .clickable {
                                         isFrozen = !isFrozen
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         Toast.makeText(context, if (isFrozen) "Canvas Locked: Dragging disabled" else "Canvas Unlocked: Dragging enabled", Toast.LENGTH_SHORT).show()
                                     }
-                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                                    .padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = if (isFrozen) Icons.Default.Lock else Icons.Default.LockOpen,
                                         contentDescription = "Freeze",
                                         tint = if (isFrozen) Color(0xFFDC2626) else if (isLightMode) Color(0xFF475569) else Color(0xFF94A3B8),
-                                        modifier = Modifier.size(12.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Spacer(modifier = Modifier.width(5.dp))
                                     Text(
                                         text = if (isFrozen) "Locked" else "Lock",
                                         color = if (isFrozen) Color(0xFF991B1B) else if (isLightMode) Color(0xFF334155) else Color(0xFFCBD5E1),
-                                        fontSize = 9.5.sp,
+                                        fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
                             }
-
-
-                        }
-                    } else {
-                        // Non-Fullscreen Mode: Clean badge showing member count
-                        Surface(
-                            color = if (isLightMode) Color(0xFFE2E8F0) else Color(0xFF13261D),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Text(
-                                text = "${activeCanvasNodes.size} Nodes",
-                                color = if (isLightMode) Color(0xFF047857) else NeonGreen,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                            )
+                        } else {
+                            // Non-Fullscreen Mode: Clean badge showing member count
+                            Box(
+                                modifier = Modifier
+                                    .height(32.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isLightMode) Color(0xFFE2E8F0) else Color(0xFF13261D).copy(alpha = 0.8f))
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isLightMode) Color(0xFFCBD5E1) else NeonGreen.copy(alpha = 0.3f),
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(horizontal = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${activeCanvasNodes.size} Nodes",
+                                    color = if (isLightMode) Color(0xFF047857) else NeonGreen,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -2066,7 +2217,7 @@ fun DragAndDropCanvasView(
                 }
 
                 // ----------------------------------------------------
-                // HUD STATS BADGE (Showing Active Node Count & Viewport Culling)
+                // HUD STATS BADGE (Active Node & Viewport Culling Count)
                 // ----------------------------------------------------
                 Surface(
                     color = (if (isLightMode) Color.White else Color(0xFF0F1D17)).copy(alpha = 0.90f),
@@ -2077,7 +2228,7 @@ fun DragAndDropCanvasView(
                         .padding(top = 10.dp, end = 10.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -2261,6 +2412,30 @@ fun DragAndDropCanvasView(
                                     isPathMode = !isPathMode
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     Toast.makeText(context, if (isPathMode) "Path Mode: Directional routes highlighted" else "Path Mode Off", Toast.LENGTH_SHORT).show()
+                                }
+                            )
+
+                            CanvasToolIconButton(
+                                icon = Icons.Default.AccountTree,
+                                label = "Tree View",
+                                isActive = showRoomTreeDialog,
+                                isLightMode = isLightMode,
+                                activeColor = Color(0xFF10B981),
+                                onClick = {
+                                    showRoomTreeDialog = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                }
+                            )
+
+                            CanvasToolIconButton(
+                                icon = Icons.Default.Psychology,
+                                label = "AI Reroute",
+                                isActive = showAiRerouteDialog,
+                                isLightMode = isLightMode,
+                                activeColor = Color(0xFFA855F7),
+                                onClick = {
+                                    showAiRerouteDialog = true
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 }
                             )
 
@@ -2623,10 +2798,31 @@ fun DragAndDropCanvasView(
                         )
 
                         onNodesUpdated(nodes + newNode)
+
+                        // Persist directly to Room DB
+                        coroutineScope.launch {
+                            orgRepository.insertNode(
+                                com.example.data.database.OrgNodeEntity(
+                                    id = newNode.id,
+                                    name = newNode.name,
+                                    role = newNode.role,
+                                    department = newNode.department,
+                                    parentId = newNode.parentId,
+                                    positionX = newNode.position.x,
+                                    positionY = newNode.position.y,
+                                    assignedShift = newNode.assignedShift,
+                                    attendanceStatus = newNode.attendanceStatus,
+                                    weeklyHours = newNode.weeklyHours,
+                                    restPeriodHours = newNode.restPeriodHours,
+                                    approvalTier = newNode.approvalTier
+                                )
+                            )
+                        }
+
                         showAddEmployeeDialog = false
                         newEmpNameOrId = ""
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        Toast.makeText(context, "Added '${newNode.name}' to hierarchy!", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Added '${newNode.name}' to Room DB Hierarchy!", Toast.LENGTH_LONG).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = if (isLightMode) Color(0xFF059669) else NeonGreen)
                 ) {
@@ -2639,6 +2835,80 @@ fun DragAndDropCanvasView(
                 }
             }
         )
+    }
+
+    // ----------------------------------------------------
+    // RECURSIVE ROOM DB ORG TREE VIEW DIALOG
+    // ----------------------------------------------------
+    if (showRoomTreeDialog) {
+        Dialog(
+            onDismissRequest = { showRoomTreeDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxSize(0.92f)
+                    .padding(12.dp),
+                shape = RoundedCornerShape(20.dp),
+                color = if (isLightMode) Color(0xFFF8FAFC) else Color(0xFF0D1117)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    com.example.ui.components.RecursiveOrgTreeView(
+                        nodes = roomOrgNodes,
+                        isLightMode = isLightMode,
+                        onNodeSelect = { selectedEntity ->
+                            scale = 1.0f
+                            canvasOffset = Offset(
+                                -selectedEntity.positionX * 1.0f + viewportWidthPx / 2f - 100f,
+                                -selectedEntity.positionY * 1.0f + viewportHeightPx / 2f - 100f
+                            )
+                            showRoomTreeDialog = false
+                            Toast.makeText(context, "Jumped to ${selectedEntity.name}", Toast.LENGTH_SHORT).show()
+                        },
+                        onAddNodeClick = {
+                            showRoomTreeDialog = false
+                            showAddEmployeeDialog = true
+                        },
+                        onRefreshDb = {
+                            coroutineScope.launch {
+                                val entities = nodes.map { n ->
+                                    com.example.data.database.OrgNodeEntity(
+                                        id = n.id,
+                                        name = n.name,
+                                        role = n.role,
+                                        department = n.department,
+                                        parentId = n.parentId,
+                                        positionX = n.position.x,
+                                        positionY = n.position.y,
+                                        assignedShift = n.assignedShift,
+                                        attendanceStatus = n.attendanceStatus,
+                                        weeklyHours = n.weeklyHours,
+                                        restPeriodHours = n.restPeriodHours,
+                                        approvalTier = n.approvalTier
+                                    )
+                                }
+                                orgRepository.insertAll(entities)
+                                Toast.makeText(context, "Room DB Synced with Canvas Nodes!", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    )
+
+                    IconButton(
+                        onClick = { showRoomTreeDialog = false },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = if (isLightMode) Color(0xFF64748B) else Color(0xFF8B949E)
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // ----------------------------------------------------
@@ -2814,6 +3084,196 @@ fun DragAndDropCanvasView(
                 }
             }
         )
+    }
+
+    // ----------------------------------------------------
+    // AI AUTOMATIC HIERARCHY REROUTE DIALOG
+    // ----------------------------------------------------
+    if (showAiRerouteDialog) {
+        val dialogBg = if (isLightMode) Color.White else Color(0xFF0F1D17)
+        val dialogTextPrimary = if (isLightMode) Color(0xFF0F172A) else Color.White
+        val dialogTextSecondary = if (isLightMode) Color(0xFF475569) else Color(0xFF94A3B8)
+        val accentPurple = Color(0xFFA855F7)
+
+        Dialog(onDismissRequest = { showAiRerouteDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = dialogBg,
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, accentPurple),
+                modifier = Modifier
+                    .widthIn(max = 440.dp)
+                    .padding(16.dp)
+                    .testTag("ai_reroute_hierarchy_dialog")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Header Title
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(accentPurple.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Psychology, contentDescription = null, tint = accentPurple, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text("AI Auto-Reroute Hierarchy", color = dialogTextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text("Automated department reporting topology", color = dialogTextSecondary, fontSize = 10.sp)
+                            }
+                        }
+                        IconButton(onClick = { showAiRerouteDialog = false }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.Gray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+
+                    HorizontalDivider(color = if (isLightMode) Color(0xFFE2E8F0) else Color(0xFF1E3A2B))
+
+                    // Target Department Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Target Department Scope:", color = dialogTextPrimary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+
+                        val deptList = listOf("ALL") + nodes.map { it.department }.filter { it != "Executive Ops" }.distinct()
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(deptList) { deptOption ->
+                                val isSelected = aiRerouteSelectedDept == deptOption
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) accentPurple.copy(alpha = 0.25f) else (if (isLightMode) Color(0xFFF1F5F9) else Color(0xFF13281E)),
+                                    border = androidx.compose.foundation.BorderStroke(
+                                        1.dp,
+                                        if (isSelected) accentPurple else (if (isLightMode) Color(0xFFCBD5E1) else Color(0xFF224233))
+                                    ),
+                                    modifier = Modifier
+                                        .clickable {
+                                            aiRerouteSelectedDept = deptOption
+                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                        }
+                                ) {
+                                    Text(
+                                        text = if (deptOption == "ALL") "All Departments" else deptOption,
+                                        color = if (isSelected) accentPurple else dialogTextPrimary,
+                                        fontSize = 10.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Rerouting Strategy Selector
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Rerouting Optimization Strategy:", color = dialogTextPrimary, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+
+                        val strategies = listOf(
+                            Triple("STRICT_ROLE", "Strict Role Hierarchy", "GM -> Director -> Supervisors -> Employees"),
+                            Triple("SPAN_CONTROL", "Balanced Span-of-Control", "Distribute employees evenly across supervisors"),
+                            Triple("CLEAN_ORPHANS", "Orphan Repair & Clean Links", "Fix missing parentIds & mismatched department links")
+                        )
+
+                        strategies.forEach { (stratKey, title, desc) ->
+                            val isSelected = aiRerouteStrategy == stratKey
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        aiRerouteStrategy = stratKey
+                                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) accentPurple.copy(alpha = 0.15f) else (if (isLightMode) Color(0xFFF8FAFC) else Color(0xFF0D1813))
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (isSelected) accentPurple else (if (isLightMode) Color(0xFFE2E8F0) else Color(0xFF1C382C))
+                                ),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { aiRerouteStrategy = stratKey },
+                                        colors = RadioButtonDefaults.colors(selectedColor = accentPurple)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column {
+                                        Text(title, color = dialogTextPrimary, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        Text(desc, color = dialogTextSecondary, fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Live Metrics Preview
+                    Surface(
+                        color = if (isLightMode) Color(0xFFF1F5F9) else Color(0xFF11221B),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val targetNodes = if (aiRerouteSelectedDept == "ALL") nodes else nodes.filter { it.department == aiRerouteSelectedDept }
+                            Text("Nodes in Scope: ${targetNodes.size}", fontSize = 10.sp, color = dialogTextPrimary, fontWeight = FontWeight.Bold)
+                            Text("AI Topology: Ready", fontSize = 10.sp, color = accentPurple, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Action Buttons
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showAiRerouteDialog = false },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Cancel", color = dialogTextSecondary, fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = {
+                                historyStack.add(nodes)
+                                redoStack.clear()
+                                val (resultNodes, msg) = applyAiDepartmentHierarchyReroute(
+                                    currentNodes = nodes,
+                                    targetDept = aiRerouteSelectedDept,
+                                    strategy = aiRerouteStrategy
+                                )
+                                onNodesUpdated(resultNodes)
+                                showAiRerouteDialog = false
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentPurple, contentColor = Color.White),
+                            modifier = Modifier.weight(1.5f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Run AI Reroute", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // ----------------------------------------------------
@@ -3624,3 +4084,246 @@ fun SearchableAssignListView(
         }
     }
 }
+
+// ----------------------------------------------------
+// GITHUB STYLE SIDEBAR COMPONENT FOR DEPARTMENTS
+// ----------------------------------------------------
+
+// 1. Data Model for Menu Items
+data class SidebarMenuItem(
+    val id: Int,
+    val title: String,
+    val icon: ImageVector,
+    val deptKey: String = ""
+)
+
+// 2. Main Sidebar Component
+@Composable
+fun GitHubStyleSidebar(
+    modifier: Modifier = Modifier,
+    items: List<SidebarMenuItem>? = null,
+    selectedDept: String? = null,
+    onItemSelected: (SidebarMenuItem) -> Unit = {}
+) {
+    val menuItems = items ?: remember {
+        listOf(
+            SidebarMenuItem(0, "Public profile", Icons.Default.Person, "Public profile"),
+            SidebarMenuItem(1, "Account", Icons.Default.Settings, "Account"),
+            SidebarMenuItem(2, "Appearance", Icons.Default.Edit, "Appearance"),
+            SidebarMenuItem(3, "Accessibility", Icons.Default.Accessibility, "Accessibility"),
+            SidebarMenuItem(4, "Notifications", Icons.Default.Notifications, "Notifications")
+        )
+    }
+
+    var selectedIndex by remember(selectedDept, menuItems) {
+        val found = menuItems.indexOfFirst { it.deptKey == selectedDept || it.title == selectedDept }
+        mutableIntStateOf(if (found != -1) found else 0)
+    }
+
+    Column(
+        modifier = modifier
+            .width(220.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF0D1117)) // CSS .input background
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        menuItems.forEachIndexed { index, item ->
+            val isSelected = selectedIndex == index
+            val isAnyOtherSelected = selectedIndex != -1 && !isSelected
+
+            SidebarItemRow(
+                item = item,
+                isSelected = isSelected,
+                isOtherActive = isAnyOtherSelected,
+                onClick = {
+                    selectedIndex = index
+                    onItemSelected(item)
+                }
+            )
+        }
+    }
+}
+
+// 3. Individual Button Row Component
+@Composable
+private fun SidebarItemRow(
+    item: SidebarMenuItem,
+    isSelected: Boolean,
+    isOtherActive: Boolean,
+    onClick: () -> Unit
+) {
+    // CSS Animated State Mirroring
+    val offsetX by animateDpAsState(
+        targetValue = if (isSelected) 16.dp else 0.dp,
+        animationSpec = tween(durationMillis = 400),
+        label = "offsetAnimation"
+    )
+
+    val scale by animateFloatAsState(
+        targetValue = if (isOtherActive) 0.95f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "scaleAnimation"
+    )
+
+    val alpha by animateFloatAsState(
+        targetValue = if (isOtherActive) 0.6f else 1f,
+        animationSpec = tween(durationMillis = 300),
+        label = "alphaAnimation"
+    )
+
+    val backgroundColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF1A1F24) else Color.Transparent,
+        animationSpec = tween(durationMillis = 400),
+        label = "bgColorAnimation"
+    )
+
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFF637185) else Color.White,
+        animationSpec = tween(durationMillis = 400),
+        label = "textColorAnimation"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                this.alpha = alpha
+            }
+    ) {
+        // Active Blue Indicator Bar (CSS ::before pseudo-element)
+        if (isSelected) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(4.dp)
+                    .fillMaxHeight(0.7f)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF2F81F7))
+            )
+        }
+
+        // Main Button Surface
+        Row(
+            modifier = Modifier
+                .offset(x = offsetX)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(backgroundColor)
+                .border(
+                    width = if (isSelected) 2.dp else 0.dp,
+                    color = if (isSelected) Color(0xFF1A1F24) else Color.Transparent,
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                )
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = item.icon,
+                contentDescription = item.title,
+                tint = if (isSelected) Color(0xFF637185) else Color(0xFF7D8590),
+                modifier = Modifier.size(20.dp)
+            )
+
+            Text(
+                text = item.title,
+                color = textColor,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+    }
+}
+
+// ----------------------------------------------------
+// CUSTOM PILL SWITCH FOR LIGHT / DARK MODE (Matching Reference Photo)
+// ----------------------------------------------------
+@Composable
+fun CustomThemePillSwitch(
+    isLightMode: Boolean,
+    onToggle: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val trackBgColor by animateColorAsState(
+        targetValue = if (isLightMode) Color(0xFFD1D5DB) else Color(0xFF3F3F46),
+        animationSpec = tween(durationMillis = 300),
+        label = "trackBgColor"
+    )
+
+    val trackBorderColor by animateColorAsState(
+        targetValue = if (isLightMode) Color(0xFF9CA3AF) else Color(0xFF52525B),
+        animationSpec = tween(durationMillis = 300),
+        label = "trackBorderColor"
+    )
+
+    val thumbBgColor by animateColorAsState(
+        targetValue = if (isLightMode) Color.White else Color(0xFF18181B),
+        animationSpec = tween(durationMillis = 300),
+        label = "thumbBgColor"
+    )
+
+    val thumbOffsetDp by animateDpAsState(
+        targetValue = if (isLightMode) 26.dp else 2.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "thumbOffset"
+    )
+
+    Box(
+        modifier = modifier
+            .width(58.dp)
+            .height(32.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(trackBgColor)
+            .border(1.dp, trackBorderColor, RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onToggle(!isLightMode) }
+            )
+            .padding(2.dp)
+            .testTag("org_mapper_theme_toggle_pill")
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Moon Icon (Left side) - active color in Light mode
+            Icon(
+                imageVector = Icons.Default.Bedtime,
+                contentDescription = "Moon (Dark)",
+                tint = if (isLightMode) Color(0xFF475569) else Color.Transparent,
+                modifier = Modifier.size(16.dp)
+            )
+
+            // Sun Icon (Right side) - active color in Dark mode
+            Icon(
+                imageVector = Icons.Default.WbSunny,
+                contentDescription = "Sun (Light)",
+                tint = if (!isLightMode) Color.White else Color.Transparent,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        // Sliding Circle Thumb
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffsetDp)
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(thumbBgColor)
+                .shadow(2.dp, CircleShape)
+        )
+    }
+}
+

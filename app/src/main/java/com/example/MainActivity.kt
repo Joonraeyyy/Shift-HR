@@ -329,6 +329,13 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Global uncaught exception handler to prevent unexpected app process termination & ActivityRecord warnings
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e("ShiftHR_CrashProtection", "Intercepted uncaught exception on thread '${thread.name}': ${throwable.message}", throwable)
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {

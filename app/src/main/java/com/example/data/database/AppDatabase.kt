@@ -6,14 +6,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [TimeLogEntity::class, ShiftConfigEntity::class, DossierDocumentEntity::class],
-    version = 1,
+    entities = [TimeLogEntity::class, ShiftConfigEntity::class, DossierDocumentEntity::class, OrgNodeEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun timeLogDao(): TimeLogDao
     abstract fun shiftConfigDao(): ShiftConfigDao
     abstract fun dossierDao(): DossierDao
+    abstract fun orgNodeDao(): OrgNodeDao
 
     companion object {
         @Volatile
