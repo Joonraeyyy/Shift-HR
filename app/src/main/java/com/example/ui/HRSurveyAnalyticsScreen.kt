@@ -49,6 +49,7 @@ import com.example.data.KeywordInsight
 import com.example.data.QuarterTrend
 import com.example.data.SurveyAnalyticsData
 import com.example.data.sampleSurveyAnalyticsData
+import com.example.data.sampleSurveyAnalyticsData
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -114,30 +115,51 @@ fun HRSurveyAnalyticsScreen(
         }
     }
 
-    // Liquid Glassmorphic Deep Ambient Background (Seamless Flow)
+    // Liquid Glassmorphic Deep Ambient Background
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF030712),
+                        Color(0xFF061A14),
+                        Color(0xFF082E23),
+                        Color(0xFF030712)
+                    )
+                )
+            )
     ) {
+        // Ambient Liquid Glow Accents
+        Box(
+            modifier = Modifier
+                .offset(x = 180.dp, y = (-40).dp)
+                .size(260.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF059669).copy(alpha = 0.15f))
+        )
+
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
             // ----------------------------------------------------
-            // 1. COMPACT LIQUID HEADER & AI PDF REPORT TRIGGER BUTTON
+            // 1. LIQUID GLASS HEADER & AI PDF REPORT TRIGGER BUTTON
             // ----------------------------------------------------
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    // Liquid Tag Pill
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFF10B981).copy(alpha = 0.15f))
-                            .border(1.dp, Color(0xFF10B981).copy(alpha = 0.35f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF10B981).copy(alpha = 0.18f))
+                            .border(1.dp, Color(0xFF10B981).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
@@ -146,9 +168,9 @@ fun HRSurveyAnalyticsScreen(
                                 tint = Color(0xFF34D399),
                                 modifier = Modifier.size(12.dp)
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(5.dp))
                             Text(
-                                text = "AI PULSE ANALYTICS",
+                                text = "ANALYTICS ENGINE",
                                 color = Color(0xFF34D399),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -156,12 +178,20 @@ fun HRSurveyAnalyticsScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     Text(
-                        text = "Q3 Survey Intelligence",
+                        text = "Survey Intelligence & Trends",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = data.surveyTitle,
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
 
@@ -173,15 +203,15 @@ fun HRSurveyAnalyticsScreen(
                         containerColor = Color(0xFF059669),
                         contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                     modifier = Modifier
-                        .height(34.dp)
-                        .border(1.dp, Color(0xFF34D399).copy(alpha = 0.5f), RoundedCornerShape(10.dp))
+                        .height(44.dp)
+                        .border(1.dp, Color(0xFF34D399).copy(alpha = 0.6f), RoundedCornerShape(14.dp))
                 ) {
                     if (isGeneratingPdf) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(14.dp),
+                            modifier = Modifier.size(18.dp),
                             color = Color.White,
                             strokeWidth = 2.dp
                         )
@@ -191,27 +221,34 @@ fun HRSurveyAnalyticsScreen(
                                 imageVector = Icons.Default.PictureAsPdf,
                                 contentDescription = "PDF Report",
                                 tint = Color.White,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(18.dp)
                             )
-                            Spacer(modifier = Modifier.width(5.dp))
-                            Text(
-                                text = "AI PDF Report",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "AI PDF Report",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "View & Export",
+                                    fontSize = 9.sp,
+                                    color = Color(0xFFA7F3D0)
+                                )
+                            }
                         }
                     }
                 }
             }
 
+            Spacer(modifier = Modifier.height(14.dp))
+
             // ----------------------------------------------------
             // 2. LIQUID GLASS KPI SUMMARY TILES (SPACIOUS & CLEAR)
             // ----------------------------------------------------
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 LiquidMetricTile(
                     title = "Overall Score",
@@ -236,13 +273,14 @@ fun HRSurveyAnalyticsScreen(
                 )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
             // ----------------------------------------------------
-            // 3. SCROLLABLE ANALYTICS CONTENT (AMPLED BOTTOM PADDING)
+            // 3. SCROLLABLE ANALYTICS CONTENT
             // ----------------------------------------------------
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Section A: Quarter-over-Quarter Trend Tracking
                 item {
@@ -254,21 +292,21 @@ fun HRSurveyAnalyticsScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 2.dp, bottom = 2.dp),
+                            .padding(top = 4.dp, bottom = 2.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .width(3.dp)
-                                .height(14.dp)
+                                .width(4.dp)
+                                .height(16.dp)
                                 .clip(RoundedCornerShape(2.dp))
                                 .background(Color(0xFF34D399))
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "CATEGORY HEALTH & ACTION TRIGGERS",
                             color = Color(0xFF34D399),
-                            fontSize = 11.5.sp,
+                            fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 0.8.sp
                         )
@@ -289,6 +327,11 @@ fun HRSurveyAnalyticsScreen(
                 // Section C: Keyword & Sentiment Cloud
                 item {
                     LiquidKeywordSentimentCard(keywords = data.topKeywords)
+                }
+
+                // Bottom Spacing
+                item {
+                    Spacer(modifier = Modifier.height(20.dp))
                 }
             }
         }
@@ -815,18 +858,17 @@ private fun LiquidCategoryHealthCard(
 }
 
 // --- 4. Liquid Glass Keyword Cloud Card ---
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LiquidKeywordSentimentCard(keywords: List<KeywordInsight>) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF0F172A).copy(alpha = 0.8f),
-                        Color(0xFF0A1B15).copy(alpha = 0.9f)
+                        Color(0xFF10261E).copy(alpha = 0.85f),
+                        Color(0xFF081712).copy(alpha = 0.95f)
                     )
                 )
             )
@@ -834,33 +876,32 @@ private fun LiquidKeywordSentimentCard(keywords: List<KeywordInsight>) {
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.2f),
-                        Color(0xFF10B981).copy(alpha = 0.25f)
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.08f)
                     )
                 ),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             )
-            .padding(14.dp)
+            .padding(18.dp)
     ) {
         Column {
             Text(
                 text = "Top Recurring Feedback Keywords",
                 color = Color.White,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = "NLP analysis from employee qualitative responses",
                 color = Color(0xFF94A3B8),
-                fontSize = 11.sp
+                fontSize = 11.5.sp
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 keywords.forEach { item ->
                     val (chipBg, chipBorder, chipText) = when (item.sentiment) {
@@ -883,15 +924,15 @@ private fun LiquidKeywordSentimentCard(keywords: List<KeywordInsight>) {
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(20.dp))
                             .background(chipBg)
-                            .border(1.dp, chipBorder, RoundedCornerShape(16.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .border(1.dp, chipBorder, RoundedCornerShape(20.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp)
                     ) {
                         Text(
                             text = "${item.word} (${item.count})",
                             color = chipText,
-                            fontSize = 11.5.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
