@@ -324,6 +324,49 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var liveFieldLat = mutableStateOf(14.5995)
     var liveFieldLng = mutableStateOf(120.9842)
 
+    // --- GOOGLE CALENDAR HOLIDAY ANALYSIS STATES ---
+    var gcalSyncedHolidays = mutableStateOf<List<com.example.data.GoogleCalendarHolidayItem>>(emptyList())
+    var gcalHolidayAnalysis = mutableStateOf<com.example.data.HolidayPayrollImpactSummary?>(null)
+    var isSyncingGcalHolidays = mutableStateOf(false)
+    var gcalSyncLastCompleted = mutableStateOf<String?>(null)
+
+    fun syncAndAnalyzeGoogleCalendarHolidays() {
+        viewModelScope.launch {
+            isSyncingGcalHolidays.value = true
+            try {
+                // 1. Fetch Google Calendar PH Public Holiday API feed
+                val fetchedGcalHolidays = com.example.data.GoogleCalendarHolidayService.fetchGoogleCalendarHolidays(2026)
+                gcalSyncedHolidays.value = fetchedGcalHolidays
+
+                // 2. Merge into local holidays list
+                val newHolidays = fetchedGcalHolidays.map { com.example.data.GoogleCalendarHolidayService.mapToAppHoliday(it) }
+                localHolidays.value = newHolidays
+
+                // 3. Perform AI analysis on Regular vs Special Holidays
+                val impactAnalysis = com.example.data.GoogleCalendarHolidayService.analyzeCalendarHolidaysWithAi(fetchedGcalHolidays)
+                gcalHolidayAnalysis.value = impactAnalysis
+
+                val sdf = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                gcalSyncLastCompleted.value = sdf.format(Date())
+
+                checkTodayHoliday()
+                addNotification(
+                    title = "Google Calendar Sync",
+                    message = "Successfully synced ${fetchedGcalHolidays.size} Philippine local holidays via Google Calendar API. Regular (200%) & Special (130%) payroll rules applied.",
+                    isAlert = false
+                )
+            } catch (e: Exception) {
+                addNotification(
+                    title = "Google Calendar Sync Alert",
+                    message = "Calendar sync notice: ${e.message}",
+                    isAlert = true
+                )
+            } finally {
+                isSyncingGcalHolidays.value = false
+            }
+        }
+    }
+
     // Combined Holiday list for Manila / Philippines region
     var localHolidays = mutableStateOf<List<Holiday>>(listOf(
         Holiday("New Year's Day", "2026-01-01", "Global New Year and Philippine Regular Holiday", true, "PH"),
@@ -1497,6 +1540,20 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         activeUrgentNotification.value = null
     }
 
+    fun deleteCyberNotification(id: String) {
+        cyberNotifications.value = cyberNotifications.value.filter { it.id != id }
+        if (activeUrgentNotification.value?.id == id) {
+            activeUrgentNotification.value = null
+        }
+    }
+
+    fun deleteCyberNotifications(ids: Set<String>) {
+        cyberNotifications.value = cyberNotifications.value.filter { it.id !in ids }
+        if (activeUrgentNotification.value?.id in ids) {
+            activeUrgentNotification.value = null
+        }
+    }
+
     fun clearAllCyberNotifications() {
         cyberNotifications.value = emptyList()
         activeUrgentNotification.value = null
@@ -1811,26 +1868,47 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     // Update shift for a specific employee and date
-    fun updateEmployeeShift(employeeName: String, department: String, date: String, newShift: String, updatedBy: String) {
+    fun updateEmployeeShift(
+        employeeName: String,
+        department: String,
+        date: String,
+        newShift: String,
+        updatedBy: String,
+        customStartTime: String? = null,
+        customBreakTime: String? = null,
+        customEndTime: String? = null,
+        isOvernight: Boolean = false
+    ) {
         val currentList = teamSchedules.value.toMutableList()
         val index = currentList.indexOfFirst { it.employeeName == employeeName && it.date == date }
         if (index != -1) {
-            currentList[index] = currentList[index].copy(shiftName = newShift)
+            currentList[index] = currentList[index].copy(
+                shiftName = newShift,
+                customStartTime = customStartTime ?: currentList[index].customStartTime,
+                customBreakTime = customBreakTime ?: currentList[index].customBreakTime,
+                customEndTime = customEndTime ?: currentList[index].customEndTime,
+                isOvernight = if (customStartTime != null) isOvernight else currentList[index].isOvernight
+            )
         } else {
             currentList.add(TeamSchedule(
                 id = java.util.UUID.randomUUID().toString(),
                 employeeName = employeeName,
                 department = department,
                 date = date,
-                shiftName = newShift
+                shiftName = newShift,
+                customStartTime = customStartTime,
+                customBreakTime = customBreakTime,
+                customEndTime = customEndTime,
+                isOvernight = isOvernight
             ))
         }
         teamSchedules.value = currentList
 
+        val detailStr = if (customStartTime != null) " [$customStartTime - $customEndTime • Break $customBreakTime]" else ""
         // Add audit log
-        addAuditLog(updatedBy, "Reassigned schedule for $employeeName on $date to $newShift.")
+        addAuditLog(updatedBy, "Reassigned schedule for $employeeName on $date to $newShift$detailStr.")
         // Add notification
-        addNotification("Schedule Reassigned", "Shift for $employeeName on $date updated to $newShift.", isAlert = false)
+        addNotification("Schedule Reassigned", "Shift for $employeeName on $date updated to $newShift$detailStr.", isAlert = false)
     }
 
 

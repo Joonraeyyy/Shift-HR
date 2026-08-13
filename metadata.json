@@ -1,8 +1,6 @@
 {
-  "name": "Shift HR",
-  "description": "An elegant, intuitive HR time tracking and automated reporting app designed with offline syncing, simple spreadsheets, custom shifts, and administrative approvals.",
+  "name": "Time Tracker",
+  "description": "Administrative shift approval and manager management system",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1149,6 +1149,42 @@ fun TimeTrackerApp(
                             com.example.ui.SurveyHubScreen(viewModel = viewModel)
                         }
                     }
+                    "notification_dashboard", "notifications" -> {
+                        Column {
+                            SaaSHeader(title = "Notifications", onBack = { viewModel.currentScreen.value = "saas_hub" })
+                            com.example.ui.NotificationDashboardScreen(
+                                notifications = viewModel.cyberNotifications.value,
+                                onNotificationClick = { clickedItem ->
+                                    viewModel.markNotificationAsRead(clickedItem.id)
+                                    clickedItem.targetRoute?.let { route ->
+                                        if (route.isNotEmpty()) {
+                                            viewModel.currentScreen.value = route
+                                        }
+                                    }
+                                },
+                                onDeleteNotification = { id -> viewModel.deleteCyberNotification(id) },
+                                onDeleteNotifications = { ids -> viewModel.deleteCyberNotifications(ids) },
+                                onMarkAllAsRead = { viewModel.markAllCyberNotificationsAsRead() },
+                                onClearAll = { viewModel.clearAllCyberNotifications() },
+                                onTriggerTestUrgent = {
+                                    viewModel.postCyberNotification(
+                                        title = "URGENT SHIFT CANCELLATION",
+                                        message = "Marcus Aurelius canceled Shift #102 for Today.",
+                                        priority = com.example.ui.NotificationPriority.URGENT,
+                                        targetRoute = "shift_calendar"
+                                    )
+                                },
+                                onTriggerTestPassive = {
+                                    viewModel.postCyberNotification(
+                                        title = "Audit Report Ready",
+                                        message = "Compliance AI completed monthly timesheet analysis.",
+                                        priority = com.example.ui.NotificationPriority.PASSIVE,
+                                        targetRoute = "audit_log"
+                                    )
+                                }
+                            )
+                        }
+                    }
                     "map_dashboard" -> {
                         MapDashboardScreen(
                             viewModel = viewModel,
@@ -1383,6 +1419,8 @@ fun TimeTrackerApp(
                     }
                     showNotificationCenterSheet = false
                 },
+                onDeleteNotification = { id -> viewModel.deleteCyberNotification(id) },
+                onDeleteNotifications = { ids -> viewModel.deleteCyberNotifications(ids) },
                 onMarkAllAsRead = { viewModel.markAllCyberNotificationsAsRead() },
                 onClearAll = { viewModel.clearAllCyberNotifications() },
                 onTriggerTestUrgent = {
@@ -4489,85 +4527,307 @@ fun AdminApprovalScreen(
     onDelete: (TimeLogEntity) -> Unit,
     userRole: String
 ) {
-    var selectedApprovalTab by remember { mutableStateOf(0) } // 0 = Pending, 1 = Audit History
+    var selectedApprovalTab by remember { mutableStateOf(0) } // 0 = Pending, 1 = Approved, 2 = Rejected, 3 = All Audit
+    var searchQuery by remember { mutableStateOf("") }
+    val df = DecimalFormat("#.##")
 
     val isAuthorized = userRole == "ADMIN_HR" || userRole == "MANAGER" || userRole == "SUPERVISOR"
 
     if (!isAuthorized) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(48.dp))
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("RESTRICTED MODULE", fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                Text("Only HR, Managers, or Supervisors can authorize punches.", fontSize = 12.sp, color = getAdaptiveTextColor(0.4f))
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(56.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("RESTRICTED ADMINISTRATIVE MODULE", fontWeight = FontWeight.Black, fontSize = 16.sp, color = com.example.ui.theme.AppTextColor)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("Only HR Directors, Managers, or Supervisors are authorized to approve shift entries.", fontSize = 12.sp, color = getAdaptiveTextColor(0.5f), textAlign = TextAlign.Center)
             }
         }
         return
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Filter calculations
+    val filteredPending = pendingLogs.filter { log ->
+        searchQuery.isBlank() || log.employeeName.contains(searchQuery, ignoreCase = true) || log.date.contains(searchQuery, ignoreCase = true)
+    }
+
+    val approvedLogs = allLogs.filter { it.isApproved == "APPROVED" }.filter { log ->
+        searchQuery.isBlank() || log.employeeName.contains(searchQuery, ignoreCase = true) || log.date.contains(searchQuery, ignoreCase = true)
+    }
+
+    val rejectedLogs = allLogs.filter { it.isApproved == "REJECTED" }.filter { log ->
+        searchQuery.isBlank() || log.employeeName.contains(searchQuery, ignoreCase = true) || log.date.contains(searchQuery, ignoreCase = true)
+    }
+
+    val filteredAll = allLogs.filter { log ->
+        searchQuery.isBlank() || log.employeeName.contains(searchQuery, ignoreCase = true) || log.date.contains(searchQuery, ignoreCase = true)
+    }
+
+    // Compute summary stats for pending shifts
+    val totalPendingHours = pendingLogs.sumOf { log ->
+        if (log.timeIn != null && log.timeOut != null) {
+            val total = log.timeOut - log.timeIn
+            val lunch = if (log.lunchOut != null && log.lunchIn != null) log.lunchIn - log.lunchOut else 0L
+            val brk = if (log.breakOut != null && log.breakIn != null) log.breakIn - log.breakOut else 0L
+            ((total - lunch - brk).coerceAtLeast(0L)).toDouble() / 3600000.0
+        } else 0.0
+    }
+
+    val totalPendingEstPay = pendingLogs.sumOf { log ->
+        val totalMillis = if (log.timeIn != null && log.timeOut != null) {
+            val total = log.timeOut - log.timeIn
+            val lunch = if (log.lunchOut != null && log.lunchIn != null) log.lunchIn - log.lunchOut else 0L
+            val brk = if (log.breakOut != null && log.breakIn != null) log.breakIn - log.breakOut else 0L
+            (total - lunch - brk).coerceAtLeast(0L)
+        } else 0L
+        (totalMillis.toDouble() / 3600000.0) * log.hourlyRate
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Manager Administrative Approval Summary Banner Cards
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Card 1: Pending Count
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.HourglassEmpty, contentDescription = null, tint = Color(0xFFF59E0B), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("AWAITING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.5f))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${pendingLogs.size} Shifts",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                        color = Color(0xFFF59E0B)
+                    )
+                }
+            }
+
+            // Card 2: Pending Hours
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, Color(0xFF00E5FF).copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Schedule, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("EST. HOURS", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.5f))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${df.format(totalPendingHours)} hrs",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                        color = Color(0xFF00E5FF)
+                    )
+                }
+            }
+
+            // Card 3: Est Pay
+            Card(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                border = BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.3f))
+            ) {
+                Column(modifier = Modifier.padding(10.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AttachMoney, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("EST. PAYROLL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.5f))
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${df.format(totalPendingEstPay)}",
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                        color = Color(0xFF10B981)
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
-        TabRow(
+        // Search and Batch Action Row
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search by employee or date...", fontSize = 12.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Default.Close, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                        }
+                    }
+                },
+                modifier = Modifier.weight(1f).height(48.dp).testTag("approval_search_input"),
+                shape = RoundedCornerShape(12.dp),
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = getAdaptiveColor(0.12f)
+                )
+            )
+
+            if (selectedApprovalTab == 0 && filteredPending.isNotEmpty()) {
+                Button(
+                    onClick = {
+                        filteredPending.forEach { onApprove(it.id) }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
+                    modifier = Modifier.height(48.dp).testTag("batch_approve_all_button")
+                ) {
+                    Icon(Icons.Default.DoneAll, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Approve All", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Navigation Tabs for Status Filtering
+        ScrollableTabRow(
             selectedTabIndex = selectedApprovalTab,
             containerColor = Color.Transparent,
             contentColor = Color(0xFFCCFF00),
-            modifier = Modifier.padding(bottom = 12.dp)
+            edgePadding = 0.dp,
+            divider = {},
+            modifier = Modifier.padding(bottom = 8.dp)
         ) {
             Tab(
                 selected = selectedApprovalTab == 0,
                 onClick = { selectedApprovalTab = 0 },
-                text = { Text("Awaiting Approval (${pendingLogs.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Pending (${pendingLogs.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedApprovalTab == 1,
                 onClick = { selectedApprovalTab = 1 },
-                text = { Text("Audit History (${allLogs.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Approved (${allLogs.count { it.isApproved == "APPROVED" }})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedApprovalTab == 2,
+                onClick = { selectedApprovalTab = 2 },
+                text = { Text("Rejected (${allLogs.count { it.isApproved == "REJECTED" }})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedApprovalTab == 3,
+                onClick = { selectedApprovalTab = 3 },
+                text = { Text("All Audit (${allLogs.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             )
         }
 
-        if (selectedApprovalTab == 0) {
-            if (pendingLogs.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.TaskAlt, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text("No pending timesheets left for review!", fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                        Text("All employee timesheets are cleared.", fontSize = 12.sp, color = getAdaptiveTextColor(0.4f))
+        // Tab Contents
+        when (selectedApprovalTab) {
+            0 -> {
+                if (filteredPending.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.TaskAlt, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("No pending shifts for review!", fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
+                            Text("All employee shift entries are processed.", fontSize = 12.sp, color = getAdaptiveTextColor(0.4f))
+                        }
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(pendingLogs) { log ->
-                        PendingApprovalItem(
-                            log = log,
-                            onApprove = { onApprove(log.id) },
-                            onReject = { onReject(log.id) },
-                            onEdit = { onEdit(log) }
-                        )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredPending, key = { it.id }) { log ->
+                            PendingApprovalItem(
+                                log = log,
+                                onApprove = { onApprove(log.id) },
+                                onReject = { onReject(log.id) },
+                                onEdit = { onEdit(log) }
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            if (allLogs.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("No records found in database.", color = getAdaptiveTextColor(0.4f))
+            1 -> {
+                if (approvedLogs.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No approved shift records found.", color = getAdaptiveTextColor(0.4f))
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(approvedLogs, key = { it.id }) { log ->
+                            AuditHistoryItem(
+                                log = log,
+                                onEdit = { onEdit(log) },
+                                onDelete = { onDelete(log) },
+                                canModify = (userRole == "ADMIN_HR" || userRole == "MANAGER")
+                            )
+                        }
+                    }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(allLogs) { log ->
-                        AuditHistoryItem(
-                            log = log,
-                            onEdit = { onEdit(log) },
-                            onDelete = { onDelete(log) },
-                            canModify = (userRole == "ADMIN_HR" || userRole == "MANAGER")
-                        )
+            }
+            2 -> {
+                if (rejectedLogs.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No rejected shift records found.", color = getAdaptiveTextColor(0.4f))
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(rejectedLogs, key = { it.id }) { log ->
+                            AuditHistoryItem(
+                                log = log,
+                                onEdit = { onEdit(log) },
+                                onDelete = { onDelete(log) },
+                                canModify = (userRole == "ADMIN_HR" || userRole == "MANAGER")
+                            )
+                        }
+                    }
+                }
+            }
+            else -> {
+                if (filteredAll.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No records found in database.", color = getAdaptiveTextColor(0.4f))
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(filteredAll, key = { it.id }) { log ->
+                            AuditHistoryItem(
+                                log = log,
+                                onEdit = { onEdit(log) },
+                                onDelete = { onDelete(log) },
+                                canModify = (userRole == "ADMIN_HR" || userRole == "MANAGER")
+                            )
+                        }
                     }
                 }
             }
@@ -4587,39 +4847,62 @@ fun PendingApprovalItem(
         val total = log.timeOut - log.timeIn
         val lunch = if (log.lunchOut != null && log.lunchIn != null) log.lunchIn - log.lunchOut else 0L
         val brk = if (log.breakOut != null && log.breakIn != null) log.breakIn - log.breakOut else 0L
-        total - lunch - brk
+        (total - lunch - brk).coerceAtLeast(0L)
     } else 0L
     val hours = totalMillis.toDouble() / 3600000.0
+    val isOvertime = hours > 8.0
+    val otHours = if (isOvertime) hours - 8.0 else 0.0
+    val estPay = hours * log.hourlyRate
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("pending_shift_card_${log.id}"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, getAdaptiveColor(0.06f))
+        border = BorderStroke(1.dp, Color(0xFFF59E0B).copy(alpha = 0.25f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // Employee Header Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 15.sp, color = com.example.ui.theme.AppTextColor)
-                    Text(text = "Date: ${log.date}", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape)
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 15.sp, color = com.example.ui.theme.AppTextColor)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = getAdaptiveTextColor(0.4f), modifier = Modifier.size(11.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(text = "Shift Date: ${log.date}", fontSize = 11.sp, color = getAdaptiveTextColor(0.5f), fontWeight = FontWeight.Medium)
+                        }
+                    }
                 }
+                
                 Box(
                     modifier = Modifier
-                        .background(Color(0xFFF59E0B).copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                        .border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                        .background(Color(0xFFF59E0B).copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFFF59E0B), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("PENDING APPROVAL", color = Color(0xFFF59E0B), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Text("PENDING", color = Color(0xFFF59E0B), fontSize = 10.sp, fontWeight = FontWeight.Black)
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = getAdaptiveTextColor(0.06f))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Timestamps row
+            // Timestamps Breakdown Grid
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -4629,34 +4912,78 @@ fun PendingApprovalItem(
                     Text(text = formatTimestamp(log.timeIn), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
                 Column {
-                    Text(text = "LUNCH TIME", fontSize = 9.sp, color = getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
+                    Text(text = "LUNCH DURATION", fontSize = 9.sp, color = getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
                     val lunchMins = if (log.lunchOut != null && log.lunchIn != null) (log.lunchIn - log.lunchOut) / 60000 else 0
-                    Text(text = "${lunchMins}M", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
+                    Text(text = "${lunchMins} mins", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
                 Column {
+                    Text(text = "BREAK DURATION", fontSize = 9.sp, color = getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
+                    val breakMins = if (log.breakOut != null && log.breakIn != null) (log.breakIn - log.breakOut) / 60000 else 0
+                    Text(text = "${breakMins} mins", fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
+                }
+                Column(horizontalAlignment = Alignment.End) {
                     Text(text = "TIME OUT", fontSize = 9.sp, color = getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
                     Text(text = formatTimestamp(log.timeOut), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, color = com.example.ui.theme.AppTextColor)
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Hours & Payroll Metric Card
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(getAdaptiveColor(0.03f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color(0xFFCCFF00), modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text("TOTAL CALCULATED", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.4f))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "${df.format(hours)} HRS", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFFCCFF00))
+                            if (isOvertime) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "(+${df.format(otHours)}h OT)",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF59E0B)
+                                )
+                            }
+                        }
+                    }
+                }
+
                 Column(horizontalAlignment = Alignment.End) {
-                    Text(text = "CALCULATED", fontSize = 9.sp, color = getAdaptiveTextColor(0.4f), fontWeight = FontWeight.Bold)
-                    Text(text = "${df.format(hours)} HRS", fontSize = 13.sp, fontWeight = FontWeight.Black, color = Color(0xFFCCFF00))
+                    Text("ESTIMATED PAY", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.4f))
+                    Text(
+                        text = "${df.format(estPay)} (@ ${df.format(log.hourlyRate)}/h)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF10B981)
+                    )
                 }
             }
 
-            // GPS verified location
+            // GPS Verified Location Badge
             if (log.gpsLocationName != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
+                        .fillMaxWidth()
                         .background(Color(0xFF00E5FF).copy(alpha = 0.08f), RoundedCornerShape(8.dp))
                         .border(1.dp, Color(0xFF00E5FF).copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp)
                 ) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "GPS: ${log.gpsLocationName} [${df.format(log.gpsLatitude ?: 0.0)}, ${df.format(log.gpsLongitude ?: 0.0)}]",
+                        text = "GPS Verified: ${log.gpsLocationName} (${df.format(log.gpsLatitude ?: 0.0)}, ${df.format(log.gpsLongitude ?: 0.0)})",
                         fontSize = 10.sp,
                         color = Color(0xFF00E5FF),
                         fontWeight = FontWeight.Bold
@@ -4668,18 +4995,19 @@ fun PendingApprovalItem(
             HorizontalDivider(color = getAdaptiveTextColor(0.08f))
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action row
+            // Action Buttons Row (Manager Approval Controls)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
                     onClick = onEdit,
-                    modifier = Modifier.height(34.dp)
+                    modifier = Modifier.height(38.dp).testTag("modify_log_action_${log.id}")
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Modify", fontSize = 12.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
+                    Text("Adjust", fontSize = 12.sp, color = Color(0xFF00E5FF), fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
@@ -4689,9 +5017,11 @@ fun PendingApprovalItem(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF43F5E)),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp),
-                    modifier = Modifier.height(34.dp).testTag("reject_log_action")
+                    modifier = Modifier.height(38.dp).testTag("reject_log_action_${log.id}").testTag("reject_log_action")
                 ) {
-                    Text("Reject", fontSize = 12.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
+                    Icon(Icons.Default.Close, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Reject", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
                 }
 
                 Button(
@@ -4699,9 +5029,11 @@ fun PendingApprovalItem(
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 14.dp),
-                    modifier = Modifier.height(34.dp).testTag("approve_log_action")
+                    modifier = Modifier.height(38.dp).testTag("approve_log_action_${log.id}").testTag("approve_log_action")
                 ) {
-                    Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
+                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Approve", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
                 }
             }
         }
@@ -4715,25 +5047,64 @@ fun AuditHistoryItem(
     onDelete: () -> Unit,
     canModify: Boolean
 ) {
+    val isApproved = log.isApproved == "APPROVED"
+    val isRejected = log.isApproved == "REJECTED"
+    val badgeColor = when {
+        isApproved -> Color(0xFF10B981)
+        isRejected -> Color(0xFFF43F5E)
+        else -> Color(0xFFF59E0B)
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().testTag("audit_history_card_${log.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(1.dp, getAdaptiveColor(0.04f))
+        border = BorderStroke(1.dp, badgeColor.copy(alpha = 0.2f))
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(14.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = log.employeeName, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = com.example.ui.theme.AppTextColor)
-                Text(text = "${log.date} | Decision: ${log.isApproved}", fontSize = 11.sp, color = getAdaptiveTextColor(0.4f))
-                if (log.rejectionReason != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = log.employeeName, fontWeight = FontWeight.Black, fontSize = 14.sp, color = com.example.ui.theme.AppTextColor)
+                    Text(text = "Date: ${log.date}", fontSize = 11.sp, color = getAdaptiveTextColor(0.5f))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .border(1.dp, badgeColor, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
                     Text(
-                        text = "Policy Infraction: ${log.rejectionReason}",
+                        text = log.isApproved,
+                        color = badgeColor,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                }
+            }
+
+            if (log.rejectionReason != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF43F5E).copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFFF43F5E).copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color(0xFFF43F5E), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Infraction Note: ${log.rejectionReason}",
                         fontSize = 11.sp,
                         color = Color(0xFFF43F5E),
                         fontWeight = FontWeight.Medium
@@ -4742,11 +5113,16 @@ fun AuditHistoryItem(
             }
 
             if (canModify) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit", tint = Color(0xFF00E5FF), modifier = Modifier.size(16.dp))
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
+                    IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFF43F5E), modifier = Modifier.size(16.dp))
                     }
                 }
@@ -4850,6 +5226,224 @@ fun LocalHolidayCalendarScreen(
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
+                    }
+                }
+            }
+        }
+
+        // --- GOOGLE CALENDAR API LOCAL HOLIDAY ANALYTICS & SYNC PANEL ---
+        val gcalAnalysis = viewModel.gcalHolidayAnalysis.value
+        val isSyncing = viewModel.isSyncingGcalHolidays.value
+        val gcalSyncedItems = viewModel.gcalSyncedHolidays.value
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            border = BorderStroke(1.dp, Color(0xFF4285F4).copy(alpha = 0.3f))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF4285F4).copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudSync,
+                                contentDescription = "Google Calendar Sync",
+                                tint = Color(0xFF4285F4),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "GOOGLE CALENDAR API ENGINE",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 10.sp,
+                                color = Color(0xFF4285F4),
+                                letterSpacing = 1.2.sp
+                            )
+                            Text(
+                                text = "Local Holiday Classification & AI Payroll Analysis",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = com.example.ui.theme.AppTextColor
+                            )
+                        }
+                    }
+
+                    if (viewModel.gcalSyncLastCompleted.value != null) {
+                        Text(
+                            text = "Synced: ${viewModel.gcalSyncLastCompleted.value}",
+                            fontSize = 9.sp,
+                            color = getAdaptiveTextColor(0.5f),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.syncAndAnalyzeGoogleCalendarHolidays() },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSyncing,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        if (isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Analyzing API...", fontSize = 11.sp, color = Color.White)
+                        } else {
+                            Icon(Icons.Default.Sync, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Sync Google Calendar", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+
+                    if (gcalAnalysis != null) {
+                        OutlinedButton(
+                            onClick = {
+                                val pdfFile = com.example.data.GoogleCalendarHolidayService.generateHolidayAnalysisPdf(
+                                    context = context,
+                                    summary = gcalAnalysis,
+                                    holidays = gcalSyncedItems
+                                )
+                                if (pdfFile != null && pdfFile.exists()) {
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        pdfFile
+                                    )
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                        setDataAndType(uri, "application/pdf")
+                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    try {
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "PDF Report generated: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(0.9f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, Color(0xFF10B981))
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Export PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        }
+                    }
+                }
+
+                // Analytics KPI row if analyzed
+                if (gcalAnalysis != null) {
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(getAdaptiveColor(0.04f), RoundedCornerShape(12.dp))
+                                .border(1.dp, getAdaptiveColor(0.08f), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("REGULAR (200%)", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                Text("${gcalAnalysis.regularHolidaysCount} Days", fontSize = 14.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(getAdaptiveColor(0.04f), RoundedCornerShape(12.dp))
+                                .border(1.dp, getAdaptiveColor(0.08f), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("SPECIAL (130%)", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF3B82F6))
+                                Text("${gcalAnalysis.specialNonWorkingCount} Days", fontSize = 14.sp, fontWeight = FontWeight.Black, color = com.example.ui.theme.AppTextColor)
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .weight(1.1f)
+                                .background(Color(0xFF10B981).copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                                .border(1.dp, Color(0xFF10B981).copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text("EST. LIABILITY", fontSize = 8.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                                Text("+${String.format("%.1f", gcalAnalysis.totalEstPayrollLiabilityIncreasePct)}%", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color(0xFF10B981))
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // AI DOLE Holiday Compliance Executive Insights Box
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(getAdaptiveColor(0.03f), RoundedCornerShape(12.dp))
+                            .border(1.dp, getAdaptiveColor(0.08f), RoundedCornerShape(12.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Psychology,
+                                    contentDescription = null,
+                                    tint = Color(0xFF8B5CF6),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "AI DOLE HOLIDAY COMPLIANCE AUDIT",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF8B5CF6),
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = gcalAnalysis.aiExecutiveSummary,
+                                fontSize = 10.5.sp,
+                                color = getAdaptiveTextColor(0.85f),
+                                lineHeight = 15.sp
+                            )
+                        }
                     }
                 }
             }
@@ -5016,10 +5610,12 @@ fun LocalHolidayCalendarScreen(
                 
                 if (employeeShift != null) {
                     val shiftName = employeeShift.shiftName
-                    val shiftColor = when (shiftName) {
-                        "Manila Dev Shift" -> Color(0xFF10B981) // Green
-                        "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
-                        "Night Ops" -> Color(0xFF8B5CF6) // Purple
+                    val isFreeShift = shiftName == "Free Custom Shift" || employeeShift.customStartTime != null
+                    val shiftColor = when {
+                        isFreeShift -> Color(0xFFF59E0B) // Amber
+                        shiftName == "Manila Dev Shift" -> Color(0xFF10B981) // Green
+                        shiftName == "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
+                        shiftName == "Night Ops" -> Color(0xFF8B5CF6) // Purple
                         else -> Color(0xFF9CA3AF) // Gray
                     }
 
@@ -5041,13 +5637,19 @@ fun LocalHolidayCalendarScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
                                 Text(
-                                    text = "ASSIGNED SHIFT: ${shiftName.uppercase()}",
+                                    text = if (isFreeShift) "ASSIGNED SHIFT: CUSTOM FREE (9H BLOCK)" else "ASSIGNED SHIFT: ${shiftName.uppercase()}",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
                                     color = shiftColor
                                 )
                                 Text(
-                                    text = when (shiftName) {
+                                    text = if (isFreeShift) {
+                                        val start = employeeShift.customStartTime ?: "10:30 AM"
+                                        val end = employeeShift.customEndTime ?: "07:30 PM"
+                                        val brk = employeeShift.customBreakTime ?: "02:30 PM"
+                                        val overnight = if (employeeShift.isOvernight) " [Overnight]" else ""
+                                        "$start - $end • (8h Work • 1h Break at $brk)$overnight"
+                                    } else when (shiftName) {
                                         "Manila Dev Shift" -> "09:00 AM - 06:00 PM • Standard Compliance Sync"
                                         "Indore Day Flex" -> "08:00 AM - 05:00 PM • Flex Hours Rule"
                                         "Night Ops" -> "09:00 PM - 06:00 AM • Night Differential Bonus"
@@ -5056,6 +5658,48 @@ fun LocalHolidayCalendarScreen(
                                     fontSize = 10.sp,
                                     color = getAdaptiveTextColor(0.6f)
                                 )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                // Visual Timeline Track Bar with Red Break Notch
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(12.dp)
+                                        .clip(RoundedCornerShape(3.dp))
+                                        .background(getAdaptiveColor(0.1f)),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // 4h Work
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(4f)
+                                            .fillMaxHeight()
+                                            .background(shiftColor, RoundedCornerShape(topStart = 3.dp, bottomStart = 3.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("WORK", fontSize = 6.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                    }
+                                    // 1h Unpaid Break Notch (Coral Red)
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFEF4444), RoundedCornerShape(1.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("BREAK", fontSize = 6.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                    }
+                                    // 4h Work
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(4f)
+                                            .fillMaxHeight()
+                                            .background(shiftColor, RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("WORK", fontSize = 6.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                    }
+                                }
                             }
                         }
                     }

@@ -7356,6 +7356,8 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
             )
         }
 
+
+
         if (isStaff) {
             Spacer(modifier = Modifier.height(10.dp))
             Row(
@@ -7559,7 +7561,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
         "2026-06-30" to "Tue 30"
     )
     
-    val shiftTypes = listOf("Manila Dev Shift", "Indore Day Flex", "Night Ops", "Off")
+    val shiftTypes = listOf("Manila Dev Shift", "Indore Day Flex", "Night Ops", "Free Custom Shift", "Off")
     
     val filteredProfiles = profiles.filter {
         selectedDeptFilter == "All" || it.department == selectedDeptFilter
@@ -7570,6 +7572,15 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
     var viewMode by remember { mutableStateOf("gantt") }
     var activeSubTab by remember { mutableStateOf("schedule") } // "schedule" or "holidays"
     
+    // Custom Time Picker Dialog State
+    var showCustomTimePicker by remember { mutableStateOf(false) }
+    var customPickerEmpName by remember { mutableStateOf("") }
+    var customPickerEmpDept by remember { mutableStateOf("") }
+    var customPickerDateKey by remember { mutableStateOf("") }
+    var customStartHour by remember { mutableIntStateOf(10) } // 10:30 AM default
+    var customStartMin by remember { mutableIntStateOf(30) }
+    var customBreakOffsetHours by remember { mutableDoubleStateOf(4.0) }
+
     // Real Drag and Drop Gesture State
     var isDraggingShift by remember { mutableStateOf(false) }
     var dragShiftName by remember { mutableStateOf<String?>(null) }
@@ -7589,11 +7600,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                 }
                 val shiftName = activeSchedule?.shiftName ?: "Off"
                 when (shiftName) {
-                    "Manila Dev Shift" -> {
-                        morning++
-                        afternoon++
-                    }
-                    "Indore Day Flex" -> {
+                    "Manila Dev Shift", "Indore Day Flex", "Free Custom Shift" -> {
                         morning++
                         afternoon++
                     }
@@ -8023,10 +8030,12 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                         }
                                         val shiftName = activeSchedule?.shiftName ?: "Off"
                                         
-                                        val cellColor = when (shiftName) {
-                                            "Manila Dev Shift" -> Color(0xFF10B981) // Green
-                                            "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
-                                            "Night Ops" -> Color(0xFF8B5CF6) // Purple
+                                        val isCustomShift = shiftName == "Free Custom Shift" || activeSchedule?.customStartTime != null
+                                        val cellColor = when {
+                                            isCustomShift -> Color(0xFFF59E0B) // Amber
+                                            shiftName == "Manila Dev Shift" -> Color(0xFF10B981) // Green
+                                            shiftName == "Indore Day Flex" -> Color(0xFF00E5FF) // Cyan
+                                            shiftName == "Night Ops" -> Color(0xFF8B5CF6) // Purple
                                             else -> Color(0xFF9CA3AF) // Gray
                                         }
 
@@ -8052,6 +8061,11 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                             "Locked: You cannot schedule ${emp.name} in ${emp.department}.", 
                                                             Toast.LENGTH_SHORT
                                                         ).show()
+                                                    } else if (activeShiftTemplate == "Free Custom Shift") {
+                                                        customPickerEmpName = emp.name
+                                                        customPickerEmpDept = emp.department
+                                                        customPickerDateKey = dateKey
+                                                        showCustomTimePicker = true
                                                     } else {
                                                         // Apply active template click paint immediately!
                                                         viewModel.updateEmployeeShift(
@@ -8083,10 +8097,11 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
                                                         Text(
-                                                            text = when (shiftName) {
-                                                                "Manila Dev Shift" -> "DEV"
-                                                                "Indore Day Flex" -> "FLEX"
-                                                                "Night Ops" -> "NIGHT"
+                                                            text = when {
+                                                                isCustomShift -> "FREE"
+                                                                shiftName == "Manila Dev Shift" -> "DEV"
+                                                                shiftName == "Indore Day Flex" -> "FLEX"
+                                                                shiftName == "Night Ops" -> "NIGHT"
                                                                 else -> "OFF"
                                                             },
                                                             fontSize = 8.sp,
@@ -8094,10 +8109,11 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                             color = cellColor
                                                         )
                                                         Text(
-                                                            text = when (shiftName) {
-                                                                "Manila Dev Shift" -> "09-18"
-                                                                "Indore Day Flex" -> "08-17"
-                                                                "Night Ops" -> "21-06"
+                                                            text = when {
+                                                                isCustomShift -> "${activeSchedule?.customStartTime?.take(5) ?: "10:30"}-${activeSchedule?.customEndTime?.take(5) ?: "19:30"}"
+                                                                shiftName == "Manila Dev Shift" -> "09-18"
+                                                                shiftName == "Indore Day Flex" -> "08-17"
+                                                                shiftName == "Night Ops" -> "21-06"
                                                                 else -> "REST"
                                                             },
                                                             fontSize = 7.sp,
@@ -8105,30 +8121,49 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                         )
                                                     }
 
-                                                    // Visual 24-hour horizontal track & pill
+                                                    // Visual 24-hour horizontal track with bright 1h Break Notch
                                                     Row(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
-                                                            .height(5.dp)
-                                                            .background(getAdaptiveColor(0.05f), RoundedCornerShape(2.5.dp))
+                                                            .height(6.dp)
+                                                            .background(getAdaptiveColor(0.06f), RoundedCornerShape(3.dp))
                                                             .padding(horizontal = 1.dp),
                                                         verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        when (shiftName) {
+                                                        val breakNotchColor = Color(0xFFEF4444) // Vibrant Coral Red
+                                                        if (isCustomShift) {
+                                                            val startMins = com.example.ui.viewmodel.CustomShiftCalculator.parseTimeStringToMinutes(activeSchedule?.customStartTime ?: "10:30 AM")
+                                                            val startH = (startMins / 60f).coerceIn(0f, 23f)
+                                                            Spacer(modifier = Modifier.weight(maxOf(0.1f, startH)))
+                                                            // 4h Work segment
+                                                            Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
+                                                            // 1h Shaded Break Notch (Red)
+                                                            Box(modifier = Modifier.weight(1f).fillMaxHeight().background(breakNotchColor, RoundedCornerShape(1.dp)))
+                                                            // 4h Work segment
+                                                            Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
+                                                            val remH = maxOf(0.1f, 24f - (startH + 9f))
+                                                            Spacer(modifier = Modifier.weight(remH))
+                                                        } else when (shiftName) {
                                                             "Indore Day Flex" -> {
                                                                 Spacer(modifier = Modifier.weight(8f))
-                                                                Box(modifier = Modifier.weight(9f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
+                                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(breakNotchColor, RoundedCornerShape(1.dp)))
+                                                                Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
                                                                 Spacer(modifier = Modifier.weight(7f))
                                                             }
                                                             "Manila Dev Shift" -> {
                                                                 Spacer(modifier = Modifier.weight(9f))
-                                                                Box(modifier = Modifier.weight(9f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
+                                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(breakNotchColor, RoundedCornerShape(1.dp)))
+                                                                Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
                                                                 Spacer(modifier = Modifier.weight(6f))
                                                             }
                                                             "Night Ops" -> {
-                                                                Box(modifier = Modifier.weight(6f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
+                                                                Box(modifier = Modifier.weight(1f).fillMaxHeight().background(breakNotchColor, RoundedCornerShape(1.dp)))
+                                                                Box(modifier = Modifier.weight(4f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
                                                                 Spacer(modifier = Modifier.weight(15f))
-                                                                Box(modifier = Modifier.weight(3f).fillMaxHeight().background(cellColor, RoundedCornerShape(2.5.dp)))
+                                                                Box(modifier = Modifier.weight(3f).fillMaxHeight().background(cellColor, RoundedCornerShape(1.5.dp)))
                                                             }
                                                             else -> {
                                                                 Box(modifier = Modifier.weight(24f).height(1.dp).background(getAdaptiveColor(0.15f)))
@@ -8139,16 +8174,24 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                             } else {
                                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                     Text(
-                                                        text = when (shiftName) {
-                                                            "Manila Dev Shift" -> "DEV"
-                                                            "Indore Day Flex" -> "FLEX"
-                                                            "Night Ops" -> "NIGHT"
+                                                        text = when {
+                                                            isCustomShift -> "FREE"
+                                                            shiftName == "Manila Dev Shift" -> "DEV"
+                                                            shiftName == "Indore Day Flex" -> "FLEX"
+                                                            shiftName == "Night Ops" -> "NIGHT"
                                                             else -> "OFF"
                                                         },
                                                         fontSize = 9.sp,
                                                         fontWeight = FontWeight.ExtraBold,
                                                         color = cellColor
                                                     )
+                                                    if (isCustomShift) {
+                                                        Text(
+                                                            text = "${activeSchedule?.customStartTime?.take(5) ?: "10:30"}-${activeSchedule?.customEndTime?.take(5) ?: "19:30"}",
+                                                            fontSize = 7.sp,
+                                                            color = getAdaptiveTextColor(0.6f)
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
@@ -8456,6 +8499,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                         shiftTypes.forEach { shift ->
                             val isSelected = activeShiftTemplate == shift
                             val color = when (shift) {
+                                "Free Custom Shift" -> Color(0xFFF59E0B) // Amber
                                 "Manila Dev Shift" -> Color(0xFF10B981)
                                 "Indore Day Flex" -> Color(0xFF00E5FF)
                                 "Night Ops" -> Color(0xFF8B5CF6)
@@ -8490,18 +8534,25 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                                 // When they drag and release, we perform drop simulation
                                                 val targetEmp = filteredProfiles.firstOrNull { canEdit(it.department) }
                                                 if (targetEmp != null) {
-                                                    viewModel.updateEmployeeShift(
-                                                        targetEmp.name,
-                                                        targetEmp.department,
-                                                        "2026-06-29",
-                                                        shift,
-                                                        currentUserName
-                                                    )
-                                                    Toast.makeText(
-                                                        context, 
-                                                        "Dropped & Assigned: $shift to ${targetEmp.name} on June 29!", 
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
+                                                    if (shift == "Free Custom Shift") {
+                                                        customPickerEmpName = targetEmp.name
+                                                        customPickerEmpDept = targetEmp.department
+                                                        customPickerDateKey = "2026-06-29"
+                                                        showCustomTimePicker = true
+                                                    } else {
+                                                        viewModel.updateEmployeeShift(
+                                                            targetEmp.name,
+                                                            targetEmp.department,
+                                                            "2026-06-29",
+                                                            shift,
+                                                            currentUserName
+                                                        )
+                                                        Toast.makeText(
+                                                            context, 
+                                                            "Dropped & Assigned: $shift to ${targetEmp.name} on June 29!", 
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+                                                    }
                                                 }
                                             }
                                         )
@@ -8519,6 +8570,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = when(shift) {
+                                            "Free Custom Shift" -> "CUSTOM"
                                             "Manila Dev Shift" -> "DEV"
                                             "Indore Day Flex" -> "FLEX"
                                             "Night Ops" -> "NIGHT"
@@ -8530,6 +8582,7 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
                                     )
                                     Text(
                                         text = when(shift) {
+                                            "Free Custom Shift" -> "9H FREE"
                                             "Manila Dev Shift" -> "09-18"
                                             "Indore Day Flex" -> "08-17"
                                             "Night Ops" -> "21-06"
@@ -8595,6 +8648,294 @@ fun SupervisorScheduleScreen(viewModel: TimeTrackerViewModel) {
         }
     } else {
         PhilippineHolidayCalendarComponent(viewModel = viewModel)
+    }
+
+    // --- CUSTOM SHIFT 9-HOUR TIME PICKER DIALOG ---
+    if (showCustomTimePicker) {
+        val calcResult = com.example.ui.viewmodel.CustomShiftCalculator.calculate9HourBlock(
+            customStartHour,
+            customStartMin,
+            customBreakOffsetHours
+        )
+
+        AlertDialog(
+            onDismissRequest = { showCustomTimePicker = false },
+            title = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⚙️ Custom 9-Hour Shift Builder", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = NeonGreen)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Assigning to $customPickerEmpName ($customPickerEmpDept) on $customPickerDateKey",
+                        fontSize = 11.sp,
+                        color = getAdaptiveTextColor(0.6f)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Quick Preset Buttons
+                    Text("Select Start Time Preset or Adjust:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.8f))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val presets = listOf(
+                            "08:00 AM" to (8 to 0),
+                            "09:30 AM" to (9 to 30),
+                            "10:30 AM" to (10 to 30),
+                            "01:00 PM" to (13 to 0),
+                            "04:00 PM" to (16 to 0),
+                            "09:00 PM" to (21 to 0),
+                            "10:00 PM" to (22 to 0)
+                        )
+                        presets.forEach { (label, hourMin) ->
+                            val isSel = customStartHour == hourMin.first && customStartMin == hourMin.second
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSel) Color(0xFFF59E0B) else getAdaptiveColor(0.08f))
+                                    .clickable {
+                                        customStartHour = hourMin.first
+                                        customStartMin = hourMin.second
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSel) Color.Black else getAdaptiveTextColor(0.8f)
+                                )
+                            }
+                        }
+                    }
+
+                    // Manual Hour & Minute Adjuster
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
+                        border = BorderStroke(1.dp, getAdaptiveColor(0.12f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Shift Start Time:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    text = calcResult.startTimeStr,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFFF59E0B)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Hour: ", fontSize = 11.sp)
+                                    IconButton(
+                                        onClick = { customStartHour = (customStartHour - 1 + 24) % 24 },
+                                        modifier = Modifier.size(28.dp)
+                                    ) { Text("-", fontWeight = FontWeight.Bold) }
+                                    Text("${customStartHour.toString().padStart(2, '0')}:00", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    IconButton(
+                                        onClick = { customStartHour = (customStartHour + 1) % 24 },
+                                        modifier = Modifier.size(28.dp)
+                                    ) { Text("+", fontWeight = FontWeight.Bold) }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Min: ", fontSize = 11.sp)
+                                    IconButton(
+                                        onClick = { customStartMin = (customStartMin - 15 + 60) % 60 },
+                                        modifier = Modifier.size(28.dp)
+                                    ) { Text("-15", fontSize = 10.sp) }
+                                    Text("${customStartMin.toString().padStart(2, '0')}", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    IconButton(
+                                        onClick = { customStartMin = (customStartMin + 15) % 60 },
+                                        modifier = Modifier.size(28.dp)
+                                    ) { Text("+15", fontSize = 10.sp) }
+                                }
+                            }
+                        }
+                    }
+
+                    // Break Offset Setting (4.0 Hours default)
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("1h Break Placement Offset:", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("${customBreakOffsetHours}h after start", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NeonGreen)
+                        }
+                        Slider(
+                            value = customBreakOffsetHours.toFloat(),
+                            onValueChange = { customBreakOffsetHours = it.toDouble() },
+                            valueRange = 2.0f..6.0f,
+                            steps = 7, // 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0
+                            colors = SliderDefaults.colors(
+                                thumbColor = Color(0xFFF59E0B),
+                                activeTrackColor = Color(0xFFF59E0B),
+                                inactiveTrackColor = getAdaptiveColor(0.2f)
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    // Calculated 9-Hour Shift Summary Card
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFF59E0B).copy(alpha = 0.1f))
+                            .border(1.dp, Color(0xFFF59E0B).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                            .padding(12.dp)
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("CALCULATED 9H BLOCK", fontSize = 10.sp, fontWeight = FontWeight.Black, color = Color(0xFFF59E0B))
+                                if (calcResult.isOvernight) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color(0xFF8B5CF6), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text("OVERNIGHT", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Shift Span: ${calcResult.summaryText}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = getAdaptiveTextColor(0.9f)
+                            )
+                            Text(
+                                text = "Unpaid Break: ${calcResult.breakStartTimeStr} - ${calcResult.breakEndTimeStr} (1 Hour)",
+                                fontSize = 11.sp,
+                                color = Color(0xFFEF4444),
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Paid Work Hours: 8.0 Hours total",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonGreen
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            // High Contrast Visual Timeline Track with Red Break Notch
+                            Text("VISUAL TIMELINE BREAK PREVIEW:", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = getAdaptiveTextColor(0.6f))
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(getAdaptiveColor(0.12f))
+                                    .padding(2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Work segment 1
+                                Box(
+                                    modifier = Modifier
+                                        .weight(customBreakOffsetHours.toFloat())
+                                        .fillMaxHeight()
+                                        .background(Color(0xFFF59E0B), RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("WORK", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                }
+                                // Break notch (Vibrant Red)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .background(Color(0xFFEF4444), RoundedCornerShape(2.dp)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("☕ BREAK", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                }
+                                // Work segment 2
+                                val remWork = (8.0 - customBreakOffsetHours).toFloat()
+                                if (remWork > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(remWork)
+                                            .fillMaxHeight()
+                                            .background(Color(0xFFF59E0B), RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("WORK", fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.Black)
+                                    }
+                                }
+                            }
+                            
+                            // Timeline Time Milestones
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(calcResult.startTimeStr, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                                Text("Break: ${calcResult.breakStartTimeStr}", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                                Text(calcResult.endTimeStr, fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFF59E0B))
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateEmployeeShift(
+                            customPickerEmpName,
+                            customPickerEmpDept,
+                            customPickerDateKey,
+                            "Free Custom Shift",
+                            currentUserName,
+                            customStartTime = calcResult.startTimeStr,
+                            customBreakTime = calcResult.breakStartTimeStr,
+                            customEndTime = calcResult.endTimeStr,
+                            isOvernight = calcResult.isOvernight
+                        )
+                        Toast.makeText(
+                            context,
+                            "Assigned Custom Shift: ${calcResult.startTimeStr} - ${calcResult.endTimeStr} to $customPickerEmpName!",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        showCustomTimePicker = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF59E0B))
+                ) {
+                    Text("Confirm & Assign Shift", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomTimePicker = false }) {
+                    Text("Cancel", color = getAdaptiveTextColor(0.6f))
+                }
+            }
+        )
     }
 }
 }

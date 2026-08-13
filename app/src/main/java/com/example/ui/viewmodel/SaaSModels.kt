@@ -154,8 +154,101 @@ data class TeamSchedule(
     val employeeName: String,
     val department: String,
     val date: String, // format "YYYY-MM-DD", e.g., "2026-06-29"
-    val shiftName: String // "Manila Dev Shift", "Indore Day Flex", "Night Ops", "Off"
+    val shiftName: String, // "Manila Dev Shift", "Indore Day Flex", "Night Ops", "Free Custom Shift", "Off"
+    val customStartTime: String? = null, // e.g. "10:30 AM"
+    val customBreakTime: String? = null, // e.g. "02:30 PM"
+    val customEndTime: String? = null,   // e.g. "07:30 PM"
+    val isOvernight: Boolean = false
 )
+
+object CustomShiftCalculator {
+    fun parseTimeToMinutes(hour24: Int, minute: Int): Int {
+        return (hour24 * 60 + minute) % 1440
+    }
+
+    fun parseTimeStringToMinutes(timeStr: String): Int {
+        val clean = timeStr.trim().uppercase(java.util.Locale.US)
+        val isPm = clean.contains("PM")
+        val isAm = clean.contains("AM")
+        val rawTime = clean.replace("AM", "").replace("PM", "").trim()
+        val parts = rawTime.split(":")
+        if (parts.size >= 2) {
+            var h = parts[0].trim().toIntOrNull() ?: 9
+            val m = parts[1].trim().toIntOrNull() ?: 0
+            if (isPm && h < 12) h += 12
+            if (isAm && h == 12) h = 0
+            return (h * 60 + m) % 1440
+        }
+        return 540 // Default 9:00 AM (540 mins)
+    }
+
+    fun formatMinutesTo12Hr(totalMinutes: Int): String {
+        val minsInDay = (totalMinutes % 1440 + 1440) % 1440
+        val hour24 = minsInDay / 60
+        val minute = minsInDay % 60
+        val isPm = hour24 >= 12
+        val hour12 = when (val h = hour24 % 12) {
+            0 -> 12
+            else -> h
+        }
+        return String.format(java.util.Locale.US, "%02d:%02d %s", hour12, minute, if (isPm) "PM" else "AM")
+    }
+
+    data class ShiftBlockResult(
+        val startTimeStr: String,       // e.g. "10:30 AM"
+        val breakStartTimeStr: String,  // e.g. "02:30 PM"
+        val breakEndTimeStr: String,    // e.g. "03:30 PM"
+        val endTimeStr: String,         // e.g. "07:30 PM"
+        val startMins: Int,
+        val breakStartMins: Int,
+        val endMins: Int,
+        val isOvernight: Boolean,
+        val summaryText: String,         // "10:30 AM - 07:30 PM"
+        val subText: String              // "(8h Work • 1h Break at 02:30 PM)"
+    )
+
+    fun calculate9HourBlock(
+        startHour24: Int,
+        startMinute: Int,
+        breakOffsetHours: Double = 4.0 // default 4 hours after start
+    ): ShiftBlockResult {
+        val startMins = parseTimeToMinutes(startHour24, startMinute)
+        val breakStartMins = (startMins + (breakOffsetHours * 60).toInt())
+        val breakEndMins = breakStartMins + 60
+        val totalEndMins = startMins + (9 * 60) // 8h work + 1h break = 9h block
+
+        val isOvernight = (startMins + 9 * 60) >= 1440
+
+        val startStr = formatMinutesTo12Hr(startMins)
+        val breakStartStr = formatMinutesTo12Hr(breakStartMins)
+        val breakEndStr = formatMinutesTo12Hr(breakEndMins)
+        val endStr = formatMinutesTo12Hr(totalEndMins)
+
+        val summaryText = "$startStr - $endStr"
+        val overnightLabel = if (isOvernight) " [Overnight]" else ""
+        val subText = "(8h Work • 1h Break at $breakStartStr)$overnightLabel"
+
+        return ShiftBlockResult(
+            startTimeStr = startStr,
+            breakStartTimeStr = breakStartStr,
+            breakEndTimeStr = breakEndStr,
+            endTimeStr = endStr,
+            startMins = startMins,
+            breakStartMins = breakStartMins,
+            endMins = totalEndMins,
+            isOvernight = isOvernight,
+            summaryText = summaryText,
+            subText = subText
+        )
+    }
+
+    fun calculate9HourBlockFromTimeStr(timeStr: String, breakOffsetHours: Double = 4.0): ShiftBlockResult {
+        val totalMins = parseTimeStringToMinutes(timeStr)
+        val h = totalMins / 60
+        val m = totalMins % 60
+        return calculate9HourBlock(h, m, breakOffsetHours)
+    }
+}
 
 // --- COMPLIANCE WORKFLOW MODELS ---
 
