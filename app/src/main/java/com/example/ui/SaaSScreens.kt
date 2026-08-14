@@ -59,6 +59,7 @@ import androidx.core.content.ContextCompat
 import com.example.data.database.TimeLogEntity
 import com.example.data.backend.*
 import com.example.ui.viewmodel.*
+import com.example.ui.components.HRBulletinSection
 import com.google.accompanist.permissions.*
 import kotlinx.coroutines.delay
 import android.graphics.Canvas
@@ -7384,47 +7385,9 @@ fun SaaSHubScreen(viewModel: TimeTrackerViewModel) {
             }
         }
 
-        // BULLETIN ANNOUNCEMENTS SECTION
+        // 3D FANNING BULLETIN & WELLNESS SECTION
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Company Bulletins & Announcements",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = com.example.ui.theme.AppTextColor,
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
-
-        if (announcements.isEmpty()) {
-            Text(
-                "No announcements published yet.",
-                color = getAdaptiveTextColor(0.5f),
-                fontSize = 11.sp,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        } else {
-            announcements.forEach { bulletin ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = CardGreyBg),
-                    border = BorderStroke(1.dp, BorderGrey)
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(bulletin.title, color = NeonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(bulletin.date, color = getAdaptiveTextColor(0.4f), fontSize = 9.sp)
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(bulletin.content, color = com.example.ui.theme.AppTextColor, fontSize = 11.sp)
-                    }
-                }
-            }
-        }
+        HRBulletinSection(viewModel = viewModel)
     }
 }
 

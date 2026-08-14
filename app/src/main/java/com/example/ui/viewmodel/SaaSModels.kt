@@ -42,11 +42,31 @@ data class TaskAssignment(
     val status: String = "PENDING" // PENDING, COMPLETED
 )
 
+data class BulletinComment(
+    val id: String = UUID.randomUUID().toString(),
+    val authorName: String,
+    val authorRole: String = "EMPLOYEE",
+    val text: String,
+    val timestamp: String
+)
+
 data class Announcement(
     val id: String = UUID.randomUUID().toString(),
     val title: String,
+    val subtitle: String = "",
     val content: String,
-    val date: String
+    val date: String,
+    val category: String = "Wellness", // e.g., Calm, Ritual, Sleep, Motion, Health, Fitness, Milestone, Culture
+    val imageUrl: String = "", // URL or Content URI
+    val drawableResName: String = "", // e.g. "img_hr_mind_reset", "img_hr_morning_flow", "img_hr_team_summit"
+    val author: String = "HR Leadership",
+    val galleryImages: List<String> = emptyList(),
+    val likesCount: Int = 12,
+    val celebrateCount: Int = 8,
+    val isLiked: Boolean = false,
+    val isCelebrated: Boolean = false,
+    val comments: List<BulletinComment> = emptyList(),
+    val isPinned: Boolean = false
 )
 
 data class AuditLog(

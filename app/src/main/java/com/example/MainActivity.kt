@@ -19,6 +19,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.File
 import com.example.data.backend.*
+import com.example.ui.components.HRBulletinSection
 
 import android.app.Application
 import android.os.Bundle
@@ -2794,7 +2795,13 @@ fun EmployeeClockScreen(
             .padding(bottom = 100.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 3D Fanning HR Bulletin & Workplace Wellness Pulse Cards (Hero Feature at top)
+        HRBulletinSection(
+            viewModel = viewModel,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
 
         // Large Glassmorphic Weather Forecast Card
         WeatherForecastCard(viewModel = viewModel)
@@ -7447,10 +7454,15 @@ fun exportLogsToExcel(logs: List<TimeLogEntity>, context: android.content.Contex
         val bIn = log.breakIn?.let { sdf.format(Date(it)) } ?: ""
         val tOut = log.timeOut?.let { sdf.format(Date(it)) } ?: ""
 
+        val dateClean = com.example.data.security.SecurityManager.sanitizeSpreadsheetCell(log.date)
+        val empClean = com.example.data.security.SecurityManager.sanitizeSpreadsheetCell(log.employeeName)
+        val statusClean = com.example.data.security.SecurityManager.sanitizeSpreadsheetCell(log.isApproved)
+        val syncClean = com.example.data.security.SecurityManager.sanitizeSpreadsheetCell(if (log.isSynced) "Synced" else "Local Only")
+
         excelXml.append("   <Row>\n")
         excelXml.append("    <Cell><Data ss:Type=\"Number\">${log.id}</Data></Cell>\n")
-        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.date}</Data></Cell>\n")
-        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.employeeName}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$dateClean</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$empClean</Data></Cell>\n")
         excelXml.append("    <Cell><Data ss:Type=\"String\">$tIn</Data></Cell>\n")
         excelXml.append("    <Cell><Data ss:Type=\"String\">$lOut</Data></Cell>\n")
         excelXml.append("    <Cell><Data ss:Type=\"String\">$lIn</Data></Cell>\n")
@@ -7458,8 +7470,8 @@ fun exportLogsToExcel(logs: List<TimeLogEntity>, context: android.content.Contex
         excelXml.append("    <Cell><Data ss:Type=\"String\">$bIn</Data></Cell>\n")
         excelXml.append("    <Cell><Data ss:Type=\"String\">$tOut</Data></Cell>\n")
         excelXml.append("    <Cell><Data ss:Type=\"Number\">${log.hourlyRate}</Data></Cell>\n")
-        excelXml.append("    <Cell><Data ss:Type=\"String\">${log.isApproved}</Data></Cell>\n")
-        excelXml.append("    <Cell><Data ss:Type=\"String\">${if (log.isSynced) "Synced" else "Local Only"}</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$statusClean</Data></Cell>\n")
+        excelXml.append("    <Cell><Data ss:Type=\"String\">$syncClean</Data></Cell>\n")
         excelXml.append("   </Row>\n")
     }
 

@@ -17,7 +17,14 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        manifestPlaceholders["MAPS_API_KEY"] = ""
+        val mapsApiKey = (project.findProperty("MAPS_API_KEY") as? String) ?: System.getenv("MAPS_API_KEY") ?: ""
+        val geminiApiKey = (project.findProperty("GEMINI_API_KEY") as? String) ?: System.getenv("GEMINI_API_KEY") ?: ""
+        val openweatherApiKey = (project.findProperty("OPENWEATHER_API_KEY") as? String) ?: System.getenv("OPENWEATHER_API_KEY") ?: ""
+
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiApiKey\"")
+        buildConfigField("String", "OPENWEATHER_API_KEY", "\"$openweatherApiKey\"")
     }
 
     buildTypes {

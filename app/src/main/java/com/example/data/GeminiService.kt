@@ -1,6 +1,7 @@
 package com.example.data
 
 import com.example.BuildConfig
+import com.example.data.security.SecurityManager
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import okhttp3.OkHttpClient
@@ -8,14 +9,14 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.Header
 import retrofit2.http.POST
-import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
 interface GeminiApi {
     @POST("v1beta/models/gemini-3.5-flash:generateContent")
     suspend fun generateContent(
-        @Query("key") apiKey: String,
+        @Header("x-goog-api-key") apiKey: String,
         @Body request: GeminiRequest
     ): GeminiResponse
 }
@@ -27,8 +28,15 @@ object GeminiServiceClient {
         .add(KotlinJsonAdapterFactory())
         .build()
 
+    // Security Hardened Logger: Redacts API keys & suppresses body logs in production builds
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
+        level = if (BuildConfig.DEBUG) {
+            HttpLoggingInterceptor.Level.HEADERS
+        } else {
+            HttpLoggingInterceptor.Level.NONE
+        }
+        redactHeader("x-goog-api-key")
+        redactHeader("Authorization")
     }
 
     private val okHttpClient = OkHttpClient.Builder()
@@ -48,16 +56,20 @@ object GeminiServiceClient {
     }
 
     /**
-     * Executes content generation against gemini-3.5-flash for interactive data analysis.
+     * Executes content generation against gemini-3.5-flash with prompt injection sanitization.
      */
     suspend fun generateAnalysis(prompt: String): String {
         val key = BuildConfig.GEMINI_API_KEY
         if (key.isBlank() || key == "MY_GEMINI_API_KEY") {
             throw IllegalArgumentException("API key is not configured.")
         }
+        
+        // Sanitize input to mitigate prompt injection risks
+        val securePrompt = SecurityManager.sanitizeAiPrompt(prompt)
+
         val request = GeminiRequest(
-            contents = listOf(GeminiContent(parts = listOf(GeminiPart(text = prompt)))),
-            generationConfig = GeminiGenerationConfig(temperature = 0.4f, maxOutputTokens = 800)
+            contents = listOf(GeminiContent(parts = listOf(GeminiPart(text = securePrompt)))),
+            generationConfig = GeminiGenerationConfig(temperature = 0.3f, maxOutputTokens = 800)
         )
         val response = api.generateContent(key, request)
         return response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text

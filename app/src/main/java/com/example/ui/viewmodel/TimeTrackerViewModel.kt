@@ -108,6 +108,9 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     var currentUserRole = mutableStateOf("EMPLOYEE") // EMPLOYEE, SUPERVISOR, MANAGER, ADMIN_HR
     var currentUserName = mutableStateOf("Sarah Jenkins")
     var currentUserUsername = mutableStateOf("employee")
+    var activeSecuritySession = mutableStateOf<com.example.data.security.SecurityManager.AuthenticatedSession?>(
+        com.example.data.security.SecurityManager.createSession("employee", "Sarah Jenkins", "EMPLOYEE")
+    )
     
     // Filter states for spreadsheet
     var filterApproval = mutableStateOf("ALL") // ALL, PENDING, APPROVED, REJECTED
@@ -434,8 +437,106 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     ))
 
     var announcements = mutableStateOf<List<Announcement>>(listOf(
-        Announcement(title = "Indore Hub Hybrid Operations", content = "Flexible timings rules updated. Daily shift targets remain at 8 hours.", date = "2026-06-28"),
-        Announcement(title = "Philippine Hub Synergies Integration", content = "Welcoming our Philippine remote workers with added PH local holiday calendar sync!", date = "2026-06-29")
+        Announcement(
+            title = "Mind Reset",
+            subtitle = "Breathe and refocus",
+            category = "Calm",
+            drawableResName = "img_hr_mind_reset",
+            author = "Aditya Joshi (Director, HR)",
+            date = "2026-08-14",
+            content = "Take a 5-minute diaphragmatic breathing pause today. Our workplace wellness analysis shows that micro-breaks reduce cognitive fatigue by 34% during long shifts. Join the daily 3:00 PM mindfulness circle or take asynchronous quiet time.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
+                "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80"
+            ),
+            likesCount = 28,
+            celebrateCount = 15,
+            comments = listOf(
+                BulletinComment(authorName = "Sarah Jenkins", authorRole = "EMPLOYEE", text = "This mid-day breathing pause has been a gamechanger for my afternoon focus!", timestamp = "10:30 AM"),
+                BulletinComment(authorName = "Robert Chen", authorRole = "SUPERVISOR", text = "Encouraging the entire Indore development cohort to join!", timestamp = "11:15 AM")
+            ),
+            isPinned = true
+        ),
+        Announcement(
+            title = "Morning Flow",
+            subtitle = "Start with clarity",
+            category = "Ritual",
+            drawableResName = "img_hr_morning_flow",
+            author = "HR Wellness Operations",
+            date = "2026-08-13",
+            content = "Set intentional goals before your first shift punch. Our new hybrid workplace guidance encourages prioritizing your top 3 high-impact tasks in the first 90 minutes. Hydrate well and synchronize your daily sprint tracker with team leads.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80"
+            ),
+            likesCount = 19,
+            celebrateCount = 11,
+            comments = listOf(
+                BulletinComment(authorName = "Elena Rostova", authorRole = "MANAGER", text = "Clarity first, speed second. Great workplace principle!", timestamp = "Yesterday")
+            )
+        ),
+        Announcement(
+            title = "Sleep Score",
+            subtitle = "Track your recovery",
+            category = "Sleep",
+            drawableResName = "img_hr_mind_reset",
+            author = "Health & Ergonomics Lead",
+            date = "2026-08-12",
+            content = "Quality rest directly correlates with sustained performance. Review your biometric shift intervals and ensure adequate rest cycles between night rotations and morning sprints.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1511295742362-92c96b124e52?w=800&q=80"
+            ),
+            likesCount = 34,
+            celebrateCount = 9,
+            comments = emptyList()
+        ),
+        Announcement(
+            title = "Heart Rhythm",
+            subtitle = "Feel every signal",
+            category = "Health",
+            drawableResName = "img_hr_morning_flow",
+            author = "Dr. Priya Verma (Occupational Health)",
+            date = "2026-08-11",
+            content = "Ergonomic standing desk setups and cardiovascular health checks are now available at all regional hubs. Sign up for your complimentary annual health assessment through the Self-Service tab.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80"
+            ),
+            likesCount = 42,
+            celebrateCount = 22,
+            comments = emptyList()
+        ),
+        Announcement(
+            title = "Active Day",
+            subtitle = "Move with intention",
+            category = "Motion",
+            drawableResName = "img_hr_team_summit",
+            author = "Aditya Joshi (Director, HR)",
+            date = "2026-08-10",
+            content = "The annual inter-hub step challenge is officially live! Track your daily activity, participate in group walks during lunch breaks, and compete for wellness stipend bonuses across Indore and Philippine offices.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80",
+                "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
+            ),
+            likesCount = 56,
+            celebrateCount = 38,
+            comments = listOf(
+                BulletinComment(authorName = "Marcus Aurelius (HR Intern)", authorRole = "EMPLOYEE", text = "Indore team is already at 12,000 steps today!", timestamp = "Aug 10")
+            )
+        ),
+        Announcement(
+            title = "Body Ready",
+            subtitle = "Know your limits",
+            category = "Fitness",
+            drawableResName = "img_hr_team_summit",
+            author = "Workplace Ergonomics",
+            date = "2026-08-08",
+            content = "Check out our new ergonomic guidelines for remote work stations and physical health benefits. New gym subsidy disbursements will be applied to this month's payroll cycle.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80"
+            ),
+            likesCount = 27,
+            celebrateCount = 14,
+            comments = emptyList()
+        )
     ))
 
     var auditLogs = mutableStateOf<List<AuditLog>>(listOf(
@@ -972,13 +1073,19 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         val normUser = username.trim().lowercase()
         val normPass = passcode.trim()
 
-        val matched = registeredUsers.value.find { it.username == normUser && it.passcode == normPass }
+        val matched = registeredUsers.value.find { 
+            it.username == normUser && com.example.data.security.SecurityManager.verifyPassword(normPass, it.username, it.passcode)
+        }
 
         return if (matched != null) {
             currentUserRole.value = matched.role
             currentUserName.value = matched.name
             currentUserUsername.value = normUser
             isLoggedIn.value = true
+            
+            // Create cryptographically signed session token
+            val session = com.example.data.security.SecurityManager.createSession(normUser, matched.name, matched.role)
+            activeSecuritySession.value = session
             
             // Auto setup HR access toggle
             isAdminMode.value = (matched.role != "EMPLOYEE")
@@ -992,8 +1099,8 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
                 }
             }
 
-            addAuditLog(matched.name, "Logged in successfully under secure role.")
-            addNotification("Security Check", "Logged in successfully as ${matched.name} (${matched.role})", isAlert = false)
+            addAuditLog(matched.name, "Authenticated session established (${session.role.roleName}) [Token: ${session.sessionId.take(8)}...]")
+            addNotification("Security Check", "Logged in successfully as ${matched.name} (${matched.role}) with cryptographic session.", isAlert = false)
             refreshActiveLog()
             null // Return null on success
         } else {
@@ -1002,8 +1109,9 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun logout() {
-        addAuditLog(currentUserName.value, "Logged out of current session.")
+        addAuditLog(currentUserName.value, "Session terminated: ${activeSecuritySession.value?.sessionId?.take(8) ?: "N/A"}")
         isLoggedIn.value = false
+        activeSecuritySession.value = null
         currentUserRole.value = "EMPLOYEE"
         currentUserName.value = "Sarah Jenkins"
         currentUserUsername.value = "employee"
@@ -1407,14 +1515,94 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         addNotification("Payroll Loans", "$type of $$amount filed securely.", isAlert = false)
     }
 
-    // Create Announcement
+    // Create Announcement / Bulletin Post
     fun createAnnouncement(title: String, content: String) {
+        createBulletinPost(
+            title = title,
+            subtitle = "Company Wide Update",
+            content = content,
+            category = "Notice",
+            imageUrl = "",
+            drawableResName = "img_hr_team_summit",
+            galleryImages = emptyList()
+        )
+    }
+
+    fun createBulletinPost(
+        title: String,
+        subtitle: String,
+        content: String,
+        category: String,
+        imageUrl: String,
+        drawableResName: String,
+        galleryImages: List<String>
+    ) {
         val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val dateStr = sdf.format(Date())
-        val newReq = Announcement(title = title, content = content, date = dateStr)
+        val newReq = Announcement(
+            title = title,
+            subtitle = subtitle,
+            content = content,
+            category = category,
+            imageUrl = imageUrl,
+            drawableResName = drawableResName,
+            author = "${currentUserName.value} (${currentUserRole.value})",
+            galleryImages = galleryImages,
+            date = dateStr,
+            likesCount = 1,
+            celebrateCount = 0,
+            comments = emptyList()
+        )
         announcements.value = listOf(newReq) + announcements.value
-        addAuditLog(currentUserName.value, "Published company announcement: $title")
-        addNotification("Company Bulletin", "NEW BULLET: $title", isAlert = false)
+        addAuditLog(currentUserName.value, "Published HR Bulletin: $title [$category]")
+        addNotification("HR Bulletin", "NEW UPDATE: $title — $subtitle", isAlert = false)
+    }
+
+    fun toggleLikeBulletin(bulletinId: String) {
+        announcements.value = announcements.value.map { item ->
+            if (item.id == bulletinId) {
+                val newLiked = !item.isLiked
+                val newCount = if (newLiked) item.likesCount + 1 else (item.likesCount - 1).coerceAtLeast(0)
+                item.copy(isLiked = newLiked, likesCount = newCount)
+            } else item
+        }
+    }
+
+    fun toggleCelebrateBulletin(bulletinId: String) {
+        announcements.value = announcements.value.map { item ->
+            if (item.id == bulletinId) {
+                val newCelebrated = !item.isCelebrated
+                val newCount = if (newCelebrated) item.celebrateCount + 1 else (item.celebrateCount - 1).coerceAtLeast(0)
+                item.copy(isCelebrated = newCelebrated, celebrateCount = newCount)
+            } else item
+        }
+    }
+
+    fun addBulletinComment(bulletinId: String, commentText: String) {
+        if (commentText.isBlank()) return
+        val sdf = SimpleDateFormat("h:mm a", Locale.getDefault())
+        val timeStr = sdf.format(Date())
+        val newComment = BulletinComment(
+            authorName = currentUserName.value,
+            authorRole = currentUserRole.value,
+            text = commentText.trim(),
+            timestamp = timeStr
+        )
+        announcements.value = announcements.value.map { item ->
+            if (item.id == bulletinId) {
+                item.copy(comments = item.comments + newComment)
+            } else item
+        }
+        addAuditLog(currentUserName.value, "Commented on bulletin: ${announcements.value.find { it.id == bulletinId }?.title ?: ""}")
+    }
+
+    fun deleteBulletinPost(bulletinId: String) {
+        val target = announcements.value.find { it.id == bulletinId }
+        announcements.value = announcements.value.filter { it.id != bulletinId }
+        target?.let {
+            addAuditLog(currentUserName.value, "Removed bulletin post: ${it.title}")
+            addNotification("HR Bulletin", "Bulletin post '${it.title}' was archived.", isAlert = false)
+        }
     }
 
     // Update Profile Information
@@ -1704,25 +1892,45 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    // HR Operations: Approve log
+    // HR Operations: Approve log (Enforces Server-grade RBAC Claims)
     fun approveLog(logId: Long) {
+        if (!com.example.data.security.SecurityManager.hasPermission(
+                activeSecuritySession.value, 
+                com.example.data.security.SecurityManager.AppPermission.APPROVE_SHIFTS
+            )) {
+            addNotification("Security Alert", "Access Denied: You do not possess APPROVE_SHIFTS authority.", isAlert = true)
+            addAuditLog(currentUserName.value, "SECURITY VIOLATION: Unauthorized attempt to approve shift log ID $logId")
+            return
+        }
+
         viewModelScope.launch {
             val log = repository.getTimeLogById(logId)
             if (log != null) {
                 val updated = log.copy(isApproved = "APPROVED", rejectionReason = null)
                 repository.insertOrUpdateTimeLog(updated)
+                addAuditLog(currentUserName.value, "Approved shift record for ${log.employeeName} (${log.date})")
                 addNotification("HR Approval", "Approved shift record for ${log.employeeName} (${log.date})", isAlert = false)
             }
         }
     }
 
-    // HR Operations: Reject log
+    // HR Operations: Reject log (Enforces Server-grade RBAC Claims)
     fun rejectLog(logId: Long, reason: String) {
+        if (!com.example.data.security.SecurityManager.hasPermission(
+                activeSecuritySession.value, 
+                com.example.data.security.SecurityManager.AppPermission.APPROVE_SHIFTS
+            )) {
+            addNotification("Security Alert", "Access Denied: You do not possess APPROVE_SHIFTS authority.", isAlert = true)
+            addAuditLog(currentUserName.value, "SECURITY VIOLATION: Unauthorized attempt to reject shift log ID $logId")
+            return
+        }
+
         viewModelScope.launch {
             val log = repository.getTimeLogById(logId)
             if (log != null) {
                 val updated = log.copy(isApproved = "REJECTED", rejectionReason = reason)
                 repository.insertOrUpdateTimeLog(updated)
+                addAuditLog(currentUserName.value, "Rejected shift record for ${log.employeeName} (${log.date}) - Reason: $reason")
                 addNotification("HR Audit", "Rejected shift record for ${log.employeeName} (${log.date}): $reason", isAlert = true)
             }
         }
