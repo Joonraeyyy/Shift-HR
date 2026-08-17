@@ -74,6 +74,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import kotlin.math.sin
 import kotlin.math.cos
@@ -2433,17 +2435,17 @@ fun MainNavigationRail(
     }
 }
 
-// ---------------------- WEATHER UTILITIES & GLASSMORPHIC ADVISORY ----------------------
+// ---------------------- WEATHER UTILITIES & LIQUID GLASSMORPHIC ADVISORY ----------------------
 fun getWeatherVisuals(condition: String): Pair<ImageVector, Color> {
     val cond = condition.lowercase()
     return when {
         cond.contains("rain") || cond.contains("drizzle") || cond.contains("shower") -> 
-            Icons.Default.Umbrella to Color(0xFF38BDF8)
+            Icons.Default.WaterDrop to Color(0xFF38BDF8)
         cond.contains("thunder") -> 
-            Icons.Default.Thunderstorm to Color(0xFFFBBF24)
+            Icons.Default.FlashOn to Color(0xFFFBBF24)
         cond.contains("cloud") || cond.contains("overcast") -> 
-            Icons.Default.CloudQueue to Color(0xFF94A3B8)
-        cond.contains("snow") -> 
+            Icons.Default.Cloud to Color(0xFF67E8F9)
+        cond.contains("snow") || cond.contains("ice") || cond.contains("flurr") -> 
             Icons.Default.AcUnit to Color(0xFFE2E8F0)
         cond.contains("clear") || cond.contains("sun") -> 
             Icons.Default.WbSunny to Color(0xFFFBBF24)
@@ -2453,293 +2455,570 @@ fun getWeatherVisuals(condition: String): Pair<ImageVector, Color> {
 }
 
 @Composable
-fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
-    val currentWeather = viewModel.currentWeather.value
-    val forecast = viewModel.weatherForecast.value
-    val isLoading = viewModel.weatherLoading.value
+fun WeatherMetricItem(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    tint: Color
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(14.dp)
+        )
+        Spacer(modifier = Modifier.width(5.dp))
+        Column {
+            Text(
+                text = label,
+                fontSize = 7.5.sp,
+                fontWeight = FontWeight.Black,
+                color = Color.White.copy(alpha = 0.5f),
+                letterSpacing = 0.4.sp
+            )
+            Spacer(modifier = Modifier.height(1.dp))
+            Text(
+                text = value,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+        }
+    }
+}
+
+/**
+ * Liquid Glassmorphic Weather Capsule Widget
+ * Modeled directly after horizontal capsule cards with layered fluid liquid waves,
+ * glowing concentric sun/moon arcs, frosted glass specular borders, real-time clock,
+ * and expandable glass telemetry sheet for metrics & city search.
+ */
+@Composable
+fun WeatherForecastCard(
+    viewModel: TimeTrackerViewModel,
+    modifier: Modifier = Modifier
+) {
+    val currentWeather by viewModel.currentWeather
+    val forecast by viewModel.weatherForecast
+    val isLoading by viewModel.weatherLoading
     var cityInput by remember { mutableStateOf("") }
-    val context = androidx.compose.ui.platform.LocalContext.current
+    var showDetailsSheet by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier
+    // Auto-sync hourly
+    LaunchedEffect(Unit) {
+        if (currentWeather == null) {
+            viewModel.fetchWeatherForecast(viewModel.selectedWeatherCity.value)
+        }
+    }
+
+    // Live formatted Time & Date
+    val currentCalendar = remember { Calendar.getInstance() }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+    val dateFormat = remember { SimpleDateFormat("MMMM, d yyyy", Locale.getDefault()) }
+    val liveTimeString = timeFormat.format(currentCalendar.time)
+    val liveDateString = dateFormat.format(currentCalendar.time)
+
+    val condStr = currentWeather?.weather?.firstOrNull()?.main ?: "Sunny"
+    val condLower = condStr.lowercase()
+    val isNight = currentCalendar.get(Calendar.HOUR_OF_DAY) !in 6..18
+    val cityName = currentWeather?.name ?: viewModel.selectedWeatherCity.value
+    val tempInt = currentWeather?.main?.temp?.toInt() ?: 28
+
+    val weatherIcon = when {
+        condLower.contains("rain") || condLower.contains("drizzle") || condLower.contains("shower") -> Icons.Default.WaterDrop
+        condLower.contains("snow") || condLower.contains("ice") || condLower.contains("flurr") -> Icons.Default.AcUnit
+        condLower.contains("thunder") || condLower.contains("storm") -> Icons.Default.FlashOn
+        condLower.contains("cloud") || condLower.contains("overcast") -> Icons.Default.Cloud
+        isNight -> Icons.Default.Nightlight
+        else -> Icons.Default.WbSunny
+    }
+
+    // Dynamic Liquid Glass Theme Gradients & Fluid Layers
+    val (bgGradient, waveColors, _) = when {
+        // 1. Heavy Rain / Thunder Theme (Dark oceanic slate with fluid layered waves)
+        condLower.contains("rain") || condLower.contains("drizzle") || condLower.contains("shower") || condLower.contains("thunder") -> {
+            Triple(
+                listOf(Color(0xFF283E54), Color(0xFF334E6A), Color(0xFF203244)),
+                listOf(Color(0xFF3E5C7B).copy(alpha = 0.85f), Color(0xFF4F759B).copy(alpha = 0.65f), Color(0xFF6794BF).copy(alpha = 0.45f)),
+                Color(0xFF38BDF8)
+            )
+        }
+        // 2. Snow / Ice Theme (Frosted arctic blue with soft liquid mist & snowflakes)
+        condLower.contains("snow") || condLower.contains("ice") || condLower.contains("flurr") -> {
+            Triple(
+                listOf(Color(0xFF7A9BB8), Color(0xFF93B3CE), Color(0xFFB0CCE3)),
+                listOf(Color(0xFFA1C1DB).copy(alpha = 0.85f), Color(0xFFC0DBEF).copy(alpha = 0.65f), Color(0xFFDEF0FC).copy(alpha = 0.45f)),
+                Color(0xFFE0F2FE)
+            )
+        }
+        // 3. Night Theme (Deep midnight navy with concentric glowing moon arches & stars)
+        isNight -> {
+            Triple(
+                listOf(Color(0xFF0F172A), Color(0xFF142340), Color(0xFF1E3258)),
+                listOf(Color(0xFF1A2E54).copy(alpha = 0.9f), Color(0xFF254278).copy(alpha = 0.7f), Color(0xFF375D9E).copy(alpha = 0.5f)),
+                Color(0xFFFDE047)
+            )
+        }
+        // 4. Cloudy Theme (Vibrant liquid cyan/teal flowing waves)
+        condLower.contains("cloud") || condLower.contains("overcast") || condLower.contains("fog") -> {
+            Triple(
+                listOf(Color(0xFF2E638D), Color(0xFF397AA7), Color(0xFF4898C3)),
+                listOf(Color(0xFF4187B5).copy(alpha = 0.85f), Color(0xFF55A6D6).copy(alpha = 0.65f), Color(0xFF72C6F2).copy(alpha = 0.45f)),
+                Color(0xFF67E8F9)
+            )
+        }
+        // 5. Sunny / Warm Daylight (Warm coral-peach with glowing sun arcs)
+        else -> {
+            Triple(
+                listOf(Color(0xFFE06D63), Color(0xFFEA7E6C), Color(0xFFF39E75)),
+                listOf(Color(0xFFEE8A74).copy(alpha = 0.9f), Color(0xFFF7A97A).copy(alpha = 0.7f), Color(0xFFFFCC70).copy(alpha = 0.5f)),
+                Color(0xFFFACC15)
+            )
+        }
+    }
+
+    // Glass Liquid Capsule Container
+    Box(
+        modifier = modifier
             .fillMaxWidth()
-            .padding(bottom = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = getAdaptiveColor(0.04f)),
-        border = BorderStroke(1.dp, getAdaptiveColor(0.08f))
+            .padding(bottom = 16.dp)
+            .height(116.dp)
+            .shadow(
+                elevation = 14.dp,
+                shape = RoundedCornerShape(26.dp),
+                spotColor = bgGradient.first().copy(alpha = 0.7f),
+                ambientColor = Color.Black.copy(alpha = 0.45f)
+            )
+            .clip(RoundedCornerShape(26.dp))
+            .clickable { showDetailsSheet = true }
+            .testTag("card_liquid_weather_capsule")
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Title and City Search
-            // 1-Hour Automatic Weather Location Re-Sync
-            LaunchedEffect(Unit) {
-                while (true) {
-                    viewModel.fetchWeatherForecast(viewModel.selectedWeatherCity.value)
-                    kotlinx.coroutines.delay(3600_000L) // Auto-sync every 1 hour
+        // 1. Fluid Ambient Base Gradient
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Brush.horizontalGradient(bgGradient))
+        )
+
+        // 2. Canvas Layer: Liquid Organic Waves / Glowing Celestial Concentric Arches
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+
+            if (condLower.contains("rain") || condLower.contains("drizzle") || condLower.contains("shower") || condLower.contains("cloud") || condLower.contains("overcast")) {
+                // Layered smooth liquid Bezier waves flowing organically from center to right
+                val wavePath1 = Path().apply {
+                    moveTo(w * 0.35f, 0f)
+                    cubicTo(w * 0.55f, h * 0.25f, w * 0.65f, h * 0.05f, w, h * 0.35f)
+                    lineTo(w, 0f)
+                    close()
                 }
+                drawPath(wavePath1, color = waveColors[2])
+
+                val wavePath2 = Path().apply {
+                    moveTo(w * 0.42f, 0f)
+                    cubicTo(w * 0.58f, h * 0.45f, w * 0.72f, h * 0.2f, w, h * 0.6f)
+                    lineTo(w, 0f)
+                    close()
+                }
+                drawPath(wavePath2, color = waveColors[1])
+
+                val wavePath3 = Path().apply {
+                    moveTo(w * 0.48f, 0f)
+                    cubicTo(w * 0.64f, h * 0.65f, w * 0.78f, h * 0.4f, w, h * 0.85f)
+                    lineTo(w, 0f)
+                    close()
+                }
+                drawPath(wavePath3, color = waveColors[0])
+
+                if (condLower.contains("rain") || condLower.contains("drizzle")) {
+                    drawCircle(Color.White.copy(alpha = 0.25f), radius = 2.5f, center = Offset(w * 0.62f, h * 0.45f))
+                    drawCircle(Color.White.copy(alpha = 0.35f), radius = 3.5f, center = Offset(w * 0.75f, h * 0.3f))
+                    drawCircle(Color.White.copy(alpha = 0.2f), radius = 2.0f, center = Offset(w * 0.88f, h * 0.55f))
+                }
+            } else if (condLower.contains("snow") || condLower.contains("ice")) {
+                // Frosted cloud curves + floating crystal snowflake particles
+                drawCircle(waveColors[1], radius = h * 0.8f, center = Offset(w * 0.85f, h * 0.9f))
+                drawCircle(waveColors[0], radius = h * 0.6f, center = Offset(w * 0.65f, h * 0.95f))
+                drawCircle(Color.White.copy(alpha = 0.5f), radius = 3f, center = Offset(w * 0.58f, h * 0.35f))
+                drawCircle(Color.White.copy(alpha = 0.75f), radius = 4.5f, center = Offset(w * 0.72f, h * 0.5f))
+                drawCircle(Color.White.copy(alpha = 0.45f), radius = 3f, center = Offset(w * 0.82f, h * 0.25f))
+            } else if (isNight) {
+                // Concentric glowing moon arches from top right
+                drawCircle(Color(0xFF2E4670).copy(alpha = 0.45f), radius = h * 1.35f, center = Offset(w * 0.9f, 0f))
+                drawCircle(Color(0xFF3D5B91).copy(alpha = 0.55f), radius = h * 1.0f, center = Offset(w * 0.9f, 0f))
+                drawCircle(Color(0xFF567AB8).copy(alpha = 0.65f), radius = h * 0.7f, center = Offset(w * 0.9f, 0f))
+                drawCircle(Color(0xFFFDE047), radius = h * 0.42f, center = Offset(w * 0.9f, 0f))
+
+                // Night stars
+                drawCircle(Color.White.copy(alpha = 0.75f), radius = 2f, center = Offset(w * 0.48f, h * 0.35f))
+                drawCircle(Color.White.copy(alpha = 0.6f), radius = 1.5f, center = Offset(w * 0.56f, h * 0.65f))
+                drawCircle(Color.White.copy(alpha = 0.85f), radius = 2.5f, center = Offset(w * 0.64f, h * 0.25f))
+            } else {
+                // Radiant Concentric Sun Arches
+                drawCircle(Color(0xFFFFA94D).copy(alpha = 0.4f), radius = h * 1.45f, center = Offset(w * 0.92f, 0f))
+                drawCircle(Color(0xFFFFC078).copy(alpha = 0.55f), radius = h * 1.1f, center = Offset(w * 0.92f, 0f))
+                drawCircle(Color(0xFFFFD43B).copy(alpha = 0.7f), radius = h * 0.78f, center = Offset(w * 0.92f, 0f))
+                drawCircle(Color(0xFFFFE066), radius = h * 0.48f, center = Offset(w * 0.92f, 0f))
             }
+        }
 
-            // HEADER ROW: Title & Live Location Auto-Sync Status
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "SHIFT WEATHER ADVISORY",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = Color(0xFF38BDF8),
-                        letterSpacing = 1.5.sp
-                    )
-                    Text(
-                        text = currentWeather?.name ?: "Loading...",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = com.example.ui.theme.AppTextColor
-                    )
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF38BDF8).copy(alpha = 0.12f),
-                    border = BorderStroke(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(Color(0xFF38BDF8))
+        // 3. Liquid Glass Frost Overlay & Specular Edge Highlight
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.18f),
+                            Color.White.copy(alpha = 0.04f),
+                            Color.Black.copy(alpha = 0.12f)
                         )
-                        Text(
-                            text = "Auto-Sync 1h",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF38BDF8)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // PROPER HIERARCHY SEARCH ROW
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val isLightMode = com.example.ui.theme.AppTextColor == Color(0xFF2D3748)
-                val containerBg = if (isLightMode) Color(0xFFF1F5F9) else getAdaptiveColor(0.05f)
-                val placeholderColor = if (isLightMode) Color(0xFF4A5568) else getAdaptiveTextColor(0.5f)
-                val unfocusedBorder = if (isLightMode) Color.Black.copy(alpha = 0.15f) else getAdaptiveColor(0.1f)
-
-                OutlinedTextField(
-                    value = cityInput,
-                    onValueChange = { cityInput = it },
-                    placeholder = { Text("Search city or location...", fontSize = 12.sp, color = placeholderColor) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    singleLine = true,
-                    textStyle = TextStyle(fontSize = 12.sp, color = com.example.ui.theme.AppTextColor),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = unfocusedBorder,
-                        focusedContainerColor = containerBg,
-                        unfocusedContainerColor = containerBg
-                    ),
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                    keyboardActions = KeyboardActions(onSearch = {
-                        if (cityInput.isNotBlank()) {
-                            viewModel.fetchWeatherForecast(cityInput)
-                            cityInput = ""
-                        }
-                    })
+                    )
                 )
+                .border(
+                    BorderStroke(
+                        1.2.dp,
+                        Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(alpha = 0.65f),
+                                Color.White.copy(alpha = 0.2f),
+                                Color.White.copy(alpha = 0.08f)
+                            )
+                        )
+                    ),
+                    RoundedCornerShape(26.dp)
+                )
+        )
 
-                IconButton(
-                    onClick = {
-                        if (cityInput.isNotBlank()) {
-                            viewModel.fetchWeatherForecast(cityInput)
-                            cityInput = ""
-                        } else {
-                            viewModel.fetchWeatherForecast("Manila")
-                            Toast.makeText(context, "Location synced to current user area!", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(Color(0xFF38BDF8).copy(alpha = 0.15f), RoundedCornerShape(14.dp))
-                        .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+        // 4. Foreground Content (Matching screenshot layout: Weather/Temp on Left, Time/Date/City on Right)
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 22.dp, vertical = 14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // LEFT COLUMN: Condition Icon + Name, then Large Crisp Temperature
+            Column(
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.Start
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.MyLocation,
-                        contentDescription = "Sync Location Weather",
-                        tint = Color(0xFF38BDF8),
-                        modifier = Modifier.size(20.dp)
+                        weatherIcon,
+                        contentDescription = condStr,
+                        tint = Color.White.copy(alpha = 0.95f),
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Text(
+                        text = condStr,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.95f),
+                        letterSpacing = 0.2.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.Top) {
+                    Text(
+                        text = "$tempInt",
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        lineHeight = 44.sp,
+                        letterSpacing = (-1).sp
+                    )
+                    Text(
+                        text = "°",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.85f),
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // RIGHT COLUMN: Clean Digital Clock, Date, and Location
+            Column(
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = liveTimeString,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    lineHeight = 34.sp,
+                    letterSpacing = (-0.5).sp
+                )
 
-            if (isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    contentAlignment = Alignment.Center
+                Spacer(modifier = Modifier.height(3.dp))
+
+                Text(
+                    text = liveDateString,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF38BDF8), modifier = Modifier.size(28.dp))
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = "Location",
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Text(
+                        text = cityName,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        letterSpacing = 0.3.sp
+                    )
                 }
-            } else {
-                currentWeather?.let { weather ->
-                    val (icon, color) = getWeatherVisuals(weather.weather.firstOrNull()?.main ?: "Clear")
-                    
-                    // Main layout: Temp on left, large illustration on right
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.Bottom) {
-                                Text(
-                                    text = "${weather.main.temp.toInt()}",
-                                    fontSize = 48.sp,
-                                    fontWeight = FontWeight.Light,
-                                    color = com.example.ui.theme.AppTextColor
-                                )
-                                Text(
-                                    text = "°C",
-                                    fontSize = 20.sp,
-                                    fontWeight = FontWeight.Light,
-                                    color = Color(0xFF38BDF8),
-                                    modifier = Modifier.padding(bottom = 8.dp)
-                                )
-                            }
-                            Text(
-                                text = weather.weather.firstOrNull()?.description?.uppercase() ?: "CLEAR SKY",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = getAdaptiveTextColor(0.6f),
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "Feels like ${weather.main.feelsLike.toInt()}°C  •  H: ${weather.main.tempMax.toInt()}° L: ${weather.main.tempMin.toInt()}°",
-                                fontSize = 10.sp,
-                                color = getAdaptiveTextColor(0.4f),
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
+            }
+        }
+    }
 
-                        // Large glassy icon box
+    // Expandable Frosted Glass Telemetry & City Search Modal
+    if (showDetailsSheet) {
+        LiquidGlassWeatherDetailsDialog(
+            currentWeather = currentWeather,
+            forecast = forecast,
+            isLoading = isLoading,
+            searchQuery = cityInput,
+            onSearchQueryChange = { cityInput = it },
+            onSearchSubmit = {
+                if (cityInput.isNotBlank()) {
+                    viewModel.fetchWeatherForecast(cityInput.trim())
+                    cityInput = ""
+                }
+            },
+            onRefresh = {
+                viewModel.fetchWeatherForecast("Manila")
+            },
+            onDismiss = { showDetailsSheet = false }
+        )
+    }
+}
+
+/**
+ * Frosted Liquid Glass Detailed Weather Advisory Modal
+ */
+@Composable
+fun LiquidGlassWeatherDetailsDialog(
+    currentWeather: com.example.data.WeatherResponse?,
+    forecast: com.example.data.ForecastResponse?,
+    isLoading: Boolean,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchSubmit: () -> Unit,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .shadow(28.dp, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A).copy(alpha = 0.95f)),
+            border = BorderStroke(
+                1.2.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.White.copy(alpha = 0.15f),
+                        Color(0xFF38BDF8).copy(alpha = 0.3f)
+                    )
+                )
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Top Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(72.dp)
-                                .background(color.copy(alpha = 0.1f), RoundedCornerShape(18.dp))
-                                .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(18.dp)),
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF0284C7).copy(alpha = 0.2f))
+                                .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.5f), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = color,
-                                modifier = Modifier.size(36.dp)
+                            Icon(Icons.Default.Cloud, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "SHIFT METEOROLOGY",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF38BDF8),
+                                letterSpacing = 1.5.sp
+                            )
+                            Text(
+                                text = currentWeather?.name ?: "Indore",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
                             )
                         }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Search Bar + GPS
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = onSearchQueryChange,
+                        placeholder = {
+                            Text(
+                                "Search city (e.g. London, Manila, Tokyo)...",
+                                color = Color.White.copy(alpha = 0.45f),
+                                fontSize = 11.sp
+                            )
+                        },
+                        singleLine = true,
+                        leadingIcon = {
+                            Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(15.dp))
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF38BDF8),
+                            unfocusedBorderColor = Color.White.copy(alpha = 0.15f),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            cursorColor = Color(0xFF38BDF8)
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp)
+                            .testTag("input_weather_city_dialog"),
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { onSearchSubmit() })
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    IconButton(
+                        onClick = onRefresh,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .background(Color(0xFF0284C7).copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                            .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.4f), RoundedCornerShape(10.dp))
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = "Sync GPS", tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Shift Advisory Banner
+                currentWeather?.let { weather ->
+                    val color = Color(0xFF38BDF8)
+                    val recText = when {
+                        weather.weather.firstOrNull()?.main?.lowercase()?.contains("rain") == true ->
+                            "Heavy rain in ${weather.name}. Shift HR advises remote work or coffee shop co-working today!"
+                        weather.weather.firstOrNull()?.main?.lowercase()?.contains("thunder") == true ->
+                            "Thunderstorms active. Central hub office is open, but outdoor operations are suspended."
+                        weather.weather.firstOrNull()?.main?.lowercase()?.contains("cloud") == true ->
+                            "Comfortable cloudy weather. Ideal day for hybrid shifts at the regional Hub!"
+                        weather.main.temp > 33.0 ->
+                            "Heat advisory! Shift HR recommends air-conditioned spaces and proper hydration."
+                        else ->
+                            "Beautiful clear skies! Perfect conditions to log productive hours at the Shift HR Hub."
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF0284C7).copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                            .border(1.dp, Color(0xFF38BDF8).copy(alpha = 0.3f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Lightbulb, contentDescription = null, tint = color, modifier = Modifier.size(15.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = recText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.9f),
+                            lineHeight = 15.sp
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // 3 columns: Wind, Humidity, Pressure
+                    // Metrics Grid
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.Black.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
-                            .padding(10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                            .padding(vertical = 10.dp, horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Air, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(14.dp))
-                            Text("WIND", fontSize = 8.sp, color = getAdaptiveTextColor(0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.wind.speed} m/s", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                        }
-                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(getAdaptiveColor(0.08f)).align(Alignment.CenterVertically))
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.WaterDrop, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp))
-                            Text("HUMIDITY", fontSize = 8.sp, color = getAdaptiveTextColor(0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.main.humidity}%", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                        }
-                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(getAdaptiveColor(0.08f)).align(Alignment.CenterVertically))
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Icon(Icons.Default.Compress, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(14.dp))
-                            Text("PRESSURE", fontSize = 8.sp, color = getAdaptiveTextColor(0.4f), modifier = Modifier.padding(top = 2.dp))
-                            Text("${weather.main.pressure} hPa", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
-                        }
-                    }
-
-                    // Shift Recommendation based on weather
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(color.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                            .border(1.dp, color.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                            .padding(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Lightbulb,
-                                contentDescription = null,
-                                tint = color,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            val recText = when {
-                                weather.weather.firstOrNull()?.main?.lowercase()?.contains("rain") == true ->
-                                    "Heavy rain in ${weather.name}. Shift HR advises remote work or coffee shop co-working today!"
-                                weather.weather.firstOrNull()?.main?.lowercase()?.contains("thunder") == true ->
-                                    "Thunderstorms active. Central hub office is open, but outdoor operations are suspended."
-                                weather.weather.firstOrNull()?.main?.lowercase()?.contains("cloud") == true ->
-                                    "Comfortable cloudy weather. Ideal day for hybrid shifts at the regional Hub!"
-                                weather.main.temp > 33.0 ->
-                                    "Heat advisory! Shift HR recommends air-conditioned spaces and proper hydration."
-                                else ->
-                                    "Beautiful clear skies! Perfect conditions to log productive hours at the Shift HR Hub."
-                            }
-                            Text(
-                                text = recText,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = getAdaptiveTextColor(0.85f),
-                                lineHeight = 12.sp
-                            )
-                        }
+                        WeatherMetricItem(icon = Icons.Default.Air, label = "WIND", value = "${weather.wind.speed} m/s", tint = Color(0xFF67E8F9))
+                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.1f)))
+                        WeatherMetricItem(icon = Icons.Default.WaterDrop, label = "HUMIDITY", value = "${weather.main.humidity}%", tint = Color(0xFF38BDF8))
+                        Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color.White.copy(alpha = 0.1f)))
+                        WeatherMetricItem(icon = Icons.Default.Compress, label = "PRESSURE", value = "${weather.main.pressure} hPa", tint = Color(0xFFFBBF24))
                     }
                 }
 
-                // Hourly forecast list (6 steps)
+                // 3-Hour Forecast Row
                 forecast?.let { fc ->
                     Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "3-HOUR SHIFT TEMPERATURES",
+                        text = "3-HOUR SHIFT FORECAST",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Black,
-                        color = getAdaptiveTextColor(0.4f),
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        color = Color.White.copy(alpha = 0.6f),
+                        letterSpacing = 1.sp
                     )
+                    Spacer(modifier = Modifier.height(6.dp))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2753,20 +3032,23 @@ fun WeatherForecastCard(viewModel: TimeTrackerViewModel) {
                             val cond = item.weather.firstOrNull()?.main ?: "Clear"
                             val (fIcon, fColor) = getWeatherVisuals(cond)
 
-                            Box(
-                                modifier = Modifier
-                                    .width(60.dp)
-                                    .background(getAdaptiveColor(0.03f), RoundedCornerShape(12.dp))
-                                    .border(1.dp, getAdaptiveColor(0.05f), RoundedCornerShape(12.dp))
-                                    .padding(vertical = 6.dp),
-                                contentAlignment = Alignment.Center
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.05f)),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
+                                modifier = Modifier.width(52.dp)
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = timeStr, fontSize = 9.sp, color = getAdaptiveTextColor(0.4f))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Icon(fIcon, contentDescription = null, tint = fColor, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = "$temp°", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = com.example.ui.theme.AppTextColor)
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = timeStr, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.7f))
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Icon(fIcon, contentDescription = null, tint = fColor, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(text = "$temp°", fontSize = 11.sp, fontWeight = FontWeight.Black, color = Color.White)
                                 }
                             }
                         }

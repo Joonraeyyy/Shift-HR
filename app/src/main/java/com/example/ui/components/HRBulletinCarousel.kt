@@ -58,9 +58,16 @@ import com.example.ui.viewmodel.BulletinComment
 import com.example.ui.viewmodel.TimeTrackerViewModel
 import kotlin.math.absoluteValue
 
+// Corporate Color Palette
+private val CorpEmerald = Color(0xFF10B981)
+private val CorpCyan = Color(0xFF06B6D4)
+private val CorpDarkNavy = Color(0xFF0B1120)
+private val CorpSlateCard = Color(0xFF131E32)
+private val CorpBorder = Color(0xFF1E293B)
+private val CorpGold = Color(0xFFF59E0B)
+
 /**
- * 3D Fanning Stacked Carousel Card Component for HR Bulletin
- * Matching the exact visual aesthetic with arched 3D cards, pill tags, and detailed announcement view.
+ * Corporate Style 3D Fanning HR Bulletin & Executive Directive Desk
  */
 @Composable
 fun HRBulletinSection(
@@ -74,7 +81,7 @@ fun HRBulletinSection(
     var selectedBulletin by remember { mutableStateOf<Announcement?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    // Detail modal dialog
+    // Corporate Detail Modal dialog
     if (selectedBulletin != null) {
         val currentPost = announcements.find { it.id == selectedBulletin!!.id } ?: selectedBulletin!!
         HRBulletinDetailDialog(
@@ -92,7 +99,7 @@ fun HRBulletinSection(
         )
     }
 
-    // HR Create Bulletin Dialog
+    // HR Publish Corporate Directive Dialog
     if (showCreateDialog) {
         HRCreateBulletinDialog(
             onDismiss = { showCreateDialog = false },
@@ -114,10 +121,10 @@ fun HRBulletinSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Top Header Section: Eyebrow + Display Headline + HR Action
+        // Executive Header Section
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -126,57 +133,71 @@ fun HRBulletinSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(CorpEmerald)
+                    )
+                    Text(
+                        text = "CORPORATE DIRECTIVES & HR BULLETIN",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        color = CorpEmerald,
+                        letterSpacing = 1.8.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "DAILY ENERGY & HR BULLETIN",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFFE2B774), // Warm golden editorial tone
-                    letterSpacing = 2.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Feel Better Every Day",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Black,
+                    text = "Executive Operations Desk",
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = Color.White,
-                    letterSpacing = (-0.5).sp
+                    letterSpacing = (-0.4).sp
                 )
             }
 
-            // Post Button for HR / Management
+            // Post Button for Corporate / HR Admins
             if (isHrOrManager) {
                 Button(
                     onClick = { showCreateDialog = true },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White.copy(alpha = 0.15f),
-                        contentColor = Color.White
+                        containerColor = CorpEmerald.copy(alpha = 0.18f),
+                        contentColor = CorpEmerald
                     ),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, CorpEmerald.copy(alpha = 0.4f)),
                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                    modifier = Modifier.height(34.dp).testTag("btn_post_hr_bulletin")
+                    modifier = Modifier
+                        .height(34.dp)
+                        .testTag("btn_post_hr_bulletin")
                 ) {
-                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Post", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.PostAdd, contentDescription = "Dispatch Memo", modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("+ Post", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text("+ Dispatch Memo", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         if (announcements.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(200.dp)
-                    .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(20.dp)),
+                    .background(CorpSlateCard.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                    .border(1.dp, CorpBorder, RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No announcements published yet.", color = Color.White.copy(alpha = 0.6f))
+                Text("No corporate directives published yet.", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
             }
         } else {
-            // 3D Stacked Fanning Carousel
+            // 3D Stacked Corporate Pager
             val pagerState = rememberPagerState(
                 initialPage = 0,
                 pageCount = { announcements.size }
@@ -187,29 +208,29 @@ fun HRBulletinSection(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(380.dp),
+                    .height(375.dp),
                 contentAlignment = Alignment.Center
             ) {
                 HorizontalPager(
                     state = pagerState,
-                    contentPadding = PaddingValues(horizontal = 72.dp),
-                    pageSpacing = (-28).dp,
+                    contentPadding = PaddingValues(horizontal = 68.dp),
+                    pageSpacing = (-24).dp,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(370.dp)
+                        .height(365.dp)
                         .testTag("hr_bulletin_3d_pager")
                 ) { page ->
                     val bulletin = announcements[page]
                     val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
                         .coerceIn(-3f, 3f)
 
-                    // 3D Arched Transformation calculations
-                    val scale = lerp(0.85f, 1f, 1f - pageOffset.absoluteValue.coerceIn(0f, 1f))
-                    val rotationZ = (pageOffset * 6.5f) // Fans along the arc
-                    val rotationY = (pageOffset * -16f) // 3D inward perspective
-                    val translationY = (pageOffset.absoluteValue * 26.dp.value * density) // Downward arch curve
-                    val translationX = (pageOffset * 6.dp.value * density)
-                    val alpha = lerp(0.55f, 1f, 1f - (pageOffset.absoluteValue * 0.35f).coerceIn(0f, 0.45f))
+                    // 3D Arched Transformations
+                    val scale = lerp(0.86f, 1f, 1f - pageOffset.absoluteValue.coerceIn(0f, 1f))
+                    val rotationZ = (pageOffset * 5.5f)
+                    val rotationY = (pageOffset * -15f)
+                    val translationY = (pageOffset.absoluteValue * 22.dp.value * density)
+                    val translationX = (pageOffset * 5.dp.value * density)
+                    val alpha = lerp(0.6f, 1f, 1f - (pageOffset.absoluteValue * 0.3f).coerceIn(0f, 0.4f))
 
                     Box(
                         modifier = Modifier
@@ -226,7 +247,7 @@ fun HRBulletinSection(
                             .fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        HRBulletinCard(
+                        HRCorporateCard(
                             bulletin = bulletin,
                             onClick = { selectedBulletin = bulletin }
                         )
@@ -234,29 +255,29 @@ fun HRBulletinSection(
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // Carousel Dot Indicators
+            // Corporate Pager Indicator Dots
             Row(
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = 2.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 repeat(announcements.size) { index ->
                     val isSelected = pagerState.currentPage == index
                     val dotWidth by animateFloatAsState(
-                        targetValue = if (isSelected) 22f else 6f,
+                        targetValue = if (isSelected) 24f else 6f,
                         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                        label = "dot_width"
+                        label = "corp_dot_width"
                     )
 
                     Box(
                         modifier = Modifier
-                            .height(5.dp)
+                            .height(4.dp)
                             .width(dotWidth.dp)
-                            .clip(RoundedCornerShape(3.dp))
+                            .clip(RoundedCornerShape(2.dp))
                             .background(
-                                if (isSelected) Color.White else Color.White.copy(alpha = 0.3f)
+                                if (isSelected) CorpEmerald else Color.White.copy(alpha = 0.25f)
                             )
                     )
                 }
@@ -266,25 +287,35 @@ fun HRBulletinSection(
 }
 
 /**
- * Single 3D Bulletin Card Item
+ * Single Corporate Directive Card
  */
 @Composable
-fun HRBulletinCard(
+fun HRCorporateCard(
     bulletin: Announcement,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
+    // Category Corporate Pill Colors
+    val (pillBg, pillBorder, pillText) = when (bulletin.category.uppercase()) {
+        "POLICY" -> Triple(CorpEmerald.copy(alpha = 0.2f), CorpEmerald.copy(alpha = 0.6f), CorpEmerald)
+        "STRATEGY" -> Triple(CorpCyan.copy(alpha = 0.2f), CorpCyan.copy(alpha = 0.6f), CorpCyan)
+        "COMPLIANCE" -> Triple(Color(0xFFE11D48).copy(alpha = 0.2f), Color(0xFFE11D48).copy(alpha = 0.6f), Color(0xFFFF6482))
+        "TOWN HALL" -> Triple(CorpGold.copy(alpha = 0.2f), CorpGold.copy(alpha = 0.6f), CorpGold)
+        "BENEFITS" -> Triple(Color(0xFF8B5CF6).copy(alpha = 0.2f), Color(0xFF8B5CF6).copy(alpha = 0.6f), Color(0xFFA78BFA))
+        else -> Triple(Color.White.copy(alpha = 0.15f), Color.White.copy(alpha = 0.35f), Color.White)
+    }
+
     Card(
         modifier = modifier
-            .width(235.dp)
-            .height(345.dp)
+            .width(240.dp)
+            .height(340.dp)
             .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(26.dp),
-                spotColor = Color.Black.copy(alpha = 0.6f),
-                ambientColor = Color.Black.copy(alpha = 0.4f)
+                elevation = 18.dp,
+                shape = RoundedCornerShape(20.dp),
+                spotColor = Color.Black.copy(alpha = 0.7f),
+                ambientColor = Color.Black.copy(alpha = 0.5f)
             )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -292,19 +323,18 @@ fun HRBulletinCard(
                 onClick = onClick
             )
             .testTag("bulletin_card_${bulletin.id}"),
-        shape = RoundedCornerShape(26.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF18181B)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CorpDarkNavy),
+        border = BorderStroke(1.dp, Color(0xFF334155).copy(alpha = 0.8f))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. Photo Background Cover
+            // 1. Corporate Imagery Background
             when {
                 bulletin.drawableResName.isNotEmpty() -> {
                     val resId = when (bulletin.drawableResName) {
-                        "img_hr_mind_reset" -> R.drawable.img_hr_mind_reset
-                        "img_hr_morning_flow" -> R.drawable.img_hr_morning_flow
-                        "img_hr_team_summit" -> R.drawable.img_hr_team_summit
-                        else -> R.drawable.img_hr_mind_reset
+                        "corp_global_synergy" -> R.drawable.corp_global_synergy
+                        "corp_executive_boardroom" -> R.drawable.corp_executive_boardroom
+                        else -> R.drawable.corp_executive_boardroom
                     }
                     Image(
                         painter = painterResource(id = resId),
@@ -325,105 +355,137 @@ fun HRBulletinCard(
                     )
                 }
                 else -> {
-                    // Aesthetic fallback ambient gradient
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
                                 Brush.linearGradient(
-                                    colors = listOf(Color(0xFF833AB4), Color(0xFFFD1D1D), Color(0xFFFCB045))
+                                    colors = listOf(Color(0xFF0F172A), Color(0xFF1E293B))
                                 )
                             )
                     )
                 }
             }
 
-            // 2. Dark Cinematic Overlay Gradient for crisp text readability
+            // 2. High-contrast Slate Executive Gradient Overlay
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.55f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.35f),
-                                Color.Black.copy(alpha = 0.85f)
+                                Color(0xFF0B1120).copy(alpha = 0.85f),
+                                Color(0xFF0B1120).copy(alpha = 0.25f),
+                                Color(0xFF0B1120).copy(alpha = 0.75f),
+                                Color(0xFF0B1120).copy(alpha = 0.96f)
                             )
                         )
                     )
             )
 
-            // 3. Top Content: Title + Subtitle on Left, Glass Pill Badge on Right
+            // 3. Card Details & Meta
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(18.dp),
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
+                // Top Tag Bar: Official Classification & Category
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                    // Official Tag
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = CorpEmerald, modifier = Modifier.size(11.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = bulletin.title,
-                            fontSize = 20.sp,
+                            text = "OFFICIAL",
+                            fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            lineHeight = 24.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
+                            color = Color.White.copy(alpha = 0.9f),
+                            letterSpacing = 0.8.sp
                         )
-                        if (bulletin.subtitle.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = bulletin.subtitle,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = Color.White.copy(alpha = 0.85f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
                     }
 
-                    // Glassmorphic Category Tag Pill
+                    // Category Pill
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.White.copy(alpha = 0.22f))
-                            .border(1.dp, Color.White.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                            .padding(horizontal = 12.dp, vertical = 5.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(pillBg)
+                            .border(1.dp, pillBorder, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 9.dp, vertical = 3.dp)
                     ) {
                         Text(
-                            text = bulletin.category,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color.White,
-                            maxLines = 1
+                            text = bulletin.category.uppercase(),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = pillText,
+                            letterSpacing = 0.5.sp
                         )
                     }
                 }
 
-                // Bottom Content: Tap hint with subtle blur bar
+                // Middle Content: Directive Title & Department
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        text = bulletin.title,
+                        fontSize = 19.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White,
+                        lineHeight = 23.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (bulletin.subtitle.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = bulletin.subtitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = CorpCyan,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Issued by: ${bulletin.author}",
+                        fontSize = 10.sp,
+                        color = Color.White.copy(alpha = 0.65f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Bottom Action & Engagement Bar
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(12.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF0F172A).copy(alpha = 0.85f))
+                        .border(1.dp, Color(0xFF334155).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Tap to view update ↗",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = Color.White.copy(alpha = 0.85f)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "Review Memo",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CorpEmerald
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Icon(Icons.Default.ArrowOutward, contentDescription = null, tint = CorpEmerald, modifier = Modifier.size(12.dp))
+                    }
                     
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -432,10 +494,10 @@ fun HRBulletinCard(
                         if (bulletin.likesCount > 0) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    Icons.Default.Favorite,
+                                    Icons.Default.ThumbUp,
                                     contentDescription = null,
-                                    tint = Color(0xFFF43F5E),
-                                    modifier = Modifier.size(12.dp)
+                                    tint = CorpCyan,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
@@ -449,10 +511,10 @@ fun HRBulletinCard(
                         if (bulletin.comments.isNotEmpty()) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    Icons.Default.ChatBubble,
+                                    Icons.Default.QuestionAnswer,
                                     contentDescription = null,
-                                    tint = Color(0xFF38BDF8),
-                                    modifier = Modifier.size(12.dp)
+                                    tint = CorpGold,
+                                    modifier = Modifier.size(11.dp)
                                 )
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Text(
@@ -471,7 +533,7 @@ fun HRBulletinCard(
 }
 
 /**
- * Rich Detail Modal for Bulletin Announcement
+ * Formal Corporate Memorandum Detail Dialog
  */
 @Composable
 fun HRBulletinDetailDialog(
@@ -485,7 +547,6 @@ fun HRBulletinDetailDialog(
     val context = LocalContext.current
     var commentInput by remember { mutableStateOf("") }
     
-    // Multi-photo slider pager if gallery exists
     val allPhotos = remember(bulletin) {
         val list = mutableListOf<String>()
         if (bulletin.imageUrl.isNotEmpty()) list.add(bulletin.imageUrl)
@@ -500,46 +561,93 @@ fun HRBulletinDetailDialog(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.9f)
-                .shadow(24.dp, RoundedCornerShape(28.dp)),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f)
+                .shadow(28.dp, RoundedCornerShape(24.dp)),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1322)),
+            border = BorderStroke(1.dp, Color(0xFF334155))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // 1. Hero Image / Multi-Photo Carousel Banner
+                // 1. Executive Memo Header Bar
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF070C16))
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CorpEmerald.copy(alpha = 0.15f))
+                                .border(1.dp, CorpEmerald.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.CorporateFare, contentDescription = null, tint = CorpEmerald, modifier = Modifier.size(18.dp))
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "ENTERPRISE DIRECTIVE & MEMORANDUM",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                color = CorpEmerald,
+                                letterSpacing = 1.2.sp
+                            )
+                            Text(
+                                text = "REF: CORP-${bulletin.id.take(8).uppercase()}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.08f))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(18.dp))
+                    }
+                }
+
+                // 2. Photo / Executive Graphic Banner
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
+                        .height(200.dp)
                 ) {
                     if (allPhotos.isNotEmpty()) {
                         HorizontalPager(
                             state = galleryPagerState,
                             modifier = Modifier.fillMaxSize()
                         ) { page ->
-                            val photoUrl = allPhotos[page]
                             AsyncImage(
                                 model = ImageRequest.Builder(context)
-                                    .data(photoUrl)
+                                    .data(allPhotos[page])
                                     .crossfade(true)
                                     .build(),
-                                contentDescription = "Gallery photo ${page + 1}",
+                                contentDescription = "Memo photo ${page + 1}",
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Crop
                             )
                         }
                     } else if (bulletin.drawableResName.isNotEmpty()) {
                         val resId = when (bulletin.drawableResName) {
-                            "img_hr_mind_reset" -> R.drawable.img_hr_mind_reset
-                            "img_hr_morning_flow" -> R.drawable.img_hr_morning_flow
-                            "img_hr_team_summit" -> R.drawable.img_hr_team_summit
-                            else -> R.drawable.img_hr_mind_reset
+                            "corp_global_synergy" -> R.drawable.corp_global_synergy
+                            "corp_executive_boardroom" -> R.drawable.corp_executive_boardroom
+                            else -> R.drawable.corp_executive_boardroom
                         }
                         Image(
                             painter = painterResource(id = resId),
@@ -551,236 +659,194 @@ fun HRBulletinDetailDialog(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(Brush.linearGradient(listOf(Color(0xFF3B82F6), Color(0xFF8B5CF6))))
+                                .background(Brush.linearGradient(listOf(Color(0xFF0F172A), Color(0xFF1E293B))))
                         )
                     }
 
-                    // Gradient overlay on photo
+                    // Gradient overlay
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(
                                 Brush.verticalGradient(
                                     colors = listOf(
-                                        Color.Black.copy(alpha = 0.5f),
                                         Color.Transparent,
-                                        Color(0xFF0F172A)
+                                        Color(0xFF0B1322).copy(alpha = 0.9f),
+                                        Color(0xFF0B1322)
                                     )
                                 )
                             )
                     )
 
-                    // Close Button + Category Tag
-                    Row(
+                    // Pill Badge
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .align(Alignment.BottomStart)
+                            .padding(start = 18.dp, bottom = 10.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(CorpDarkNavy)
+                            .border(1.dp, CorpEmerald.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color.Black.copy(alpha = 0.5f))
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                                .padding(horizontal = 12.dp, vertical = 5.dp)
-                        ) {
-                            Text(
-                                text = bulletin.category.uppercase(),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                letterSpacing = 1.sp
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onDismiss,
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.6f))
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
-                    }
-
-                    // Multi-photo indicator dots if > 1
-                    if (allPhotos.size > 1) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            repeat(allPhotos.size) { idx ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(if (galleryPagerState.currentPage == idx) 8.dp else 5.dp)
-                                        .clip(CircleShape)
-                                        .background(if (galleryPagerState.currentPage == idx) Color.White else Color.White.copy(alpha = 0.4f))
-                                )
-                            }
-                        }
+                        Text(
+                            text = "CATEGORY: ${bulletin.category.uppercase()}",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CorpEmerald,
+                            letterSpacing = 0.5.sp
+                        )
                     }
                 }
 
-                // 2. Main Announcement Body & Details
+                // 3. Corporate Directive Metadata Grid
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                        .padding(horizontal = 18.dp)
                 ) {
                     Text(
                         text = bulletin.title,
-                        fontSize = 24.sp,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White,
-                        lineHeight = 30.sp
+                        lineHeight = 28.sp
                     )
 
                     if (bulletin.subtitle.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
                             text = bulletin.subtitle,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color(0xFF38BDF8)
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = CorpCyan
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    // Author & Date metadata chip row
-                    Row(
+                    // Formal Memo Data Table
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                            .background(Color(0xFF111C30), RoundedCornerShape(12.dp))
+                            .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(12.dp))
+                            .padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = bulletin.author,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-
-                        Text(
-                            text = bulletin.date,
-                            fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+                        MemoDataRow(label = "ISSUED BY", value = bulletin.author, icon = Icons.Default.AccountBalance)
+                        MemoDataRow(label = "DATE OF ISSUE", value = bulletin.date, icon = Icons.Default.CalendarToday)
+                        MemoDataRow(label = "GOVERNANCE", value = "Enterprise Active Mandate", icon = Icons.Default.Gavel)
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Full Content Body
+                    // Directive Content Body
+                    Text(
+                        text = "DIRECTIVE DETAILS & OPERATING PROCEDURES",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color.White.copy(alpha = 0.5f),
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = bulletin.content,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp,
+                        fontSize = 13.sp,
+                        lineHeight = 21.sp,
                         color = Color.White.copy(alpha = 0.9f)
                     )
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    // 3. Reaction & Engagement Action Bar
+                    // 4. Corporate Action Bar: Endorse, Celebrate & Archive
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(16.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .background(Color(0xFF111C30), RoundedCornerShape(14.dp))
+                            .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(14.dp))
                             .padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Like Button
+                        // Endorse / Like Button
                         Button(
                             onClick = onLikeClick,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (bulletin.isLiked) Color(0xFFF43F5E).copy(alpha = 0.2f) else Color.Transparent,
-                                contentColor = if (bulletin.isLiked) Color(0xFFF43F5E) else Color.White.copy(alpha = 0.8f)
+                                containerColor = if (bulletin.isLiked) CorpCyan.copy(alpha = 0.2f) else Color.Transparent,
+                                contentColor = if (bulletin.isLiked) CorpCyan else Color.White.copy(alpha = 0.8f)
                             ),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                             modifier = Modifier.testTag("btn_like_bulletin")
                         ) {
                             Icon(
-                                if (bulletin.isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = "Like",
-                                tint = if (bulletin.isLiked) Color(0xFFF43F5E) else Color.White,
-                                modifier = Modifier.size(16.dp)
+                                if (bulletin.isLiked) Icons.Default.ThumbUp else Icons.Outlined.ThumbUp,
+                                contentDescription = "Endorse",
+                                tint = if (bulletin.isLiked) CorpCyan else Color.White,
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Like (${bulletin.likesCount})",
-                                fontSize = 12.sp,
+                                text = "Endorse (${bulletin.likesCount})",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        // Celebrate Button
+                        // Celebrate Milestone Button
                         Button(
                             onClick = onCelebrateClick,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (bulletin.isCelebrated) Color(0xFFF59E0B).copy(alpha = 0.2f) else Color.Transparent,
-                                contentColor = if (bulletin.isCelebrated) Color(0xFFF59E0B) else Color.White.copy(alpha = 0.8f)
+                                containerColor = if (bulletin.isCelebrated) CorpGold.copy(alpha = 0.2f) else Color.Transparent,
+                                contentColor = if (bulletin.isCelebrated) CorpGold else Color.White.copy(alpha = 0.8f)
                             ),
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
                             modifier = Modifier.testTag("btn_celebrate_bulletin")
                         ) {
                             Icon(
                                 Icons.Default.Celebration,
                                 contentDescription = "Celebrate",
-                                tint = if (bulletin.isCelebrated) Color(0xFFF59E0B) else Color.White,
-                                modifier = Modifier.size(16.dp)
+                                tint = if (bulletin.isCelebrated) CorpGold else Color.White,
+                                modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Celebrate (${bulletin.celebrateCount})",
-                                fontSize = 12.sp,
+                                text = "Acknowledge (${bulletin.celebrateCount})",
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
 
-                        // Delete / Archive if HR
                         if (onDeleteClick != null) {
                             IconButton(
                                 onClick = onDeleteClick,
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(34.dp)
                             ) {
-                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = Color(0xFFF43F5E).copy(alpha = 0.7f))
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", tint = Color(0xFFF43F5E).copy(alpha = 0.8f))
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    // 4. Employee Comments & Acknowledgments Thread
+                    // 5. Official Department Feedback Thread
                     Text(
-                        text = "ACKNOWLEDGMENTS & COMMENTS (${bulletin.comments.size})",
-                        fontSize = 11.sp,
+                        text = "DEPARTMENT INQUIRIES & ACKNOWLEDGMENTS (${bulletin.comments.size})",
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
                         color = Color.White.copy(alpha = 0.5f),
                         letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (bulletin.comments.isEmpty()) {
                         Text(
-                            text = "Be the first team member to acknowledge or share thoughts!",
-                            fontSize = 12.sp,
+                            text = "No employee questions or acknowledgments logged yet.",
+                            fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.4f),
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            modifier = Modifier.padding(vertical = 6.dp)
                         )
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -788,23 +854,39 @@ fun HRBulletinDetailDialog(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .background(Color.White.copy(alpha = 0.03f), RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                                        .padding(12.dp)
+                                        .background(Color(0xFF111C30), RoundedCornerShape(10.dp))
+                                        .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(10.dp))
+                                        .padding(10.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(
-                                            text = "${comment.authorName} • ${comment.authorRole}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF38BDF8)
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = comment.authorName,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(CorpCyan.copy(alpha = 0.2f))
+                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = comment.authorRole,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = CorpCyan
+                                                )
+                                            }
+                                        }
                                         Text(
                                             text = comment.timestamp,
-                                            fontSize = 10.sp,
+                                            fontSize = 9.sp,
                                             color = Color.White.copy(alpha = 0.4f)
                                         )
                                     }
@@ -821,7 +903,7 @@ fun HRBulletinDetailDialog(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Comment input box
+                    // Input Row for Remarks
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -830,17 +912,17 @@ fun HRBulletinDetailDialog(
                         OutlinedTextField(
                             value = commentInput,
                             onValueChange = { commentInput = it },
-                            placeholder = { Text("Write comment or note...", fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f)) },
+                            placeholder = { Text("Log official response or note...", fontSize = 11.sp, color = Color.White.copy(alpha = 0.4f)) },
                             modifier = Modifier.weight(1f).testTag("bulletin_comment_input"),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Color.White,
                                 unfocusedTextColor = Color.White,
-                                focusedBorderColor = Color(0xFF38BDF8),
-                                unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                                focusedContainerColor = Color.Black.copy(alpha = 0.2f),
-                                unfocusedContainerColor = Color.Black.copy(alpha = 0.2f)
+                                focusedBorderColor = CorpEmerald,
+                                unfocusedBorderColor = Color(0xFF334155),
+                                focusedContainerColor = Color(0xFF0F172A),
+                                unfocusedContainerColor = Color(0xFF0F172A)
                             ),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(10.dp)
                         )
 
                         IconButton(
@@ -851,12 +933,12 @@ fun HRBulletinDetailDialog(
                                 }
                             },
                             modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFF38BDF8))
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(CorpEmerald)
                                 .testTag("btn_send_bulletin_comment")
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.Black, modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Send, contentDescription = "Send", tint = Color.Black, modifier = Modifier.size(16.dp))
                         }
                     }
 
@@ -867,8 +949,24 @@ fun HRBulletinDetailDialog(
     }
 }
 
+@Composable
+private fun MemoDataRow(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = CorpEmerald, modifier = Modifier.size(13.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.5f))
+        }
+        Text(value, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+    }
+}
+
 /**
- * HR Creator Dialog to Post new Bulletin Cards with Photos
+ * HR Creator Dialog to Dispatch Official Corporate Directives
  */
 @Composable
 fun HRCreateBulletinDialog(
@@ -879,16 +977,16 @@ fun HRCreateBulletinDialog(
     var title by remember { mutableStateOf("") }
     var subtitle by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Wellness") }
-    var selectedVisualPreset by remember { mutableStateOf("img_hr_mind_reset") }
+    var selectedCategory by remember { mutableStateOf("POLICY") }
+    var selectedVisualPreset by remember { mutableStateOf("corp_executive_boardroom") }
     var customImageUrl by remember { mutableStateOf("") }
     var additionalPhotosCsv by remember { mutableStateOf("") }
 
-    val categories = listOf("Calm", "Ritual", "Sleep", "Motion", "Health", "Fitness", "Milestone", "Culture", "Event", "Policy")
+    val categories = listOf("POLICY", "STRATEGY", "COMPLIANCE", "TOWN HALL", "BENEFITS", "OPERATIONS", "SECURITY", "TALENT")
     val visualPresets = listOf(
-        "img_hr_mind_reset" to "Mind Reset (Warm Editorial)",
-        "img_hr_morning_flow" to "Morning Flow (Sunlight Glow)",
-        "img_hr_team_summit" to "Team Summit (Executive Chic)"
+        "corp_executive_boardroom" to "Executive Boardroom (Glass Skyline)",
+        "corp_global_synergy" to "Global Strategy (Enterprise Sync)",
+        "img_hr_team_summit" to "Leadership Summit (Summit Hall)"
     )
 
     Dialog(
@@ -897,19 +995,19 @@ fun HRCreateBulletinDialog(
     ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
-                .fillMaxHeight(0.9f)
-                .shadow(24.dp, RoundedCornerShape(24.dp)),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f)
+                .shadow(24.dp, RoundedCornerShape(20.dp)),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B1322)),
+            border = BorderStroke(1.dp, Color(0xFF334155))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(20.dp)
+                    .padding(18.dp)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Header
                 Row(
@@ -919,14 +1017,14 @@ fun HRCreateBulletinDialog(
                 ) {
                     Column {
                         Text(
-                            text = "PUBLISH HR BULLETIN POST",
+                            text = "DISPATCH CORPORATE DIRECTIVE",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color(0xFFE2B774),
-                            letterSpacing = 1.5.sp
+                            color = CorpEmerald,
+                            letterSpacing = 1.4.sp
                         )
                         Text(
-                            text = "Create Visual Announcement",
+                            text = "Executive Memo Authoring",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -938,42 +1036,42 @@ fun HRCreateBulletinDialog(
                     }
                 }
 
-                Divider(color = Color.White.copy(alpha = 0.1f))
+                HorizontalDivider(color = Color(0xFF1E293B))
 
                 // Title Input
-                Text("Post Headline / Title", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("Memo Subject / Directive Title", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    placeholder = { Text("e.g. Mid-Day Wellness Circle", color = Color.White.copy(alpha = 0.4f)) },
+                    placeholder = { Text("e.g. Q3 Regional Synergy & Compliance Directive", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth().testTag("input_bulletin_title"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                        focusedBorderColor = CorpEmerald,
+                        unfocusedBorderColor = Color(0xFF334155)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
                 // Subtitle Input
-                Text("Subtitle / Tagline", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("Executive Summary / Tagline", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 OutlinedTextField(
                     value = subtitle,
                     onValueChange = { subtitle = it },
-                    placeholder = { Text("e.g. Breathe, recharge, and refocus together", color = Color.White.copy(alpha = 0.4f)) },
+                    placeholder = { Text("e.g. Enterprise Hybrid Protocol & Roster Alignment", color = Color.White.copy(alpha = 0.4f), fontSize = 12.sp) },
                     modifier = Modifier.fillMaxWidth().testTag("input_bulletin_subtitle"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                        focusedBorderColor = CorpEmerald,
+                        unfocusedBorderColor = Color(0xFF334155)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
                 // Category Selection
-                Text("Category Pill Badge", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("Directive Classification", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -984,16 +1082,16 @@ fun HRCreateBulletinDialog(
                         val isSelected = selectedCategory == cat
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isSelected) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.08f))
-                                .border(1.dp, if (isSelected) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.15f), RoundedCornerShape(14.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) CorpEmerald else Color(0xFF111C30))
+                                .border(1.dp, if (isSelected) CorpEmerald else Color(0xFF1E293B), RoundedCornerShape(10.dp))
                                 .clickable { selectedCategory = cat }
-                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = cat,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
                                 color = if (isSelected) Color.Black else Color.White
                             )
                         }
@@ -1001,21 +1099,21 @@ fun HRCreateBulletinDialog(
                 }
 
                 // Choose Cover Photo Visual Preset
-                Text("Select Cover Photography", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("Select Corporate Visual Theme", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     visualPresets.forEach { (resKey, label) ->
                         val isSelected = selectedVisualPreset == resKey && customImageUrl.isBlank()
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.04f))
-                                .border(1.dp, if (isSelected) Color(0xFF38BDF8) else Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (isSelected) Color(0xFF162540) else Color(0xFF111C30))
+                                .border(1.dp, if (isSelected) CorpEmerald else Color(0xFF1E293B), RoundedCornerShape(10.dp))
                                 .clickable {
                                     selectedVisualPreset = resKey
                                     customImageUrl = ""
                                 }
-                                .padding(12.dp),
+                                .padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             RadioButton(
@@ -1024,65 +1122,65 @@ fun HRCreateBulletinDialog(
                                     selectedVisualPreset = resKey
                                     customImageUrl = ""
                                 },
-                                colors = RadioButtonDefaults.colors(selectedColor = Color(0xFF38BDF8), unselectedColor = Color.White.copy(alpha = 0.4f))
+                                colors = RadioButtonDefaults.colors(selectedColor = CorpEmerald, unselectedColor = Color.White.copy(alpha = 0.4f))
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(text = label, fontSize = 12.sp, color = Color.White)
                         }
                     }
                 }
 
-                // Or Custom Photo URL
-                Text("Or Custom Photo URL / Cloud Image", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                // Custom Photo URL
+                Text("Or Custom Enterprise Graphic URL", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 OutlinedTextField(
                     value = customImageUrl,
                     onValueChange = { customImageUrl = it },
-                    placeholder = { Text("https://example.com/photo.jpg", color = Color.White.copy(alpha = 0.4f)) },
+                    placeholder = { Text("https://company.com/memo-banner.jpg", color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth().testTag("input_bulletin_custom_url"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                        focusedBorderColor = CorpEmerald,
+                        unfocusedBorderColor = Color(0xFF334155)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
-                // Additional Gallery Photos
-                Text("Additional Gallery Photo URLs (comma-separated)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                // Additional Photos
+                Text("Additional Document & Gallery URLs (comma-separated)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 OutlinedTextField(
                     value = additionalPhotosCsv,
                     onValueChange = { additionalPhotosCsv = it },
-                    placeholder = { Text("https://photo1.jpg, https://photo2.jpg", color = Color.White.copy(alpha = 0.4f)) },
+                    placeholder = { Text("https://img1.jpg, https://img2.jpg", color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                        focusedBorderColor = CorpEmerald,
+                        unfocusedBorderColor = Color(0xFF334155)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
                 // Detailed Announcement Content
-                Text("Full Announcement Body", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
+                Text("Official Directive Memorandum Body", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.8f))
                 OutlinedTextField(
                     value = content,
                     onValueChange = { content = it },
-                    placeholder = { Text("Write full update, schedule, directives or details...", color = Color.White.copy(alpha = 0.4f)) },
+                    placeholder = { Text("Enter formal policy directives, memorandum reference, scope, timelines, and instructions...", color = Color.White.copy(alpha = 0.4f), fontSize = 11.sp) },
                     modifier = Modifier.fillMaxWidth().height(120.dp).testTag("input_bulletin_content"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFF38BDF8),
-                        unfocusedBorderColor = Color.White.copy(alpha = 0.2f)
+                        focusedBorderColor = CorpEmerald,
+                        unfocusedBorderColor = Color(0xFF334155)
                     ),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(10.dp)
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                // Actions
+                // Action Buttons
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -1092,12 +1190,12 @@ fun HRCreateBulletinDialog(
                         Text("Cancel", color = Color.White.copy(alpha = 0.6f))
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
 
                     Button(
                         onClick = {
                             if (title.isBlank() || content.isBlank()) {
-                                Toast.makeText(context, "Please provide a title and announcement content.", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Please provide directive title and content.", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
                             val galleryList = additionalPhotosCsv.split(",")
@@ -1114,13 +1212,13 @@ fun HRCreateBulletinDialog(
                                 galleryList
                             )
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8), contentColor = Color.Black),
-                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = CorpEmerald, contentColor = Color.Black),
+                        shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.testTag("btn_publish_bulletin")
                     ) {
-                        Icon(Icons.Default.Publish, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Publish Bulletin", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Text("Dispatch Directive", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }

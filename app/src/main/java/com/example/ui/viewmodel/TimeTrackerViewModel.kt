@@ -438,104 +438,88 @@ class TimeTrackerViewModel(application: Application) : AndroidViewModel(applicat
 
     var announcements = mutableStateOf<List<Announcement>>(listOf(
         Announcement(
-            title = "Mind Reset",
-            subtitle = "Breathe and refocus",
-            category = "Calm",
-            drawableResName = "img_hr_mind_reset",
-            author = "Aditya Joshi (Director, HR)",
+            title = "Q3 Hybrid Policy",
+            subtitle = "Enterprise Work Protocol",
+            category = "POLICY",
+            drawableResName = "corp_executive_boardroom",
+            author = "Executive Leadership Council",
             date = "2026-08-14",
-            content = "Take a 5-minute diaphragmatic breathing pause today. Our workplace wellness analysis shows that micro-breaks reduce cognitive fatigue by 34% during long shifts. Join the daily 3:00 PM mindfulness circle or take asynchronous quiet time.",
+            content = "MEMORANDUM REF #ELC-2026-Q3-088\n\nTo: All Enterprise Personnel & Regional Operating Hubs\nSubject: Updated Q3 Hybrid Workplace Guidelines & Cross-Border Collaboration Protocol.\n\nAs part of our commitment to agile workforce enablement, starting Monday all teams are authorized for the 3/2 hybrid model with core synchronized collaboration hours (10:00 AM - 4:00 PM local hub time). Please review the updated secure VPN compliance mandates and ensure bi-weekly timesheet approvals with your regional supervisor.",
             galleryImages = listOf(
-                "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&q=80",
-                "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&q=80"
+                "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+                "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800&q=80"
             ),
-            likesCount = 28,
-            celebrateCount = 15,
+            likesCount = 48,
+            celebrateCount = 31,
             comments = listOf(
-                BulletinComment(authorName = "Sarah Jenkins", authorRole = "EMPLOYEE", text = "This mid-day breathing pause has been a gamechanger for my afternoon focus!", timestamp = "10:30 AM"),
-                BulletinComment(authorName = "Robert Chen", authorRole = "SUPERVISOR", text = "Encouraging the entire Indore development cohort to join!", timestamp = "11:15 AM")
+                BulletinComment(authorName = "Elena Rostova", authorRole = "MANAGER", text = "The cross-border synchronization window is well structured for both Indore and Manila desks.", timestamp = "10:15 AM"),
+                BulletinComment(authorName = "Robert Chen", authorRole = "SUPERVISOR", text = "Supervisor desk team rosters have been adjusted accordingly.", timestamp = "11:00 AM")
             ),
             isPinned = true
         ),
         Announcement(
-            title = "Morning Flow",
-            subtitle = "Start with clarity",
-            category = "Ritual",
-            drawableResName = "img_hr_morning_flow",
-            author = "HR Wellness Operations",
+            title = "Global Synergies",
+            subtitle = "Expansion & Hub Sync",
+            category = "STRATEGY",
+            drawableResName = "corp_global_synergy",
+            author = "Office of Global Strategy",
             date = "2026-08-13",
-            content = "Set intentional goals before your first shift punch. Our new hybrid workplace guidance encourages prioritizing your top 3 high-impact tasks in the first 90 minutes. Hydrate well and synchronize your daily sprint tracker with team leads.",
+            content = "MEMORANDUM REF #OGS-2026-Q3-014\n\nTo: All Department Heads & Project Leads\nSubject: Integration of Philippine & Indore Strategic Operation Hubs.\n\nWe are pleased to announce the successful rollout of the unified SaaS payroll ledger and multi-tier compliance engine across our regional operations. Cross-hub shift alignment has increased operational throughput by 28%. Join this Thursday's Global Operations Review via the Control Room.",
             galleryImages = listOf(
-                "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&q=80"
-            ),
-            likesCount = 19,
-            celebrateCount = 11,
-            comments = listOf(
-                BulletinComment(authorName = "Elena Rostova", authorRole = "MANAGER", text = "Clarity first, speed second. Great workplace principle!", timestamp = "Yesterday")
-            )
-        ),
-        Announcement(
-            title = "Sleep Score",
-            subtitle = "Track your recovery",
-            category = "Sleep",
-            drawableResName = "img_hr_mind_reset",
-            author = "Health & Ergonomics Lead",
-            date = "2026-08-12",
-            content = "Quality rest directly correlates with sustained performance. Review your biometric shift intervals and ensure adequate rest cycles between night rotations and morning sprints.",
-            galleryImages = listOf(
-                "https://images.unsplash.com/photo-1511295742362-92c96b124e52?w=800&q=80"
-            ),
-            likesCount = 34,
-            celebrateCount = 9,
-            comments = emptyList()
-        ),
-        Announcement(
-            title = "Heart Rhythm",
-            subtitle = "Feel every signal",
-            category = "Health",
-            drawableResName = "img_hr_morning_flow",
-            author = "Dr. Priya Verma (Occupational Health)",
-            date = "2026-08-11",
-            content = "Ergonomic standing desk setups and cardiovascular health checks are now available at all regional hubs. Sign up for your complimentary annual health assessment through the Self-Service tab.",
-            galleryImages = listOf(
-                "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80"
-            ),
-            likesCount = 42,
-            celebrateCount = 22,
-            comments = emptyList()
-        ),
-        Announcement(
-            title = "Active Day",
-            subtitle = "Move with intention",
-            category = "Motion",
-            drawableResName = "img_hr_team_summit",
-            author = "Aditya Joshi (Director, HR)",
-            date = "2026-08-10",
-            content = "The annual inter-hub step challenge is officially live! Track your daily activity, participate in group walks during lunch breaks, and compete for wellness stipend bonuses across Indore and Philippine offices.",
-            galleryImages = listOf(
-                "https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80",
                 "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&q=80"
             ),
-            likesCount = 56,
-            celebrateCount = 38,
+            likesCount = 52,
+            celebrateCount = 44,
             comments = listOf(
-                BulletinComment(authorName = "Marcus Aurelius (HR Intern)", authorRole = "EMPLOYEE", text = "Indore team is already at 12,000 steps today!", timestamp = "Aug 10")
+                BulletinComment(authorName = "Aditya Joshi", authorRole = "ADMIN_HR", text = "Heartiest congratulations to the engineering and payroll operations teams!", timestamp = "Yesterday")
             )
         ),
         Announcement(
-            title = "Body Ready",
-            subtitle = "Know your limits",
-            category = "Fitness",
-            drawableResName = "img_hr_team_summit",
-            author = "Workplace Ergonomics",
-            date = "2026-08-08",
-            content = "Check out our new ergonomic guidelines for remote work stations and physical health benefits. New gym subsidy disbursements will be applied to this month's payroll cycle.",
+            title = "Compliance Audit",
+            subtitle = "Security & Governance",
+            category = "COMPLIANCE",
+            drawableResName = "corp_executive_boardroom",
+            author = "Enterprise Risk & Legal Board",
+            date = "2026-08-12",
+            content = "MEMORANDUM REF #GOV-2026-AUD-04\n\nTo: All Certified Personnel\nSubject: Annual ISO/SOC-2 Automated Audit & Geofence Attestation.\n\nAll employees are requested to review and acknowledge their updated digital signature NDA and confirm device compliance on the Employee Self-Service Dossier. Geofenced biometric logs are automatically hashed to ensure data privacy and full regulatory compliance.",
             galleryImages = listOf(
-                "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&q=80"
+                "https://images.unsplash.com/photo-1450133064473-71024230f91b?w=800&q=80"
             ),
-            likesCount = 27,
-            celebrateCount = 14,
+            likesCount = 36,
+            celebrateCount = 18,
             comments = emptyList()
+        ),
+        Announcement(
+            title = "Leadership Summit",
+            subtitle = "Executive All-Hands",
+            category = "TOWN HALL",
+            drawableResName = "corp_executive_boardroom",
+            author = "Corporate Communications",
+            date = "2026-08-11",
+            content = "MEMORANDUM REF #TOWN-2026-Q3-02\n\nTo: Company-Wide Distribution\nSubject: Q3 Global All-Hands Town Hall & Product Innovation Showcase.\n\nJoin the Executive Leadership team for our quarterly business review, milestone celebrations, and product roadmap unveilings. Q&A channel is now open on the SaaS Hub. Key milestones include 99.98% uptime and record regional adoption.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80"
+            ),
+            likesCount = 67,
+            celebrateCount = 59,
+            comments = emptyList()
+        ),
+        Announcement(
+            title = "Total Rewards",
+            subtitle = "Benefits & Ergonomics",
+            category = "BENEFITS",
+            drawableResName = "corp_global_synergy",
+            author = "Global People & Benefits Ops",
+            date = "2026-08-10",
+            content = "MEMORANDUM REF #BEN-2026-08\n\nTo: All Full-Time & Contract Personnel\nSubject: Extended Health Stipend & Wellness Reimbursement Program.\n\nEffective this billing cycle, the wellness allowance has been expanded to cover home office ergonomic equipment, biometric fitness tracking memberships, and mental health counseling sessions. Submit reimbursement claims via the Self-Service Claims Desk.",
+            galleryImages = listOf(
+                "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=800&q=80"
+            ),
+            likesCount = 74,
+            celebrateCount = 62,
+            comments = listOf(
+                BulletinComment(authorName = "Sarah Jenkins", authorRole = "EMPLOYEE", text = "The ergonomic setup reimbursement was approved and credited in 24 hours. Excellent initiative!", timestamp = "Aug 10")
+            )
         )
     ))
 

@@ -587,6 +587,12 @@ fun CoreHrScreen(
                 modifier = Modifier.padding(vertical = 12.dp)
             )
 
+            // Executive HR Directives & Corporate Bulletin
+            HRBulletinSection(
+                viewModel = viewModel,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
